@@ -1,0 +1,1118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VideoStream - Premium Content Platform</title>
+    <style>
+:root {
+    --primary-bg: #141414;
+    --secondary-bg: #000000;
+    --card-bg: #181818;
+    --accent-color: #e50914;
+    --accent-secondary: #f40612;
+    --text-primary: #ffffff;
+    --text-secondary: #b3b3b3;
+    --text-muted: #808080;
+    --border-color: #333333;
+    --glass-bg: rgba(0, 0, 0, 0.8);
+    --glass-border: rgba(51, 51, 51, 0.5);
+    --shadow-light: rgba(0, 0, 0, 0.75);
+    --shadow-dark: rgba(0, 0, 0, 0.9);
+    --gradient-primary: linear-gradient(135deg, #e50914 0%, #f40612 100%);
+    --gradient-card: linear-gradient(145deg, #181818 0%, #1f1f1f 100%);
+    --gradient-hover: linear-gradient(145deg, #333333 0%, #2a2a2a 100%);
+    --blur-backdrop: blur(20px);
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Netflix Sans', 'Helvetica Neue', Arial, sans-serif;
+    background: radial-gradient(ellipse at center, #1a1a1a 0%, #141414 70%, #0d0d0d 100%);
+    color: var(--text-primary);
+    min-height: 100vh;
+    overflow-x: hidden;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+body::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: 
+        radial-gradient(circle at 20% 50%, rgba(229, 9, 20, 0.03) 0%, transparent 50%),
+        radial-gradient(circle at 80% 20%, rgba(244, 6, 18, 0.02) 0%, transparent 50%),
+        radial-gradient(circle at 40% 80%, rgba(229, 9, 20, 0.01) 0%, transparent 50%);
+    pointer-events: none;
+    z-index: -1;
+}
+
+/* Header Styles */
+.header {
+    background: linear-gradient(180deg, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.7) 70%, transparent 100%);
+    backdrop-filter: var(--blur-backdrop);
+    -webkit-backdrop-filter: var(--blur-backdrop);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    padding: 1.5rem 4%;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    transition: all 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    transform: translateZ(0);
+}
+
+.header.scrolled {
+    background: rgba(0, 0, 0, 0.95);
+    backdrop-filter: var(--blur-backdrop);
+    -webkit-backdrop-filter: var(--blur-backdrop);
+    padding: 1.2rem 4%;
+    box-shadow: 0 2px 20px rgba(0, 0, 0, 0.6);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.logo {
+    font-size: 2.8rem;
+    font-weight: 900;
+    background: var(--gradient-primary);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    letter-spacing: -0.08em;
+    position: relative;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    cursor: pointer;
+}
+
+.logo::after {
+    content: '';
+    position: absolute;
+    bottom: -4px;
+    left: 0;
+    width: 0;
+    height: 3px;
+    background: var(--gradient-primary);
+    border-radius: 2px;
+    transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.logo:hover::after {
+    width: 100%;
+}
+
+.search-container {
+    flex: 1;
+    max-width: 600px;
+    margin: 0 3rem;
+    position: relative;
+}
+
+.search-bar {
+    width: 100%;
+    padding: 14px 24px 14px 50px;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: var(--blur-backdrop);
+    -webkit-backdrop-filter: var(--blur-backdrop);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    font-size: 0.95rem;
+    color: var(--text-primary);
+    outline: none;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    font-weight: 400;
+}
+
+.search-bar::placeholder {
+    color: var(--text-muted);
+    font-weight: 300;
+}
+
+.search-bar:focus {
+    border-color: rgba(255, 255, 255, 0.3);
+    background: rgba(0, 0, 0, 0.8);
+    box-shadow: 0 0 0 3px rgba(229, 9, 20, 0.1);
+    transform: translateY(-1px);
+}
+
+.search-icon {
+    position: absolute;
+    left: 18px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 1.1rem;
+    color: var(--text-muted);
+    pointer-events: none;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.search-bar:focus + .search-icon {
+    color: var(--text-primary);
+    transform: translateY(-50%) scale(1.1);
+}
+
+.user-menu {
+    display: flex;
+    align-items: center;
+    gap: 2rem;
+}
+
+.user-avatar {
+    width: 40px;
+    height: 40px;
+    background: var(--gradient-primary);
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    font-size: 0.9rem;
+    position: relative;
+    overflow: hidden;
+}
+
+.user-avatar::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+    transition: left 0.6s ease;
+}
+
+.user-avatar:hover {
+    transform: translateY(-2px) scale(1.05);
+    box-shadow: 0 8px 25px rgba(229, 9, 20, 0.3);
+}
+
+.user-avatar:hover::before {
+    left: 100%;
+}
+
+/* Main Content */
+.main-content {
+    margin-top: 100px;
+    padding: 3rem 4%;
+    min-height: calc(100vh - 100px);
+}
+
+.videos-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 1.5rem;
+    max-width: 1800px;
+    margin: 0 auto;
+}
+
+.video-card {
+    background: var(--gradient-card);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    position: relative;
+    backdrop-filter: var(--blur-backdrop);
+    -webkit-backdrop-filter: var(--blur-backdrop);
+    transform: translateZ(0);
+    will-change: transform;
+}
+
+.video-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(255,255,255,0.1) 0%, transparent 50%);
+    opacity: 0;
+    transition: opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    pointer-events: none;
+    z-index: 1;
+}
+
+.video-card:hover::before {
+    opacity: 1;
+}
+
+.video-card:hover {
+    transform: translateY(-8px) scale(1.03);
+    box-shadow: 
+        0 20px 40px rgba(0, 0, 0, 0.4),
+        0 0 0 1px rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.15);
+    z-index: 10;
+}
+
+.video-thumbnail {
+    width: 100%;
+    height: 200px;
+    position: relative;
+    overflow: hidden;
+    background: linear-gradient(135deg, #2a2a2a 0%, #1a1a1a 100%);
+}
+
+.video-thumbnail img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: all 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    filter: brightness(0.9) contrast(1.1);
+}
+
+.video-card:hover .video-thumbnail img {
+    transform: scale(1.08);
+    filter: brightness(1.1) contrast(1.2) saturate(1.1);
+}
+
+.video-placeholder {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 3.5rem;
+    background: linear-gradient(135deg, #2a2a2a 0%, #1a1a1a 100%);
+    color: var(--text-muted);
+    opacity: 0.8;
+}
+
+.play-overlay {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(0.8);
+    width: 60px;
+    height: 60px;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: var(--blur-backdrop);
+    -webkit-backdrop-filter: var(--blur-backdrop);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.4rem;
+    color: var(--secondary-bg);
+    opacity: 0;
+    transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+.play-overlay::before {
+    content: '▶';
+    margin-left: 3px;
+    font-size: 1.2rem;
+}
+
+.video-card:hover .play-overlay {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+}
+
+.video-info {
+    padding: 1.5rem;
+    position: relative;
+    z-index: 2;
+    background: linear-gradient(180deg, transparent 0%, rgba(0,0,0,0.1) 100%);
+}
+
+.video-title {
+    font-size: 1.15rem;
+    font-weight: 600;
+    margin-bottom: 0.6rem;
+    color: var(--text-primary);
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    line-height: 1.4;
+    letter-spacing: -0.01em;
+    transition: color 0.3s ease;
+}
+
+.video-card:hover .video-title {
+    color: #ffffff;
+}
+
+.video-artist {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    font-weight: 400;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    opacity: 0.9;
+}
+
+.video-card:hover .video-artist {
+    color: var(--text-primary);
+    opacity: 1;
+}
+
+/* Loading & States */
+.loading {
+    text-align: center;
+    padding: 5rem;
+    color: var(--text-secondary);
+    font-size: 1.1rem;
+}
+
+.loading-spinner {
+    width: 50px;
+    height: 50px;
+    border: 3px solid rgba(255, 255, 255, 0.1);
+    border-top: 3px solid var(--accent-color);
+    border-radius: 50%;
+    animation: spin 1.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+    margin: 0 auto 2rem;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.no-results {
+    text-align: center;
+    padding: 6rem 2rem;
+    color: var(--text-secondary);
+    font-size: 1.2rem;
+    opacity: 0.8;
+}
+
+.no-results-icon {
+    font-size: 4rem;
+    margin-bottom: 1.5rem;
+    opacity: 0.4;
+    filter: drop-shadow(0 4px 8px rgba(0,0,0,0.3));
+}
+
+/* Modal Styles */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 2000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.95);
+    backdrop-filter: var(--blur-backdrop);
+    -webkit-backdrop-filter: var(--blur-backdrop);
+    animation: modalFadeIn 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+@keyframes modalFadeIn {
+    from { 
+        opacity: 0;
+        backdrop-filter: blur(0px);
+        -webkit-backdrop-filter: blur(0px);
+    }
+    to { 
+        opacity: 1;
+        backdrop-filter: var(--blur-backdrop);
+        -webkit-backdrop-filter: var(--blur-backdrop);
+    }
+}
+
+.modal-content {
+    position: relative;
+    margin: 2% auto;
+    width: 90%;
+    max-width: 1200px;
+    height: 85vh;
+    display: flex;
+    flex-direction: column;
+    border-radius: 16px;
+    overflow: hidden;
+    background: var(--secondary-bg);
+    box-shadow: 0 25px 60px rgba(0, 0, 0, 0.7);
+    animation: modalSlideIn 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+@keyframes modalSlideIn {
+    from { 
+        transform: translateY(60px) scale(0.9);
+        opacity: 0;
+    }
+    to { 
+        transform: translateY(0) scale(1);
+        opacity: 1;
+    }
+}
+
+.modal-video {
+    flex: 1;
+    background: var(--secondary-bg);
+    border-radius: 16px 16px 0 0;
+    overflow: hidden;
+    position: relative;
+}
+
+.modal-video video {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.modal-info {
+    background: linear-gradient(135deg, #1a1a1a 0%, #141414 100%);
+    backdrop-filter: var(--blur-backdrop);
+    -webkit-backdrop-filter: var(--blur-backdrop);
+    padding: 2.5rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 0 0 16px 16px;
+}
+
+.modal-title {
+    font-size: 2rem;
+    font-weight: 700;
+    margin-bottom: 0.8rem;
+    color: var(--text-primary);
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+}
+
+.modal-artist {
+    color: var(--text-secondary);
+    font-size: 1.1rem;
+    font-weight: 400;
+    opacity: 0.9;
+}
+
+.close {
+    position: absolute;
+    top: 20px;
+    right: 25px;
+    color: var(--text-primary);
+    font-size: 24px;
+    font-weight: bold;
+    cursor: pointer;
+    z-index: 2001;
+    background: rgba(0, 0, 0, 0.8);
+    backdrop-filter: var(--blur-backdrop);
+    -webkit-backdrop-filter: var(--blur-backdrop);
+    width: 45px;
+    height: 45px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.close:hover {
+    background: rgba(229, 9, 20, 0.9);
+    border-color: rgba(229, 9, 20, 0.5);
+    transform: scale(1.1);
+    box-shadow: 0 4px 20px rgba(229, 9, 20, 0.3);
+}
+
+/* Scrollbar Styling */
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--secondary-bg);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: linear-gradient(135deg, var(--border-color) 0%, #404040 100%);
+    border-radius: 4px;
+    transition: background 0.3s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(135deg, var(--text-secondary) 0%, #505050 100%);
+}
+
+/* Focus & Selection */
+.video-card:focus {
+    outline: 2px solid var(--accent-color);
+    outline-offset: 4px;
+    border-radius: 12px;
+}
+
+.search-bar:focus {
+    outline: none;
+}
+
+::selection {
+    background: rgba(229, 9, 20, 0.8);
+    color: var(--text-primary);
+}
+
+::-moz-selection {
+    background: rgba(229, 9, 20, 0.8);
+    color: var(--text-primary);
+}
+
+/* Responsive Design */
+@media (max-width: 1200px) {
+    .videos-grid {
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 1.2rem;
+    }
+}
+
+@media (max-width: 768px) {
+    .header {
+        padding: 1.2rem 3%;
+        flex-direction: column;
+        gap: 1.5rem;
+        background: rgba(0, 0, 0, 0.95);
+    }
+
+    .header.scrolled {
+        padding: 1.2rem 3%;
+    }
+
+    .search-container {
+        margin: 0;
+        max-width: 100%;
+        order: 2;
+        width: 100%;
+    }
+
+    .user-menu {
+        order: 1;
+        align-self: flex-end;
+    }
+
+    .logo {
+        font-size: 2.2rem;
+        order: 0;
+        align-self: flex-start;
+    }
+
+    .main-content {
+        margin-top: 140px;
+        padding: 2rem 3%;
+    }
+
+    .videos-grid {
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 1rem;
+    }
+
+    .video-thumbnail {
+        height: 160px;
+    }
+
+    .modal-content {
+        width: 95%;
+        height: 90vh;
+        margin: 1% auto;
+        border-radius: 12px;
+    }
+
+    .modal-info {
+        padding: 2rem;
+    }
+
+    .modal-title {
+        font-size: 1.6rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .main-content {
+        padding: 1.5rem 2%;
+    }
+
+    .videos-grid {
+        grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+        gap: 0.8rem;
+    }
+    
+    .logo {
+        font-size: 2rem;
+    }
+
+    .search-bar {
+        padding: 12px 20px 12px 45px;
+        font-size: 16px;
+        border-radius: 6px;
+    }
+
+    .video-info {
+        padding: 1.2rem;
+    }
+
+    .video-title {
+        font-size: 1.05rem;
+    }
+
+    .video-thumbnail {
+        height: 135px;
+    }
+
+    .play-overlay {
+        width: 50px;
+        height: 50px;
+        font-size: 1.2rem;
+    }
+}
+
+/* Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+    * {
+        animation-duration: 0.1s !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.1s !important;
+    }
+    
+    .video-card:hover {
+        transform: none;
+    }
+    
+    .play-overlay {
+        opacity: 0.7;
+        transform: translate(-50%, -50%) scale(1);
+    }
+}
+
+/* Enhanced hover states for better UX */
+@media (hover: hover) {
+    .video-card {
+        transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    }
+    
+    .video-card:hover {
+        transform: translateY(-12px) scale(1.04);
+        box-shadow: 
+            0 25px 50px rgba(0, 0, 0, 0.5),
+            0 0 0 1px rgba(255, 255, 255, 0.15),
+            0 0 20px rgba(229, 9, 20, 0.1);
+    }
+}
+
+/* Dark mode enhancements */
+@media (prefers-color-scheme: dark) {
+    body {
+        background: radial-gradient(ellipse at center, #1a1a1a 0%, #141414 70%, #0a0a0a 100%);
+    }
+}
+    </style>
+</head>
+<body>
+    <header class="header" id="header">
+        <div class="logo">VideoStream</div>
+        <div class="search-container">
+            <input type="text" class="search-bar" placeholder="Search for videos or creators..." id="searchInput" autocomplete="off">
+            <div class="search-icon">🔍</div>
+        </div>
+        <div class="user-menu">
+            <div class="user-avatar">U</div>
+        </div>
+    </header>
+
+    <main class="main-content">
+        <div class="videos-grid" id="videosGrid"></div>
+        <div class="loading" id="loading" style="display: none;">
+            <div class="loading-spinner"></div>
+            Loading more content...
+        </div>
+        <div class="no-results" id="noResults" style="display: none;">
+            <div class="no-results-icon">🎬</div>
+            <div>No content found</div>
+            <div style="font-size: 0.9rem; margin-top: 0.5rem; opacity: 0.7;">Try a different search term</div>
+        </div>
+    </main>
+
+    <!-- Video Modal -->
+    <div id="videoModal" class="modal">
+        <span class="close" id="closeModal">&times;</span>
+        <div class="modal-content">
+            <div class="modal-video">
+                <video id="modalVideo" controls autoplay>
+                    Your browser does not support the video tag.
+                </video>
+            </div>
+            <div class="modal-info">
+                <div class="modal-title" id="modalTitle"></div>
+                <div class="modal-artist" id="modalArtist"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+       class VideoStreamApp {
+    constructor() {
+        this.currentPage = 1;
+        this.isLoading = false;
+        this.hasMore = true;
+        this.searchTerm = '';
+        this.searchTimeout = null;
+        
+        this.initializeElements();
+        this.bindEvents();
+        this.loadVideos();
+        // Setup intersection observer after initial load
+        setTimeout(() => this.setupIntersectionObserver(), 100);
+    }
+
+    initializeElements() {
+        this.videosGrid = document.getElementById('videosGrid');
+        this.loading = document.getElementById('loading');
+        this.noResults = document.getElementById('noResults');
+        this.searchInput = document.getElementById('searchInput');
+        this.modal = document.getElementById('videoModal');
+        this.modalVideo = document.getElementById('modalVideo');
+        this.modalTitle = document.getElementById('modalTitle');
+        this.modalArtist = document.getElementById('modalArtist');
+        this.closeModal = document.getElementById('closeModal');
+        this.header = document.getElementById('header');
+    }
+
+    setupIntersectionObserver() {
+        // Remove existing observer if it exists
+        if (this.observer) {
+            this.observer.disconnect();
+        }
+
+        // Remove existing sentinel if it exists
+        if (this.sentinel) {
+            this.sentinel.remove();
+        }
+
+        // Create a sentinel element for infinite scroll
+        this.sentinel = document.createElement('div');
+        this.sentinel.className = 'scroll-sentinel';
+        this.sentinel.style.cssText = `
+            height: 20px;
+            margin: 20px 0;
+            background: transparent;
+            pointer-events: none;
+        `;
+        
+        // Append sentinel after the videos grid
+        this.videosGrid.parentNode.insertBefore(this.sentinel, this.videosGrid.nextSibling);
+
+        this.observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting && !this.isLoading && this.hasMore) {
+                    console.log('Sentinel intersected - loading more videos');
+                    this.loadMoreVideos();
+                }
+            });
+        }, { 
+            rootMargin: '100px',
+            threshold: 0.1
+        });
+
+        this.observer.observe(this.sentinel);
+        console.log('Intersection observer setup complete');
+    }
+
+    bindEvents() {
+        // Header scroll effect
+        let ticking = false;
+        window.addEventListener('scroll', () => {
+            if (!ticking) {
+                requestAnimationFrame(() => {
+                    if (this.header) {
+                        if (window.scrollY > 50) {
+                            this.header.classList.add('scrolled');
+                        } else {
+                            this.header.classList.remove('scrolled');
+                        }
+                    }
+                    ticking = false;
+                });
+                ticking = true;
+            }
+        });
+
+        // Search functionality with debouncing
+        if (this.searchInput) {
+            this.searchInput.addEventListener('input', (e) => {
+                clearTimeout(this.searchTimeout);
+                this.searchTimeout = setTimeout(() => {
+                    this.handleSearch(e.target.value);
+                }, 300);
+            });
+
+            // Search on Enter key
+            this.searchInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    clearTimeout(this.searchTimeout);
+                    this.handleSearch(e.target.value);
+                }
+            });
+        }
+
+        // Modal events
+        if (this.closeModal && this.modal) {
+            this.closeModal.addEventListener('click', () => this.closeVideoModal());
+            this.modal.addEventListener('click', (e) => {
+                if (e.target === this.modal) {
+                    this.closeVideoModal();
+                }
+            });
+        }
+
+        // Keyboard events
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                this.closeVideoModal();
+            }
+        });
+
+        // Prevent modal from closing when clicking on video controls
+        if (this.modalVideo) {
+            this.modalVideo.addEventListener('click', (e) => {
+                e.stopPropagation();
+            });
+
+            // Handle video errors gracefully
+            this.modalVideo.addEventListener('error', (e) => {
+                console.warn('Video playback error:', e);
+            });
+        }
+    }
+
+    async loadVideos(reset = false) {
+        if (this.isLoading) {
+            console.log('Already loading, skipping request');
+            return;
+        }
+
+        if (!this.hasMore && !reset) {
+            console.log('No more videos to load');
+            return;
+        }
+
+        console.log(`Loading videos - Page: ${this.currentPage}, Reset: ${reset}, Search: "${this.searchTerm}"`);
+        
+        this.isLoading = true;
+        
+        if (this.loading) {
+            this.loading.style.display = 'block';
+        }
+        if (this.noResults) {
+            this.noResults.style.display = 'none';
+        }
+
+        if (reset) {
+            this.currentPage = 1;
+            this.hasMore = true;
+            if (this.videosGrid) {
+                this.videosGrid.innerHTML = '';
+            }
+        }
+
+        try {
+            const response = await fetch(`/api/videos?page=${this.currentPage}&limit=20&search=${encodeURIComponent(this.searchTerm)}`);
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            console.log(`Loaded ${data.videos.length} videos, hasMore: ${data.hasMore}`);
+
+            if (data.videos.length === 0 && this.currentPage === 1) {
+                if (this.noResults) {
+                    this.noResults.style.display = 'block';
+                }
+            } else {
+                this.renderVideos(data.videos);
+                this.hasMore = data.hasMore;
+                this.currentPage++;
+                
+                // Re-setup observer if this was a reset (search)
+                if (reset) {
+                    setTimeout(() => this.setupIntersectionObserver(), 100);
+                }
+            }
+        } catch (error) {
+            console.error('Error loading videos:', error);
+            if (this.currentPage === 1) {
+                this.showError('Failed to load content. Please try again.');
+            }
+        } finally {
+            this.isLoading = false;
+            if (this.loading) {
+                this.loading.style.display = 'none';
+            }
+        }
+    }
+
+    loadMoreVideos() {
+        console.log('loadMoreVideos called');
+        if (!this.isLoading && this.hasMore) {
+            this.loadVideos();
+        }
+    }
+
+    renderVideos(videos) {
+        if (!this.videosGrid) return;
+        
+        const fragment = document.createDocumentFragment();
+        
+        videos.forEach((video, index) => {
+            const videoCard = this.createVideoCard(video);
+            
+            // Add staggered animation delay
+            videoCard.style.animationDelay = `${index * 0.1}s`;
+            videoCard.style.animation = 'fadeInUp 0.6s ease forwards';
+            videoCard.style.opacity = '0';
+            videoCard.style.transform = 'translateY(20px)';
+            
+            fragment.appendChild(videoCard);
+        });
+        
+        this.videosGrid.appendChild(fragment);
+    }
+
+    createVideoCard(video) {
+        const card = document.createElement('div');
+        card.className = 'video-card';
+        card.setAttribute('tabindex', '0');
+        card.setAttribute('role', 'button');
+        card.setAttribute('aria-label', `Play ${video.title} by ${video.artist}`);
+        
+        const thumbnailContent = video.thumbnailUrl 
+            ? `<img src="${video.thumbnailUrl}" alt="${this.escapeHtml(video.title)}" loading="lazy">`
+            : `<div class="video-placeholder">🎬</div>`;
+
+        card.innerHTML = `
+            <div class="video-thumbnail">
+                ${thumbnailContent}
+                <div class="play-overlay">▶</div>
+            </div>
+            <div class="video-info">
+                <div class="video-title">${this.escapeHtml(video.title)}</div>
+                <div class="video-artist">${this.escapeHtml(video.artist)}</div>
+            </div>
+        `;
+
+        // Add click and keyboard event listeners
+        card.addEventListener('click', () => this.openVideoModal(video));
+        card.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                this.openVideoModal(video);
+            }
+        });
+
+        return card;
+    }
+
+    openVideoModal(video) {
+        if (!this.modal || !this.modalVideo) return;
+        
+        this.modalVideo.src = video.videoUrl;
+        if (this.modalTitle) this.modalTitle.textContent = video.title;
+        if (this.modalArtist) this.modalArtist.textContent = video.artist;
+        this.modal.style.display = 'block';
+        document.body.style.overflow = 'hidden';
+        
+        // Focus management for accessibility
+        if (this.closeModal) {
+            this.closeModal.focus();
+        }
+    }
+
+    closeVideoModal() {
+        if (!this.modal || !this.modalVideo) return;
+        
+        this.modal.style.display = 'none';
+        this.modalVideo.pause();
+        this.modalVideo.src = '';
+        document.body.style.overflow = 'auto';
+        
+        // Return focus to the document
+        document.body.focus();
+    }
+
+    handleSearch(term) {
+        this.searchTerm = term.trim();
+        console.log('Searching for:', this.searchTerm);
+        this.loadVideos(true);
+    }
+
+    showError(message) {
+        if (!this.noResults) return;
+        
+        this.noResults.innerHTML = `
+            <div class="no-results-icon">⚠️</div>
+            <div>${message}</div>
+        `;
+        this.noResults.style.display = 'block';
+    }
+
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    // Cleanup method
+    destroy() {
+        if (this.observer) {
+            this.observer.disconnect();
+        }
+        if (this.sentinel) {
+            this.sentinel.remove();
+        }
+        clearTimeout(this.searchTimeout);
+    }
+}
+
+// Add fade in animation keyframes
+const style = document.createElement('style');
+style.textContent = `
+    @keyframes fadeInUp {
+        from {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+    
+    .scroll-sentinel {
+        height: 20px;
+        margin: 20px 0;
+        background: transparent;
+        pointer-events: none;
+    }
+`;
+document.head.appendChild(style);
+
+// Initialize the app when DOM is loaded
+document.addEventListener('DOMContentLoaded', () => {
+    window.videoApp = new VideoStreamApp();
+});
+
+// Add service worker for better performance (optional)
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        // Service worker registration would go here
+        // navigator.serviceWorker.register('/sw.js');
+    });
+}
+    </script>
+</body>
+</html>
