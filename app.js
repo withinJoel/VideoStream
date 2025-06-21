@@ -65,12 +65,12 @@ const extractCategories = (filename) => {
     
     const categoryMap = {
         'anal': ['anal', 'anal-sex'],
-        'gangbang': ['gang-bang', 'gangbang', 'group'],
-        'lesbian': ['lesbian', 'girl-girl', 'lez'],
-        'milf': ['milf', 'mature', 'mom'],
-        'teen': ['teen', '18+', 'young'],
-        'hardcore': ['hardcore', 'rough', 'hard'],
-        'blowjob': ['blowjob', 'oral', 'bj', 'deepthroat'],
+        'gangbang': ['gang-bang', 'gangbang'],
+        'lesbian': ['lesbian', 'girl-girl'],
+        'milf': ['milf', 'mature', 'mom', 'mommy'],
+        'teen': ['teen', '18+', 'young', 'young'],
+        'hardcore': ['hardcore', 'rough', 'hard', 'roughsex', 'rough-sex', 'hard-core'],
+        'blowjob': ['blowjob', 'oral', 'bj', 'deepthroat', 'blow-job'],
         'threesome': ['threesome', '3some', 'mmf', 'ffm'],
         'creampie': ['creampie', 'internal', 'cum-inside'],
         'big-tits': ['big-tits', 'busty', 'boobs', 'big-boobs'],
@@ -442,7 +442,7 @@ const processThumbnailQueue = async () => {
                         timestamps: [timestamp],
                         filename: path.basename(thumbnailPath),
                         folder: path.dirname(thumbnailPath),
-                        size: '320x180'
+                        size: '1280x720'
                     })
                     .on('end', resolve)
                     .on('error', reject);
