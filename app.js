@@ -79,7 +79,7 @@ const extractCategories = (filename) => {
     'amateur': ['amateur', 'homemade', 'real', 'home-video'],
     'fetish': ['fetish', 'kink', 'bdsm', 'bondage', 'domination'],
     'latina': ['latina', 'latin', 'hispanic', 'spanish'],
-    'asian': ['asian', 'japanese', 'chinese', 'korean', 'thai', 'vietnamese'],
+    'asian': ['asian', 'japanese', 'chinese', 'korean', 'thai', 'vietnamese','desi'],
     'ebony': ['ebony', 'black', 'african', 'bbc'],
     'blonde': ['blonde', 'blond', 'fair-hair'],
     'brunette': ['brunette', 'brown-hair', 'dark-hair'],
