@@ -1,3 +1,4 @@
 Public/thumbnails
 node_modules
 Videos
+.env
