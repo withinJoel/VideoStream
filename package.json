@@ -1,0 +1,29 @@
+{
+  "name": "LovePorn",
+  "version": "1.0.0",
+  "description": "A premium video platform with advanced features inspired by XHamster",
+  "type": "module",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js",
+    "dev": "nodemon app.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "fluent-ffmpeg": "^2.1.2",
+    "cors": "^2.8.5"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  },
+  "keywords": [
+    "video",
+    "streaming",
+    "platform",
+    "nodejs",
+    "express",
+    "premium"
+  ],
+  "author": "Your Name",
+  "license": "MIT"
+}

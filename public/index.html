@@ -1,0 +1,1598 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LovePorn - Premium Video Platform</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 50%, #16213e 100%);
+            color: #ffffff;
+            min-height: 100vh;
+        }
+
+        /* Header */
+        .header {
+            background: rgba(15, 15, 35, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 1rem 2rem;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .header-content {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .logo {
+            font-size: 1.8rem;
+            font-weight: bold;
+            background: linear-gradient(45deg, #ff6b6b, #4ecdc4);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .search-container {
+            flex: 1;
+            max-width: 600px;
+            margin: 0 2rem;
+            position: relative;
+        }
+
+        .search-box {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 25px;
+            color: white;
+            font-size: 1rem;
+            outline: none;
+            transition: all 0.3s ease;
+        }
+
+        .search-box:focus {
+            background: rgba(255, 255, 255, 0.15);
+            border-color: #4ecdc4;
+            box-shadow: 0 0 20px rgba(78, 205, 196, 0.3);
+        }
+
+        .search-suggestions {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: rgba(26, 26, 46, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 10px;
+            margin-top: 5px;
+            max-height: 300px;
+            overflow-y: auto;
+            z-index: 1001;
+            display: none;
+        }
+
+        .suggestion-item {
+            padding: 0.75rem 1rem;
+            cursor: pointer;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            transition: background 0.2s ease;
+        }
+
+        .suggestion-item:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .btn {
+            padding: 0.5rem 1rem;
+            background: linear-gradient(45deg, #ff6b6b, #4ecdc4);
+            border: none;
+            border-radius: 20px;
+            color: white;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(255, 107, 107, 0.4);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.2);
+            box-shadow: 0 5px 15px rgba(255, 255, 255, 0.2);
+        }
+
+        /* Main Layout */
+        .main-container {
+            display: flex;
+            margin-top: 80px;
+            min-height: calc(100vh - 80px);
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 280px;
+            background: rgba(26, 26, 46, 0.8);
+            backdrop-filter: blur(10px);
+            padding: 2rem 1rem;
+            border-right: 1px solid rgba(255, 255, 255, 0.1);
+            overflow-y: auto;
+            max-height: calc(100vh - 80px);
+        }
+
+        .sidebar-section {
+            margin-bottom: 2rem;
+        }
+
+        .sidebar-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            color: #4ecdc4;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .celebrity-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .celebrity-item {
+            padding: 0.75rem;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .celebrity-item:hover {
+            background: rgba(78, 205, 196, 0.2);
+            transform: translateX(5px);
+        }
+
+        .celebrity-item.active {
+            background: linear-gradient(45deg, #ff6b6b, #4ecdc4);
+        }
+
+        .celebrity-count {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 0.2rem 0.5rem;
+            border-radius: 12px;
+            font-size: 0.8rem;
+        }
+
+        /* Content Area */
+        .content {
+            flex: 1;
+            padding: 2rem;
+            overflow-y: auto;
+        }
+
+        .content-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+        }
+
+        .content-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+        }
+
+        .view-controls {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .view-toggle {
+            display: flex;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .view-btn {
+            padding: 0.5rem 1rem;
+            background: none;
+            border: none;
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .view-btn.active {
+            background: #4ecdc4;
+        }
+
+        .sort-select {
+            padding: 0.5rem 1rem;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            color: white;
+            outline: none;
+        }
+
+        /* Video Grid */
+        .video-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .video-card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            overflow: hidden;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            position: relative;
+        }
+
+        .video-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .video-thumbnail {
+            position: relative;
+            width: 100%;
+            height: 180px;
+            overflow: hidden;
+        }
+
+        .video-thumbnail img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: transform 0.3s ease;
+        }
+
+        .video-card:hover .video-thumbnail img {
+            transform: scale(1.05);
+        }
+
+        .video-preview {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            z-index: 2;
+        }
+
+        .video-card:hover .video-preview {
+            opacity: 1;
+        }
+
+        .video-duration {
+            position: absolute;
+            bottom: 8px;
+            right: 8px;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            z-index: 3;
+        }
+
+        .video-quality {
+            position: absolute;
+            top: 8px;
+            left: 8px;
+            background: linear-gradient(45deg, #ff6b6b, #4ecdc4);
+            color: white;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: bold;
+            z-index: 3;
+        }
+
+        .video-actions {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            display: flex;
+            gap: 0.5rem;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            z-index: 3;
+        }
+
+        .video-card:hover .video-actions {
+            opacity: 1;
+        }
+
+        .action-btn {
+            width: 32px;
+            height: 32px;
+            background: rgba(0, 0, 0, 0.7);
+            border: none;
+            border-radius: 50%;
+            color: white;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+        }
+
+        .action-btn:hover {
+            background: #4ecdc4;
+            transform: scale(1.1);
+        }
+
+        .video-info {
+            padding: 1rem;
+        }
+
+        .video-title {
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            line-height: 1.3;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .video-artist {
+            color: #4ecdc4;
+            font-size: 0.9rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .video-stats {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.8rem;
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        .video-rating {
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
+        }
+
+        .stars {
+            color: #ffd700;
+        }
+
+        /* List View */
+        .video-list {
+            display: none;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .video-list.active {
+            display: flex;
+        }
+
+        .video-list-item {
+            display: flex;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            overflow: hidden;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .video-list-item:hover {
+            background: rgba(255, 255, 255, 0.1);
+            transform: translateX(5px);
+        }
+
+        .list-thumbnail {
+            width: 200px;
+            height: 120px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .list-thumbnail img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .list-info {
+            flex: 1;
+            padding: 1rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .list-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        .list-description {
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 0.9rem;
+            line-height: 1.4;
+        }
+
+        /* Loading */
+        .loading {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 2rem;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(255, 255, 255, 0.1);
+            border-left: 4px solid #4ecdc4;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Notifications */
+        .notification {
+            position: fixed;
+            top: 100px;
+            right: 20px;
+            background: #ff6b6b;
+            color: white;
+            padding: 1rem 1.5rem;
+            border-radius: 8px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+            z-index: 1002;
+            transform: translateX(400px);
+            transition: transform 0.3s ease;
+        }
+
+        .notification.show {
+            transform: translateX(0);
+        }
+
+        .notification.success {
+            background: #4ecdc4;
+        }
+
+        .notification.error {
+            background: #ff6b6b;
+        }
+
+        /* Filters */
+        .filters {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 2rem;
+            flex-wrap: wrap;
+        }
+
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .filter-label {
+            font-size: 0.9rem;
+            color: #4ecdc4;
+            font-weight: 500;
+        }
+
+        .filter-select {
+            padding: 0.5rem 1rem;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            color: white;
+            outline: none;
+            min-width: 120px;
+        }
+
+        .filter-tags {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .filter-tag {
+            padding: 0.3rem 0.8rem;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 20px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .filter-tag:hover,
+        .filter-tag.active {
+            background: #4ecdc4;
+            border-color: #4ecdc4;
+        }
+
+        /* Pagination */
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 1rem;
+            margin-top: 2rem;
+        }
+
+        .page-btn {
+            padding: 0.5rem 1rem;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .page-btn:hover,
+        .page-btn.active {
+            background: #4ecdc4;
+            border-color: #4ecdc4;
+        }
+
+        .page-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* Video Player Modal */
+        .video-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            z-index: 2000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .video-modal.active {
+            display: flex;
+        }
+
+        .video-player-container {
+            width: 90%;
+            max-width: 1200px;
+            background: #000;
+            border-radius: 12px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .video-player {
+            width: 100%;
+            height: auto;
+            max-height: 70vh;
+        }
+
+        .close-modal {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            border: none;
+            color: white;
+            font-size: 1.5rem;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2001;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .main-container {
+                flex-direction: column;
+            }
+
+            .sidebar {
+                width: 100%;
+                max-height: none;
+                order: 2;
+            }
+
+            .content {
+                order: 1;
+            }
+
+            .video-grid {
+                grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+                gap: 1rem;
+            }
+
+            .header-content {
+                flex-direction: column;
+                gap: 1rem;
+            }
+
+            .search-container {
+                margin: 0;
+                max-width: none;
+            }
+        }
+
+        /* Categories */
+        .categories {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 2rem;
+            overflow-x: auto;
+            padding-bottom: 0.5rem;
+        }
+
+        .category-btn {
+            padding: 0.5rem 1rem;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 20px;
+            color: white;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: all 0.3s ease;
+            font-size: 0.9rem;
+        }
+
+        .category-btn:hover,
+        .category-btn.active {
+            background: linear-gradient(45deg, #ff6b6b, #4ecdc4);
+            border-color: transparent;
+        }
+
+        /* Advanced Search */
+        .advanced-search {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            display: none;
+        }
+
+        .advanced-search.active {
+            display: block;
+        }
+
+        .search-row {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .search-field {
+            flex: 1;
+            min-width: 200px;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 0.5rem 1rem;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            color: white;
+            outline: none;
+        }
+
+        /* Favorites */
+        .favorites-section {
+            margin-bottom: 2rem;
+        }
+
+        .favorites-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 1rem;
+        }
+
+        .favorite-item {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            padding: 1rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .favorite-item:hover {
+            background: rgba(78, 205, 196, 0.2);
+        }
+
+        /* Recently Watched */
+        .recent-section {
+            margin-bottom: 2rem;
+        }
+
+        .recent-list {
+            display: flex;
+            gap: 1rem;
+            overflow-x: auto;
+            padding-bottom: 0.5rem;
+        }
+
+        .recent-item {
+            min-width: 200px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            overflow: hidden;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .recent-item:hover {
+            transform: scale(1.05);
+        }
+
+        .recent-thumbnail {
+            width: 100%;
+            height: 120px;
+            object-fit: cover;
+        }
+
+        .recent-info {
+            padding: 0.5rem;
+        }
+
+        .recent-title {
+            font-size: 0.9rem;
+            font-weight: 500;
+            margin-bottom: 0.3rem;
+        }
+
+        .recent-time {
+            font-size: 0.8rem;
+            color: rgba(255, 255, 255, 0.7);
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="header-content">
+            <div class="logo">
+                <i class="fas fa-play-circle"></i>
+                LovePorn
+            </div>
+            
+            <div class="search-container">
+                <input type="text" class="search-box" placeholder="Search videos, celebrities..." id="searchInput">
+                <div class="search-suggestions" id="searchSuggestions"></div>
+            </div>
+            
+            <div class="header-actions">
+                <button class="btn btn-secondary" onclick="toggleAdvancedSearch()">
+                    <i class="fas fa-filter"></i>
+                    Advanced
+                </button>
+                <button class="btn" onclick="shuffleVideos()">
+                    <i class="fas fa-random"></i>
+                    Shuffle
+                </button>
+                <button class="btn btn-secondary" onclick="getRandomVideo()">
+                    <i class="fas fa-dice"></i>
+                    Random
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <div class="main-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-section">
+                <h3 class="sidebar-title">
+                    <i class="fas fa-star"></i>
+                    Celebrities
+                </h3>
+                <div class="celebrity-list" id="celebrityList">
+                    <!-- Celebrities will be loaded here -->
+                </div>
+            </div>
+        </aside>
+
+        <!-- Content -->
+        <main class="content">
+            <!-- Advanced Search -->
+            <div class="advanced-search" id="advancedSearch">
+                <div class="search-row">
+                    <div class="search-field">
+                        <label class="filter-label">Duration</label>
+                        <select class="filter-select" id="durationFilter">
+                            <option value="">Any Duration</option>
+                            <option value="short">Short (< 10 min)</option>
+                            <option value="medium">Medium (10-30 min)</option>
+                            <option value="long">Long (> 30 min)</option>
+                        </select>
+                    </div>
+                    <div class="search-field">
+                        <label class="filter-label">Quality</label>
+                        <select class="filter-select" id="qualityFilter">
+                            <option value="">Any Quality</option>
+                            <option value="720p">720p HD</option>
+                            <option value="1080p">1080p Full HD</option>
+                            <option value="4k">4K Ultra HD</option>
+                        </select>
+                    </div>
+                    <div class="search-field">
+                        <label class="filter-label">Sort By</label>
+                        <select class="filter-select" id="sortFilter">
+                            <option value="newest">Newest First</option>
+                            <option value="oldest">Oldest First</option>
+                            <option value="popular">Most Popular</option>
+                            <option value="rating">Highest Rated</option>
+                            <option value="duration">Duration</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="search-row">
+                    <div class="search-field">
+                        <label class="filter-label">Categories</label>
+                        <div class="filter-tags" id="categoryTags">
+                            <span class="filter-tag" data-category="amateur">Amateur</span>
+                            <span class="filter-tag" data-category="professional">Professional</span>
+                            <span class="filter-tag" data-category="vintage">Vintage</span>
+                            <span class="filter-tag" data-category="hd">HD</span>
+                            <span class="filter-tag" data-category="verified">Verified</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Categories -->
+            <div class="categories" id="categories">
+                <button class="category-btn active" data-category="all">All Videos</button>
+                <button class="category-btn" data-category="trending">Trending</button>
+                <button class="category-btn" data-category="new">New Releases</button>
+                <button class="category-btn" data-category="popular">Most Popular</button>
+                <button class="category-btn" data-category="hd">HD Videos</button>
+                <button class="category-btn" data-category="favorites">Favorites</button>
+            </div>
+
+            <!-- Recently Watched -->
+            <div class="recent-section" id="recentSection" style="display: none;">
+                <h3 class="sidebar-title">
+                    <i class="fas fa-history"></i>
+                    Recently Watched
+                </h3>
+                <div class="recent-list" id="recentList"></div>
+            </div>
+
+            <!-- Content Header -->
+            <div class="content-header">
+                <h2 class="content-title" id="contentTitle">All Videos</h2>
+                <div class="view-controls">
+                    <div class="view-toggle">
+                        <button class="view-btn active" data-view="grid">
+                            <i class="fas fa-th"></i>
+                        </button>
+                        <button class="view-btn" data-view="list">
+                            <i class="fas fa-list"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Video Grid -->
+            <div class="video-grid" id="videoGrid">
+                <!-- Videos will be loaded here -->
+            </div>
+
+            <!-- Video List -->
+            <div class="video-list" id="videoList">
+                <!-- List view videos will be loaded here -->
+            </div>
+
+            <!-- Loading -->
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+            </div>
+
+            <!-- Pagination -->
+            <div class="pagination" id="pagination" style="display: none;">
+                <button class="page-btn" id="prevPage" onclick="previousPage()">
+                    <i class="fas fa-chevron-left"></i>
+                    Previous
+                </button>
+                <span id="pageInfo">Page 1</span>
+                <button class="page-btn" id="nextPage" onclick="nextPage()">
+                    Next
+                    <i class="fas fa-chevron-right"></i>
+                </button>
+            </div>
+        </main>
+    </div>
+
+    <!-- Video Modal -->
+    <div class="video-modal" id="videoModal">
+        <div class="video-player-container">
+            <button class="close-modal" onclick="closeVideoModal()">
+                <i class="fas fa-times"></i>
+            </button>
+            <video class="video-player" id="videoPlayer" controls>
+                Your browser does not support the video tag.
+            </video>
+        </div>
+    </div>
+
+    <!-- Notification -->
+    <div class="notification" id="notification"></div>
+
+    <script>
+        // Global variables
+        let currentPage = 1;
+        let currentCelebrity = '';
+        let currentSearch = '';
+        let isLoading = false;
+        let hasMore = true;
+        let currentView = 'grid';
+        let favorites = JSON.parse(localStorage.getItem('favorites') || '[]');
+        let recentlyWatched = JSON.parse(localStorage.getItem('recentlyWatched') || '[]');
+        let watchHistory = JSON.parse(localStorage.getItem('watchHistory') || '[]');
+
+        // Initialize app
+        document.addEventListener('DOMContentLoaded', function() {
+            loadCelebrities();
+            loadVideos();
+            setupEventListeners();
+            loadRecentlyWatched();
+        });
+
+        // Setup event listeners
+        function setupEventListeners() {
+            // Search functionality
+            const searchInput = document.getElementById('searchInput');
+            let searchTimeout;
+            
+            searchInput.addEventListener('input', function() {
+                clearTimeout(searchTimeout);
+                searchTimeout = setTimeout(() => {
+                    currentSearch = this.value;
+                    currentPage = 1;
+                    loadVideos(true);
+                    if (this.value.length > 0) {
+                        showSearchSuggestions(this.value);
+                    } else {
+                        hideSearchSuggestions();
+                    }
+                }, 300);
+            });
+
+            // View toggle
+            document.querySelectorAll('.view-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
+                    this.classList.add('active');
+                    currentView = this.dataset.view;
+                    toggleView();
+                });
+            });
+
+            // Category buttons
+            document.querySelectorAll('.category-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    document.querySelectorAll('.category-btn').forEach(b => b.classList.remove('active'));
+                    this.classList.add('active');
+                    handleCategoryChange(this.dataset.category);
+                });
+            });
+
+            // Filter tags
+            document.querySelectorAll('.filter-tag').forEach(tag => {
+                tag.addEventListener('click', function() {
+                    this.classList.toggle('active');
+                    applyFilters();
+                });
+            });
+
+            // Advanced search filters
+            ['durationFilter', 'qualityFilter', 'sortFilter'].forEach(id => {
+                document.getElementById(id).addEventListener('change', applyFilters);
+            });
+
+            // Infinite scroll
+            window.addEventListener('scroll', function() {
+                if ((window.innerHeight + window.scrollY) >= document.body.offsetHeight - 1000) {
+                    if (!isLoading && hasMore) {
+                        loadMoreVideos();
+                    }
+                }
+            });
+
+            // Close modal on escape
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape') {
+                    closeVideoModal();
+                }
+            });
+        }
+
+        // Load celebrities
+        async function loadCelebrities() {
+            try {
+                const response = await fetch('/api/celebrities');
+                const data = await response.json();
+                
+                const celebrityList = document.getElementById('celebrityList');
+                celebrityList.innerHTML = '';
+
+                // Add "All Videos" option
+                const allItem = document.createElement('div');
+                allItem.className = 'celebrity-item active';
+                allItem.innerHTML = `
+                    <span>All Videos</span>
+                    <span class="celebrity-count">${data.celebrities.reduce((sum, c) => sum + c.videoCount, 0)}</span>
+                `;
+                allItem.addEventListener('click', () => selectCelebrity('', allItem));
+                celebrityList.appendChild(allItem);
+
+                // Add celebrities
+                data.celebrities.forEach(celebrity => {
+                    const item = document.createElement('div');
+                    item.className = 'celebrity-item';
+                    item.innerHTML = `
+                        <span>${celebrity.displayName}</span>
+                        <span class="celebrity-count">${celebrity.videoCount}</span>
+                    `;
+                    item.addEventListener('click', () => selectCelebrity(celebrity.name, item));
+                    celebrityList.appendChild(item);
+                });
+            } catch (error) {
+                showNotification('Failed to load celebrities', 'error');
+            }
+        }
+
+        // Select celebrity
+        function selectCelebrity(celebrity, element) {
+            document.querySelectorAll('.celebrity-item').forEach(item => item.classList.remove('active'));
+            element.classList.add('active');
+            
+            currentCelebrity = celebrity;
+            currentPage = 1;
+            document.getElementById('contentTitle').textContent = celebrity ? 
+                `${element.querySelector('span').textContent} Videos` : 'All Videos';
+            loadVideos(true);
+        }
+
+        // Load videos
+        async function loadVideos(reset = false) {
+            if (isLoading) return;
+            
+            isLoading = true;
+            const loading = document.getElementById('loading');
+            loading.style.display = 'flex';
+
+            try {
+                const params = new URLSearchParams({
+                    page: currentPage,
+                    limit: 20,
+                    search: currentSearch,
+                    celebrity: currentCelebrity
+                });
+
+                const response = await fetch(`/api/videos?${params}`);
+                const data = await response.json();
+
+                if (reset) {
+                    document.getElementById('videoGrid').innerHTML = '';
+                    document.getElementById('videoList').innerHTML = '';
+                }
+
+                displayVideos(data.videos, reset);
+                hasMore = data.hasMore;
+                
+                // Update pagination
+                updatePagination();
+
+            } catch (error) {
+                showNotification('Failed to load videos', 'error');
+            } finally {
+                isLoading = false;
+                loading.style.display = 'none';
+            }
+        }
+
+        // Display videos
+        function displayVideos(videos, reset = false) {
+            const videoGrid = document.getElementById('videoGrid');
+            const videoList = document.getElementById('videoList');
+
+            videos.forEach(video => {
+                // Create grid item
+                const gridItem = createVideoGridItem(video);
+                videoGrid.appendChild(gridItem);
+
+                // Create list item
+                const listItem = createVideoListItem(video);
+                videoList.appendChild(listItem);
+            });
+        }
+
+        // Create video grid item
+        function createVideoGridItem(video) {
+            const item = document.createElement('div');
+            item.className = 'video-card';
+            
+            const isFavorite = favorites.includes(video.id);
+            
+            item.innerHTML = `
+                <div class="video-thumbnail">
+                    <img src="${video.thumbnailExists ? video.thumbnailUrl : 'https://images.pexels.com/photos/1181467/pexels-photo-1181467.jpeg?auto=compress&cs=tinysrgb&w=320&h=180&fit=crop'}" 
+                         alt="${video.title}" loading="lazy">
+                    ${video.previewExists ? `
+                        <video class="video-preview" muted loop preload="none">
+                            <source src="${video.previewUrl}" type="video/mp4">
+                        </video>
+                    ` : ''}
+                    ${video.duration ? `<div class="video-duration">${video.duration}</div>` : ''}
+                    ${video.quality ? `<div class="video-quality">${video.quality}</div>` : ''}
+                    <div class="video-actions">
+                        <button class="action-btn" onclick="toggleFavorite('${video.id}')" title="${isFavorite ? 'Remove from favorites' : 'Add to favorites'}">
+                            <i class="fas fa-heart ${isFavorite ? 'text-red-500' : ''}"></i>
+                        </button>
+                        <button class="action-btn" onclick="addToPlaylist('${video.id}')" title="Add to playlist">
+                            <i class="fas fa-plus"></i>
+                        </button>
+                        <button class="action-btn" onclick="shareVideo('${video.id}')" title="Share">
+                            <i class="fas fa-share"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="video-info">
+                    <div class="video-title">${video.title}</div>
+                    <div class="video-artist">${video.artist}</div>
+                    <div class="video-stats">
+                        <div class="video-rating">
+                            <span class="stars">★★★★☆</span>
+                            <span>4.2</span>
+                        </div>
+                        <div class="video-views">${Math.floor(Math.random() * 100000).toLocaleString()} views</div>
+                    </div>
+                </div>
+            `;
+
+            // Add click handler
+            item.addEventListener('click', () => playVideo(video));
+
+            // Add hover handlers for preview
+            const thumbnail = item.querySelector('.video-thumbnail');
+            const preview = item.querySelector('.video-preview');
+            
+            if (preview) {
+                let hoverTimeout;
+                
+                thumbnail.addEventListener('mouseenter', () => {
+                    hoverTimeout = setTimeout(() => {
+                        preview.currentTime = 0;
+                        preview.play().catch(() => {
+                            // Preview failed to play, ignore silently
+                        });
+                    }, 500); // Delay before starting preview
+                });
+                
+                thumbnail.addEventListener('mouseleave', () => {
+                    clearTimeout(hoverTimeout);
+                    if (preview) {
+                        preview.pause();
+                        preview.currentTime = 0;
+                    }
+                });
+            }
+
+            return item;
+        }
+
+        // Create video list item
+        function createVideoListItem(video) {
+            const item = document.createElement('div');
+            item.className = 'video-list-item';
+            
+            item.innerHTML = `
+                <div class="list-thumbnail">
+                    <img src="${video.thumbnailExists ? video.thumbnailUrl : 'https://images.pexels.com/photos/1181467/pexels-photo-1181467.jpeg?auto=compress&cs=tinysrgb&w=200&h=120&fit=crop'}" 
+                         alt="${video.title}" loading="lazy">
+                    ${video.duration ? `<div class="video-duration">${video.duration}</div>` : ''}
+                </div>
+                <div class="list-info">
+                    <div class="list-title">${video.title}</div>
+                    <div class="video-artist">${video.artist}</div>
+                    <div class="list-description">
+                        ${video.quality ? `Quality: ${video.quality} • ` : ''}
+                        ${Math.floor(Math.random() * 100000).toLocaleString()} views • 
+                        Rating: ★★★★☆ 4.2
+                    </div>
+                </div>
+            `;
+
+            item.addEventListener('click', () => playVideo(video));
+            return item;
+        }
+
+        // Toggle view
+        function toggleView() {
+            const videoGrid = document.getElementById('videoGrid');
+            const videoList = document.getElementById('videoList');
+            
+            if (currentView === 'grid') {
+                videoGrid.style.display = 'grid';
+                videoList.classList.remove('active');
+            } else {
+                videoGrid.style.display = 'none';
+                videoList.classList.add('active');
+            }
+        }
+
+        // Play video
+        function playVideo(video) {
+            const modal = document.getElementById('videoModal');
+            const player = document.getElementById('videoPlayer');
+            
+            player.src = video.videoUrl;
+            modal.classList.add('active');
+            
+            // Add to recently watched
+            addToRecentlyWatched(video);
+            
+            // Add to watch history
+            addToWatchHistory(video);
+        }
+
+        // Close video modal
+        function closeVideoModal() {
+            const modal = document.getElementById('videoModal');
+            const player = document.getElementById('videoPlayer');
+            
+            modal.classList.remove('active');
+            player.pause();
+            player.src = '';
+        }
+
+        // Load more videos
+        function loadMoreVideos() {
+            if (!hasMore || isLoading) return;
+            
+            currentPage++;
+            loadVideos();
+        }
+
+        // Shuffle videos
+        async function shuffleVideos() {
+            try {
+                await fetch('/api/reshuffle', { method: 'POST' });
+                currentPage = 1;
+                loadVideos(true);
+                showNotification('Videos shuffled!', 'success');
+            } catch (error) {
+                showNotification('Failed to shuffle videos', 'error');
+            }
+        }
+
+        // Get random video
+        async function getRandomVideo() {
+            try {
+                const response = await fetch('/api/random-video');
+                const video = await response.json();
+                playVideo(video);
+            } catch (error) {
+                showNotification('Failed to get random video', 'error');
+            }
+        }
+
+        // Toggle advanced search
+        function toggleAdvancedSearch() {
+            const advancedSearch = document.getElementById('advancedSearch');
+            advancedSearch.classList.toggle('active');
+        }
+
+        // Apply filters
+        function applyFilters() {
+            currentPage = 1;
+            loadVideos(true);
+        }
+
+        // Handle category change
+        function handleCategoryChange(category) {
+            currentPage = 1;
+            
+            switch(category) {
+                case 'all':
+                    currentCelebrity = '';
+                    currentSearch = '';
+                    break;
+                case 'favorites':
+                    showFavorites();
+                    return;
+                case 'trending':
+                case 'new':
+                case 'popular':
+                case 'hd':
+                    // These would need backend implementation
+                    currentSearch = category;
+                    break;
+            }
+            
+            document.getElementById('searchInput').value = currentSearch;
+            loadVideos(true);
+        }
+
+        // Show favorites
+        function showFavorites() {
+            // This would need to be implemented with backend support
+            showNotification('Favorites feature coming soon!', 'success');
+        }
+
+        // Toggle favorite
+        function toggleFavorite(videoId) {
+            const index = favorites.indexOf(videoId);
+            if (index > -1) {
+                favorites.splice(index, 1);
+                showNotification('Removed from favorites', 'success');
+            } else {
+                favorites.push(videoId);
+                showNotification('Added to favorites', 'success');
+            }
+            
+            localStorage.setItem('favorites', JSON.stringify(favorites));
+            
+            // Update UI
+            const heartIcon = document.querySelector(`[onclick="toggleFavorite('${videoId}')"] i`);
+            if (heartIcon) {
+                heartIcon.classList.toggle('text-red-500');
+            }
+        }
+
+        // Add to playlist
+        function addToPlaylist(videoId) {
+            showNotification('Playlist feature coming soon!', 'success');
+        }
+
+        // Share video
+        function shareVideo(videoId) {
+            if (navigator.share) {
+                navigator.share({
+                    title: 'Check out this video',
+                    url: window.location.href
+                });
+            } else {
+                navigator.clipboard.writeText(window.location.href);
+                showNotification('Link copied to clipboard!', 'success');
+            }
+        }
+
+        // Add to recently watched
+        function addToRecentlyWatched(video) {
+            const existing = recentlyWatched.findIndex(item => item.id === video.id);
+            if (existing > -1) {
+                recentlyWatched.splice(existing, 1);
+            }
+            
+            recentlyWatched.unshift({
+                ...video,
+                watchedAt: new Date().toISOString()
+            });
+            
+            // Keep only last 20 items
+            recentlyWatched = recentlyWatched.slice(0, 20);
+            localStorage.setItem('recentlyWatched', JSON.stringify(recentlyWatched));
+            
+            loadRecentlyWatched();
+        }
+
+        // Load recently watched
+        function loadRecentlyWatched() {
+            const recentSection = document.getElementById('recentSection');
+            const recentList = document.getElementById('recentList');
+            
+            if (recentlyWatched.length === 0) {
+                recentSection.style.display = 'none';
+                return;
+            }
+            
+            recentSection.style.display = 'block';
+            recentList.innerHTML = '';
+            
+            recentlyWatched.slice(0, 10).forEach(video => {
+                const item = document.createElement('div');
+                item.className = 'recent-item';
+                item.innerHTML = `
+                    <img src="${video.thumbnailExists ? video.thumbnailUrl : 'https://images.pexels.com/photos/1181467/pexels-photo-1181467.jpeg?auto=compress&cs=tinysrgb&w=200&h=120&fit=crop'}" 
+                         alt="${video.title}" class="recent-thumbnail">
+                    <div class="recent-info">
+                        <div class="recent-title">${video.title}</div>
+                        <div class="recent-time">${formatTimeAgo(video.watchedAt)}</div>
+                    </div>
+                `;
+                item.addEventListener('click', () => playVideo(video));
+                recentList.appendChild(item);
+            });
+        }
+
+        // Add to watch history
+        function addToWatchHistory(video) {
+            const existing = watchHistory.findIndex(item => item.id === video.id);
+            if (existing > -1) {
+                watchHistory[existing].watchCount++;
+                watchHistory[existing].lastWatched = new Date().toISOString();
+            } else {
+                watchHistory.push({
+                    ...video,
+                    watchCount: 1,
+                    lastWatched: new Date().toISOString()
+                });
+            }
+            
+            localStorage.setItem('watchHistory', JSON.stringify(watchHistory));
+        }
+
+        // Show search suggestions
+        function showSearchSuggestions(query) {
+            // This would need backend implementation for proper suggestions
+            const suggestions = document.getElementById('searchSuggestions');
+            suggestions.style.display = 'block';
+            
+            // Mock suggestions for now
+            const mockSuggestions = [
+                'Popular videos',
+                'HD videos',
+                'New releases',
+                'Trending now'
+            ].filter(s => s.toLowerCase().includes(query.toLowerCase()));
+            
+            suggestions.innerHTML = mockSuggestions.map(suggestion => 
+                `<div class="suggestion-item" onclick="selectSuggestion('${suggestion}')">${suggestion}</div>`
+            ).join('');
+        }
+
+        // Hide search suggestions
+        function hideSearchSuggestions() {
+            document.getElementById('searchSuggestions').style.display = 'none';
+        }
+
+        // Select suggestion
+        function selectSuggestion(suggestion) {
+            document.getElementById('searchInput').value = suggestion;
+            currentSearch = suggestion;
+            currentPage = 1;
+            loadVideos(true);
+            hideSearchSuggestions();
+        }
+
+        // Update pagination
+        function updatePagination() {
+            const pagination = document.getElementById('pagination');
+            const pageInfo = document.getElementById('pageInfo');
+            const prevBtn = document.getElementById('prevPage');
+            const nextBtn = document.getElementById('nextPage');
+            
+            if (currentPage > 1 || hasMore) {
+                pagination.style.display = 'flex';
+                pageInfo.textContent = `Page ${currentPage}`;
+                prevBtn.disabled = currentPage === 1;
+                nextBtn.disabled = !hasMore;
+            } else {
+                pagination.style.display = 'none';
+            }
+        }
+
+        // Previous page
+        function previousPage() {
+            if (currentPage > 1) {
+                currentPage--;
+                loadVideos(true);
+                window.scrollTo(0, 0);
+            }
+        }
+
+        // Next page
+        function nextPage() {
+            if (hasMore) {
+                currentPage++;
+                loadVideos(true);
+                window.scrollTo(0, 0);
+            }
+        }
+
+        // Show notification
+        function showNotification(message, type = 'success') {
+            // Only show error notifications
+            if (type !== 'error') return;
+            
+            const notification = document.getElementById('notification');
+            notification.textContent = message;
+            notification.className = `notification ${type} show`;
+            
+            setTimeout(() => {
+                notification.classList.remove('show');
+            }, 3000);
+        }
+
+        // Format time ago
+        function formatTimeAgo(dateString) {
+            const date = new Date(dateString);
+            const now = new Date();
+            const diffInSeconds = Math.floor((now - date) / 1000);
+            
+            if (diffInSeconds < 60) return 'Just now';
+            if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`;
+            if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`;
+            return `${Math.floor(diffInSeconds / 86400)}d ago`;
+        }
+
+        // Click outside to close suggestions
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('.search-container')) {
+                hideSearchSuggestions();
+            }
+        });
+    </script>
+</body>
+</html>
