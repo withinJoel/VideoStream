@@ -149,6 +149,13 @@ class VideoApp {
             this.navigateToSection('favorites');
         });
 
+        // Favorites dropdown button
+        document.getElementById('favoritesDropdownBtn').addEventListener('click', (e) => {
+            e.preventDefault();
+            this.navigateToSection('favorites');
+            document.getElementById('userDropdown').classList.remove('active');
+        });
+
         // User menu
         document.getElementById('userMenuBtn').addEventListener('click', (e) => {
             e.stopPropagation();
@@ -239,11 +246,6 @@ class VideoApp {
             const data = await response.json();
             
             this.stats.totalVideos = data.totalVideos || 0;
-            
-            // Update hero stats
-            document.getElementById('totalVideosCount').textContent = this.formatNumber(this.stats.totalVideos);
-            document.getElementById('totalPerformersCount').textContent = this.formatNumber(this.stats.totalPerformers);
-            document.getElementById('totalCategoriesCount').textContent = this.formatNumber(this.stats.totalCategories);
         } catch (error) {
             console.error('Error loading stats:', error);
         }
@@ -451,7 +453,6 @@ class VideoApp {
     }
 
     showCategoriesGrid() {
-        document.getElementById('heroSection').style.display = 'none';
         document.getElementById('filterBar').style.display = 'none';
         document.getElementById('videoGrid').style.display = 'none';
         document.getElementById('performersGrid').style.display = 'none';
@@ -461,7 +462,6 @@ class VideoApp {
     }
 
     showPerformersGrid() {
-        document.getElementById('heroSection').style.display = 'none';
         document.getElementById('filterBar').style.display = 'none';
         document.getElementById('videoGrid').style.display = 'none';
         document.getElementById('categoriesGrid').style.display = 'none';
@@ -471,7 +471,6 @@ class VideoApp {
     }
 
     showVideoGrid() {
-        document.getElementById('heroSection').style.display = this.currentFilter.section === 'home' ? 'flex' : 'none';
         document.getElementById('filterBar').style.display = 'block';
         document.getElementById('categoriesGrid').style.display = 'none';
         document.getElementById('performersGrid').style.display = 'none';
@@ -988,7 +987,7 @@ class VideoApp {
             // Load videos from the same category or performer
             const params = new URLSearchParams({
                 page: 1,
-                limit: 8
+                limit: 12
             });
             
             if (currentVideo.categories && currentVideo.categories.length > 0) {
@@ -1002,7 +1001,7 @@ class VideoApp {
             
             if (data.videos) {
                 // Filter out current video
-                const relatedVideos = data.videos.filter(v => v.id !== currentVideo.id).slice(0, 6);
+                const relatedVideos = data.videos.filter(v => v.id !== currentVideo.id).slice(0, 10);
                 this.renderRelatedVideos(relatedVideos);
             }
         } catch (error) {

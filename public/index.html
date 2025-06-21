@@ -42,10 +42,6 @@
             </div>
             
             <div class="header-right">
-                <button class="header-btn upload-btn" title="Upload Video">
-                    <i class="fas fa-plus"></i>
-                    <span>Upload</span>
-                </button>
                 <button class="header-btn favorites-btn" id="favoritesBtn" title="Favorites">
                     <i class="fas fa-heart"></i>
                     <span class="favorites-count">0</span>
@@ -59,16 +55,12 @@
                     </button>
                     <div class="user-dropdown" id="userDropdown">
                         <a href="#" class="dropdown-item">
-                            <i class="fas fa-user"></i>
-                            Profile
-                        </a>
-                        <a href="#" class="dropdown-item">
-                            <i class="fas fa-cog"></i>
-                            Settings
-                        </a>
-                        <a href="#" class="dropdown-item">
                             <i class="fas fa-history"></i>
                             Watch History
+                        </a>
+                        <a href="#" class="dropdown-item" id="favoritesDropdownBtn">
+                            <i class="fas fa-heart"></i>
+                            Favorite Videos
                         </a>
                         <div class="dropdown-divider"></div>
                         <a href="#" class="dropdown-item">
@@ -131,31 +123,6 @@
 
     <!-- Main Content -->
     <main class="main-content">
-        <!-- Hero Section -->
-        <section class="hero-section" id="heroSection">
-            <div class="hero-content">
-                <h1 class="hero-title">Premium Adult Entertainment</h1>
-                <p class="hero-subtitle">Discover thousands of high-quality videos from top performers</p>
-                <div class="hero-stats">
-                    <div class="stat-item">
-                        <span class="stat-number" id="totalVideosCount">0</span>
-                        <span class="stat-label">Videos</span>
-                    </div>
-                    <div class="stat-item">
-                        <span class="stat-number" id="totalPerformersCount">0</span>
-                        <span class="stat-label">Performers</span>
-                    </div>
-                    <div class="stat-item">
-                        <span class="stat-number" id="totalCategoriesCount">0</span>
-                        <span class="stat-label">Categories</span>
-                    </div>
-                </div>
-            </div>
-            <div class="hero-background">
-                <div class="hero-overlay"></div>
-            </div>
-        </section>
-
         <!-- Filter Bar -->
         <div class="filter-bar" id="filterBar">
             <div class="filter-container">
@@ -293,77 +260,79 @@
                 </div>
             </div>
             
-            <div class="modal-video-container">
-                <video id="modalVideo" controls preload="metadata" controlsList="nodownload">
-                    <source src="" type="video/mp4">
-                    Your browser does not support the video tag.
-                </video>
-                <div class="video-overlay-controls">
-                    <button class="video-control-btn favorite-video-btn" id="modalFavoriteBtn">
-                        <i class="fas fa-heart"></i>
-                    </button>
-                    <button class="video-control-btn playlist-add-btn" id="modalPlaylistBtn">
-                        <i class="fas fa-plus"></i>
-                    </button>
-                </div>
-            </div>
-            
-            <div class="modal-content">
-                <div class="modal-video-info">
-                    <h2 class="modal-video-title" id="modalVideoTitle">Video Title</h2>
-                    <div class="modal-video-meta">
-                        <div class="video-meta-left">
-                            <span class="video-performer" id="modalVideoPerformer">Performer</span>
-                            <div class="video-stats">
-                                <span class="video-stat">
-                                    <i class="fas fa-eye"></i>
-                                    <span id="modalVideoViews">0</span> views
-                                </span>
-                                <span class="video-stat">
-                                    <i class="fas fa-thumbs-up"></i>
-                                    <span id="modalVideoLikes">0</span>
-                                </span>
-                                <span class="video-stat">
-                                    <i class="fas fa-clock"></i>
-                                    <span id="modalVideoDuration">0:00</span>
-                                </span>
-                                <span class="video-stat">
-                                    <i class="fas fa-hd-video"></i>
-                                    <span id="modalVideoQuality">HD</span>
-                                </span>
-                            </div>
-                        </div>
-                        <div class="video-meta-right">
-                            <div class="video-actions">
-                                <button class="action-btn like-btn" id="modalLikeBtn">
-                                    <i class="fas fa-thumbs-up"></i>
-                                    <span>Like</span>
-                                </button>
-                                <button class="action-btn dislike-btn" id="modalDislikeBtn">
-                                    <i class="fas fa-thumbs-down"></i>
-                                    <span>Dislike</span>
-                                </button>
-                                <button class="action-btn favorite-btn" id="modalFavBtn">
-                                    <i class="fas fa-heart"></i>
-                                    <span>Favorite</span>
-                                </button>
-                            </div>
+            <div class="modal-content-wrapper">
+                <div class="modal-video-section">
+                    <div class="modal-video-container">
+                        <video id="modalVideo" controls preload="metadata" controlsList="nodownload">
+                            <source src="" type="video/mp4">
+                            Your browser does not support the video tag.
+                        </video>
+                        <div class="video-overlay-controls">
+                            <button class="video-control-btn favorite-video-btn" id="modalFavoriteBtn">
+                                <i class="fas fa-heart"></i>
+                            </button>
+                            <button class="video-control-btn playlist-add-btn" id="modalPlaylistBtn">
+                                <i class="fas fa-plus"></i>
+                            </button>
                         </div>
                     </div>
                     
-                    <div class="video-categories" id="modalVideoCategories">
-                        <!-- Categories will be added dynamically -->
-                    </div>
-                    
-                    <div class="video-description" id="modalVideoDescription">
-                        <!-- Description will be added if available -->
+                    <div class="modal-video-info">
+                        <h2 class="modal-video-title" id="modalVideoTitle">Video Title</h2>
+                        <div class="modal-video-meta">
+                            <div class="video-meta-left">
+                                <span class="video-performer" id="modalVideoPerformer">Performer</span>
+                                <div class="video-stats">
+                                    <span class="video-stat">
+                                        <i class="fas fa-eye"></i>
+                                        <span id="modalVideoViews">0</span> views
+                                    </span>
+                                    <span class="video-stat">
+                                        <i class="fas fa-thumbs-up"></i>
+                                        <span id="modalVideoLikes">0</span>
+                                    </span>
+                                    <span class="video-stat">
+                                        <i class="fas fa-clock"></i>
+                                        <span id="modalVideoDuration">0:00</span>
+                                    </span>
+                                    <span class="video-stat">
+                                        <i class="fas fa-hd-video"></i>
+                                        <span id="modalVideoQuality">HD</span>
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="video-meta-right">
+                                <div class="video-actions">
+                                    <button class="action-btn like-btn" id="modalLikeBtn">
+                                        <i class="fas fa-thumbs-up"></i>
+                                        <span>Like</span>
+                                    </button>
+                                    <button class="action-btn dislike-btn" id="modalDislikeBtn">
+                                        <i class="fas fa-thumbs-down"></i>
+                                        <span>Dislike</span>
+                                    </button>
+                                    <button class="action-btn favorite-btn" id="modalFavBtn">
+                                        <i class="fas fa-heart"></i>
+                                        <span>Favorite</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="video-categories" id="modalVideoCategories">
+                            <!-- Categories will be added dynamically -->
+                        </div>
+                        
+                        <div class="video-description" id="modalVideoDescription">
+                            <!-- Description will be added if available -->
+                        </div>
                     </div>
                 </div>
                 
-                <!-- Related Videos -->
-                <div class="related-videos-section">
+                <!-- Related Videos Sidebar -->
+                <div class="related-videos-sidebar">
                     <h3 class="related-videos-title">Related Videos</h3>
-                    <div class="related-videos-grid" id="relatedVideosGrid">
+                    <div class="related-videos-list" id="relatedVideosGrid">
                         <!-- Related videos will be loaded dynamically -->
                     </div>
                 </div>
