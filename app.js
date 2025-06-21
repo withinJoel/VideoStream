@@ -429,7 +429,7 @@ const generateRandomVideos = function* (startIndex, limit, searchTerm = '', cele
             const fullVideoPath = pathData.isRoot ? 
                 path.join(VIDEOS_DIR, pathData.name) : 
                 path.join(VIDEOS_DIR, pathData.folder, pathData.name);
-            actualDuration = await getVideoDuration(fullVideoPath);
+            actualDuration = getVideoDuration(fullVideoPath);
         }
         
         // Get or generate stats
