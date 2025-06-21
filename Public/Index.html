@@ -43,6 +43,10 @@ body {
     -moz-osx-font-smoothing: grayscale;
 }
 
+html {
+    overflow-x: hidden;
+}
+
 body::before {
     content: '';
     position: fixed;
@@ -62,6 +66,8 @@ body::before {
 .app-container {
     display: flex;
     min-height: 100vh;
+    width: 100%;
+    overflow-x: hidden;
 }
 
 /* Sidebar Styles */
@@ -77,6 +83,7 @@ body::before {
     height: 100vh;
     z-index: 1000;
     overflow-y: auto;
+    overflow-x: hidden;
     transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     transform: translateX(0);
 }
@@ -177,6 +184,11 @@ body::before {
 .celebrity-name {
     font-weight: 500;
     font-size: 0.9rem;
+    word-break: break-word;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 180px;
 }
 
 .celebrity-count {
@@ -185,6 +197,7 @@ body::before {
     border-radius: 12px;
     font-size: 0.75rem;
     font-weight: 600;
+    flex-shrink: 0;
 }
 
 .celebrity-item.active .celebrity-count {
@@ -218,10 +231,13 @@ body::before {
     flex: 1;
     margin-left: var(--sidebar-width);
     transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    width: calc(100% - var(--sidebar-width));
+    overflow-x: hidden;
 }
 
 .main-content.expanded {
     margin-left: 0;
+    width: 100%;
 }
 
 /* Header Styles */
@@ -238,6 +254,8 @@ body::before {
     align-items: center;
     justify-content: space-between;
     transition: all 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    width: 100%;
+    overflow: hidden;
 }
 
 .header.scrolled {
@@ -253,6 +271,7 @@ body::before {
     display: flex;
     align-items: center;
     gap: 2rem;
+    flex-shrink: 0;
 }
 
 .logo {
@@ -266,6 +285,7 @@ body::before {
     position: relative;
     transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     cursor: pointer;
+    flex-shrink: 0;
 }
 
 .current-view {
@@ -276,6 +296,10 @@ body::before {
     background: rgba(255, 255, 255, 0.05);
     border-radius: 20px;
     border: 1px solid rgba(255, 255, 255, 0.1);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 200px;
 }
 
 .search-container {
@@ -283,6 +307,7 @@ body::before {
     max-width: 600px;
     margin: 0 3rem;
     position: relative;
+    min-width: 0;
 }
 
 .search-bar {
@@ -367,6 +392,46 @@ body::before {
     display: flex;
     align-items: center;
     gap: 2rem;
+    flex-shrink: 0;
+}
+
+.action-buttons {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.action-btn {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: var(--text-primary);
+    padding: 0.6rem 1.2rem;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    font-size: 0.85rem;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    white-space: nowrap;
+}
+
+.action-btn:hover {
+    background: rgba(229, 9, 20, 0.8);
+    border-color: var(--accent-color);
+    transform: translateY(-1px);
+}
+
+.action-btn.primary {
+    background: var(--gradient-primary);
+    border-color: var(--accent-color);
+}
+
+.action-btn.primary:hover {
+    background: var(--gradient-primary);
+    transform: translateY(-2px) scale(1.05);
+    box-shadow: 0 8px 25px rgba(229, 9, 20, 0.3);
 }
 
 .user-avatar {
@@ -409,14 +474,95 @@ body::before {
 .content-area {
     padding: 2rem 4%;
     min-height: calc(100vh - 100px);
+    width: 100%;
+    overflow-x: hidden;
+}
+
+.content-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 2rem;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.content-title {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.content-stats {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.stat-item {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+.view-controls {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.view-toggle {
+    display: flex;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    padding: 0.3rem;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.view-btn {
+    padding: 0.5rem 1rem;
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    border-radius: 6px;
+    transition: all 0.3s ease;
+    font-size: 0.85rem;
+}
+
+.view-btn.active {
+    background: var(--gradient-primary);
+    color: white;
+}
+
+.sort-dropdown {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: var(--text-primary);
+    padding: 0.6rem 1rem;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.85rem;
 }
 
 .videos-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
     gap: 1.5rem;
-    max-width: 1800px;
+    max-width: 100%;
     margin: 0 auto;
+    width: 100%;
+    overflow: hidden;
+}
+
+.videos-grid.list-view {
+    grid-template-columns: 1fr;
+    gap: 1rem;
 }
 
 .video-card {
@@ -431,6 +577,28 @@ body::before {
     -webkit-backdrop-filter: var(--blur-backdrop);
     transform: translateZ(0);
     will-change: transform;
+    width: 100%;
+    max-width: 100%;
+}
+
+.video-card.list-view {
+    display: flex;
+    flex-direction: row;
+    height: 120px;
+}
+
+.video-card.list-view .video-thumbnail {
+    width: 200px;
+    height: 120px;
+    flex-shrink: 0;
+}
+
+.video-card.list-view .video-info {
+    flex: 1;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
 }
 
 .video-card::before {
@@ -455,6 +623,10 @@ body::before {
         0 0 0 1px rgba(255, 255, 255, 0.1);
     border-color: rgba(255, 255, 255, 0.15);
     z-index: 10;
+}
+
+.video-card.list-view:hover {
+    transform: translateY(-2px) scale(1.01);
 }
 
 .video-thumbnail {
@@ -527,6 +699,8 @@ body::before {
     position: relative;
     z-index: 2;
     background: linear-gradient(180deg, transparent 0%, rgba(0,0,0,0.1) 100%);
+    width: 100%;
+    overflow: hidden;
 }
 
 .video-title {
@@ -541,6 +715,7 @@ body::before {
     line-height: 1.4;
     letter-spacing: -0.01em;
     transition: color 0.3s ease;
+    word-break: break-word;
 }
 
 .video-card:hover .video-title {
@@ -557,12 +732,16 @@ body::before {
     align-items: center;
     gap: 0.5rem;
     margin-bottom: 0.5rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .video-artist::before {
     content: '⭐';
     font-size: 0.8rem;
     opacity: 0.7;
+    flex-shrink: 0;
 }
 
 .video-card:hover .video-artist {
@@ -577,6 +756,7 @@ body::before {
     font-size: 0.8rem;
     color: var(--text-muted);
     margin-top: 0.5rem;
+    flex-wrap: wrap;
 }
 
 .video-quality {
@@ -586,6 +766,7 @@ body::before {
     border-radius: 4px;
     font-weight: 600;
     font-size: 0.75rem;
+    flex-shrink: 0;
 }
 
 .video-duration {
@@ -593,6 +774,7 @@ body::before {
     padding: 0.2rem 0.5rem;
     border-radius: 4px;
     font-weight: 500;
+    flex-shrink: 0;
 }
 
 /* Loading & States */
@@ -646,6 +828,7 @@ body::before {
     backdrop-filter: var(--blur-backdrop);
     -webkit-backdrop-filter: var(--blur-backdrop);
     animation: modalFadeIn 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    overflow: hidden;
 }
 
 @keyframes modalFadeIn {
@@ -697,6 +880,7 @@ body::before {
     display: flex;
     align-items: center;
     justify-content: center;
+    width: 100%;
 }
 
 .modal-video video {
@@ -714,6 +898,7 @@ body::before {
     padding: 2.5rem;
     border-top: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 0 0 16px 16px;
+    flex-shrink: 0;
 }
 
 .modal-title {
@@ -795,6 +980,10 @@ body::before {
         grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
         gap: 1.2rem;
     }
+    
+    .search-container {
+        margin: 0 2rem;
+    }
 }
 
 @media (max-width: 768px) {
@@ -812,6 +1001,7 @@ body::before {
     
     .main-content {
         margin-left: 0;
+        width: 100%;
     }
     
     .header {
@@ -859,6 +1049,20 @@ body::before {
     .modal-title {
         font-size: 1.6rem;
     }
+
+    .content-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .view-controls {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .action-buttons {
+        flex-wrap: wrap;
+    }
 }
 
 @media (max-width: 480px) {
@@ -897,6 +1101,16 @@ body::before {
         width: 50px;
         height: 50px;
         font-size: 1.2rem;
+    }
+
+    .video-card.list-view {
+        flex-direction: column;
+        height: auto;
+    }
+
+    .video-card.list-view .video-thumbnail {
+        width: 100%;
+        height: 160px;
     }
 }
 
@@ -971,11 +1185,44 @@ body::before {
                     <div class="search-suggestions" id="searchSuggestions"></div>
                 </div>
                 <div class="user-menu">
+                    <div class="action-buttons">
+                        <button class="action-btn" id="shuffleBtn">🎲 Shuffle</button>
+                        <button class="action-btn" id="randomVideoBtn">🎬 Random Video</button>
+                        <button class="action-btn primary" id="favoritesBtn">❤️ Favorites</button>
+                    </div>
                     <div class="user-avatar">U</div>
                 </div>
             </header>
 
             <div class="content-area">
+                <div class="content-header">
+                    <div class="content-title" id="contentTitle">
+                        🌟 All Stars
+                        <div class="content-stats" id="contentStats">
+                            <div class="stat-item">
+                                <span>📹</span>
+                                <span id="videoCount">0 videos</span>
+                            </div>
+                            <div class="stat-item">
+                                <span>⭐</span>
+                                <span id="celebrityCount">0 celebrities</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="view-controls">
+                        <div class="view-toggle">
+                            <button class="view-btn active" data-view="grid">🔲 Grid</button>
+                            <button class="view-btn" data-view="list">📋 List</button>
+                        </div>
+                        <select class="sort-dropdown" id="sortDropdown">
+                            <option value="random">🎲 Random Order</option>
+                            <option value="name">📝 Name A-Z</option>
+                            <option value="artist">⭐ Celebrity A-Z</option>
+                            <option value="newest">🆕 Newest First</option>
+                        </select>
+                    </div>
+                </div>
+                
                 <div class="videos-grid" id="videosGrid"></div>
                 <div class="loading" id="loading" style="display: none;">
                     <div class="loading-spinner"></div>
@@ -1016,6 +1263,11 @@ class CelebStreamApp {
         this.currentCelebrity = '';
         this.searchTimeout = null;
         this.allCelebrities = [];
+        this.currentView = 'grid';
+        this.currentSort = 'random';
+        this.favorites = JSON.parse(localStorage.getItem('celebstream_favorites') || '[]');
+        this.totalVideos = 0;
+        this.totalCelebrities = 0;
         
         this.initializeElements();
         this.bindEvents();
@@ -1041,6 +1293,14 @@ class CelebStreamApp {
         this.modalArtist = document.getElementById('modalArtist');
         this.closeModal = document.getElementById('closeModal');
         this.header = document.getElementById('header');
+        this.contentTitle = document.getElementById('contentTitle');
+        this.contentStats = document.getElementById('contentStats');
+        this.videoCount = document.getElementById('videoCount');
+        this.celebrityCount = document.getElementById('celebrityCount');
+        this.shuffleBtn = document.getElementById('shuffleBtn');
+        this.randomVideoBtn = document.getElementById('randomVideoBtn');
+        this.favoritesBtn = document.getElementById('favoritesBtn');
+        this.sortDropdown = document.getElementById('sortDropdown');
     }
 
     setupIntersectionObserver() {
@@ -1145,11 +1405,54 @@ class CelebStreamApp {
             });
         }
 
+        // Action buttons
+        if (this.shuffleBtn) {
+            this.shuffleBtn.addEventListener('click', () => this.shuffleVideos());
+        }
+
+        if (this.randomVideoBtn) {
+            this.randomVideoBtn.addEventListener('click', () => this.playRandomVideo());
+        }
+
+        if (this.favoritesBtn) {
+            this.favoritesBtn.addEventListener('click', () => this.toggleFavoritesView());
+        }
+
+        // View toggle buttons
+        document.querySelectorAll('.view-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
+                e.target.classList.add('active');
+                this.currentView = e.target.dataset.view;
+                this.updateViewMode();
+            });
+        });
+
+        // Sort dropdown
+        if (this.sortDropdown) {
+            this.sortDropdown.addEventListener('change', (e) => {
+                this.currentSort = e.target.value;
+                this.loadVideos(true);
+            });
+        }
+
+        // Logo click to reset view
+        const logo = document.querySelector('.logo');
+        if (logo) {
+            logo.addEventListener('click', () => {
+                this.resetToAllStars();
+            });
+        }
+
         // Keyboard events
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
                 this.closeVideoModal();
                 this.hideSearchSuggestions();
+            }
+            if (e.key === ' ' && e.target === document.body) {
+                e.preventDefault();
+                this.playRandomVideo();
             }
         });
 
@@ -1172,14 +1475,70 @@ class CelebStreamApp {
                 }
             }
         });
+    }
 
-        // Logo click to reset view
-        const logo = document.querySelector('.logo');
-        if (logo) {
-            logo.addEventListener('click', () => {
-                this.resetToAllStars();
+    updateViewMode() {
+        if (this.currentView === 'list') {
+            this.videosGrid.classList.add('list-view');
+            document.querySelectorAll('.video-card').forEach(card => {
+                card.classList.add('list-view');
+            });
+        } else {
+            this.videosGrid.classList.remove('list-view');
+            document.querySelectorAll('.video-card').forEach(card => {
+                card.classList.remove('list-view');
             });
         }
+    }
+
+    async shuffleVideos() {
+        try {
+            const response = await fetch('/api/reshuffle', { method: 'POST' });
+            const data = await response.json();
+            this.loadVideos(true);
+            this.showNotification('🎲 Videos shuffled!');
+        } catch (error) {
+            console.error('Error shuffling videos:', error);
+        }
+    }
+
+    async playRandomVideo() {
+        try {
+            const response = await fetch('/api/random-video');
+            const video = await response.json();
+            this.openVideoModal(video);
+        } catch (error) {
+            console.error('Error getting random video:', error);
+        }
+    }
+
+    toggleFavoritesView() {
+        // This would show favorite videos - placeholder for now
+        this.showNotification('❤️ Favorites feature coming soon!');
+    }
+
+    showNotification(message) {
+        const notification = document.createElement('div');
+        notification.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(229, 9, 20, 0.9);
+            color: white;
+            padding: 1rem 1.5rem;
+            border-radius: 8px;
+            z-index: 3000;
+            font-weight: 500;
+            backdrop-filter: blur(10px);
+            animation: slideInRight 0.3s ease;
+        `;
+        notification.textContent = message;
+        document.body.appendChild(notification);
+
+        setTimeout(() => {
+            notification.style.animation = 'slideOutRight 0.3s ease';
+            setTimeout(() => notification.remove(), 300);
+        }, 3000);
     }
 
     resetToAllStars() {
@@ -1202,9 +1561,33 @@ class CelebStreamApp {
             this.currentView.textContent = 'All Stars';
         }
         
+        this.updateContentHeader();
+        
         // Reload videos
         this.loadVideos(true);
         this.hideSearchSuggestions();
+    }
+
+    updateContentHeader() {
+        if (this.contentTitle) {
+            if (this.currentCelebrity) {
+                const celebrity = this.allCelebrities.find(c => c.name === this.currentCelebrity);
+                this.contentTitle.innerHTML = `⭐ ${celebrity ? celebrity.displayName : this.currentCelebrity}`;
+            } else if (this.searchTerm) {
+                this.contentTitle.innerHTML = `🔍 Search: ${this.searchTerm}`;
+            } else {
+                this.contentTitle.innerHTML = `🌟 All Stars`;
+            }
+        }
+    }
+
+    updateStats(videoCount, totalCelebrities) {
+        if (this.videoCount) {
+            this.videoCount.textContent = `${videoCount} videos`;
+        }
+        if (this.celebrityCount) {
+            this.celebrityCount.textContent = `${totalCelebrities} celebrities`;
+        }
     }
 
     async loadCelebrities() {
@@ -1218,6 +1601,8 @@ class CelebStreamApp {
             const allResponse = await fetch('/api/celebrities/all');
             const allData = await allResponse.json();
             this.allCelebrities = allData.celebrities;
+            this.totalCelebrities = allData.celebrities.length;
+            this.updateStats(this.totalVideos, this.totalCelebrities);
         } catch (error) {
             console.error('Error loading celebrities:', error);
         }
@@ -1263,6 +1648,7 @@ class CelebStreamApp {
             this.searchInput.value = '';
         }
         
+        this.updateContentHeader();
         this.loadVideos(true);
         
         // Close sidebar on mobile
@@ -1337,7 +1723,8 @@ class CelebStreamApp {
                 page: this.currentPage,
                 limit: 20,
                 search: this.searchTerm,
-                celebrity: this.currentCelebrity
+                celebrity: this.currentCelebrity,
+                sort: this.currentSort
             });
 
             const response = await fetch(`/api/videos?${params}`);
@@ -1356,6 +1743,8 @@ class CelebStreamApp {
                 this.renderVideos(data.videos);
                 this.hasMore = data.hasMore;
                 this.currentPage++;
+                this.totalVideos = data.total;
+                this.updateStats(this.totalVideos, this.totalCelebrities);
                 
                 if (reset) {
                     setTimeout(() => this.setupIntersectionObserver(), 100);
@@ -1397,11 +1786,12 @@ class CelebStreamApp {
         });
         
         this.videosGrid.appendChild(fragment);
+        this.updateViewMode();
     }
 
     createVideoCard(video) {
         const card = document.createElement('div');
-        card.className = 'video-card';
+        card.className = `video-card ${this.currentView === 'list' ? 'list-view' : ''}`;
         card.setAttribute('tabindex', '0');
         card.setAttribute('role', 'button');
         card.setAttribute('aria-label', `Play ${video.title} by ${video.artist}`);
@@ -1497,6 +1887,7 @@ class CelebStreamApp {
             this.currentView.textContent = this.searchTerm ? `Search: ${this.searchTerm}` : 'All Stars';
         }
         
+        this.updateContentHeader();
         this.loadVideos(true);
         this.hideSearchSuggestions();
     }
@@ -1532,6 +1923,20 @@ class CelebStreamApp {
 document.addEventListener('DOMContentLoaded', () => {
     window.celebApp = new CelebStreamApp();
 });
+
+// Add CSS animations for notifications
+const style = document.createElement('style');
+style.textContent = `
+    @keyframes slideInRight {
+        from { transform: translateX(100%); opacity: 0; }
+        to { transform: translateX(0); opacity: 1; }
+    }
+    @keyframes slideOutRight {
+        from { transform: translateX(0); opacity: 1; }
+        to { transform: translateX(100%); opacity: 0; }
+    }
+`;
+document.head.appendChild(style);
     </script>
 </body>
 </html>
