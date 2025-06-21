@@ -913,6 +913,7 @@ body {
     font-weight: 500;
     margin-bottom: 8px;
     text-decoration: none;
+    cursor: pointer;
 }
 
 .video-performer:hover {
@@ -1177,6 +1178,7 @@ body {
     font-weight: 600;
     margin-bottom: 10px;
     text-decoration: none;
+    cursor: pointer;
 }
 
 .video-performer:hover {
@@ -1281,8 +1283,6 @@ body {
     display: flex;
     flex-direction: column;
     gap: 15px;
-    max-height: calc(100vh - 200px);
-    overflow-y: auto;
 }
 
 .related-video-card {
@@ -1291,6 +1291,7 @@ body {
     overflow: hidden;
     cursor: pointer;
     transition: all 0.2s ease;
+    display: block;
 }
 
 .related-video-card:hover {
@@ -1303,12 +1304,14 @@ body {
     aspect-ratio: 16/9;
     overflow: hidden;
     background: #000000;
+    width: 100%;
 }
 
 .related-video-thumbnail img {
     width: 100%;
     height: 100%;
     object-fit: cover;
+    display: block;
 }
 
 .video-rating-small {
