@@ -40,12 +40,53 @@ const seededRandom = (seed, index) => {
     return x - Math.floor(x);
 };
 
-// Helper function to format names (replace _ with space and capitalize)
+// Helper function to format names (replace _ and - with space and capitalize)
 const formatName = (name) => {
-    return name.replace(/_/g, ' ')
+    return name.replace(/[_-]/g, ' ')
                .split(' ')
                .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
                .join(' ');
+};
+
+// Extract video quality and duration info from filename
+const extractVideoInfo = (filename) => {
+    const name = path.parse(filename).name;
+    const qualityRegex = /(\d+p|\d+k|\d+m|4k|hd|fhd|uhd|720p|1080p|1440p|2160p)/gi;
+    const durationRegex = /(\d+min|\d+m|\d+s|\d+:\d+)/gi;
+    
+    const qualities = name.match(qualityRegex) || [];
+    const durations = name.match(durationRegex) || [];
+    
+    // Clean the title by removing quality and duration info
+    let cleanTitle = name.replace(qualityRegex, '').replace(durationRegex, '');
+    cleanTitle = formatName(cleanTitle.replace(/\s+/g, ' ').trim());
+    
+    return {
+        title: cleanTitle,
+        quality: qualities.length > 0 ? qualities[0].toUpperCase() : null,
+        duration: durations.length > 0 ? durations[0] : null
+    };
+};
+
+// Get video duration using ffmpeg
+const getVideoDuration = async (videoPath) => {
+    return new Promise((resolve) => {
+        ffmpeg.ffprobe(videoPath, (err, metadata) => {
+            if (err || !metadata || !metadata.format) {
+                resolve(null);
+                return;
+            }
+            
+            const duration = metadata.format.duration;
+            if (duration) {
+                const minutes = Math.floor(duration / 60);
+                const seconds = Math.floor(duration % 60);
+                resolve(`${minutes}:${seconds.toString().padStart(2, '0')}`);
+            } else {
+                resolve(null);
+            }
+        });
+    });
 };
 
 // Get all celebrity folders
@@ -88,14 +129,19 @@ const getRandomCelebrities = (count = 10) => {
 };
 
 // Quick file count (no metadata stored)
-const countVideos = () => {
+const countVideos = (celebrityFilter = '') => {
     let count = 0;
     const items = fs.readdirSync(VIDEOS_DIR, { withFileTypes: true });
     
     for (const item of items) {
         if (item.isFile() && VIDEO_EXTENSIONS.includes(path.extname(item.name).toLowerCase())) {
-            count++;
+            if (!celebrityFilter) count++;
         } else if (item.isDirectory()) {
+            // Skip if celebrity filter is specified and doesn't match
+            if (celebrityFilter && item.name !== celebrityFilter) {
+                continue;
+            }
+            
             try {
                 const subItems = fs.readdirSync(path.join(VIDEOS_DIR, item.name), { withFileTypes: true });
                 count += subItems.filter(sub => 
@@ -117,6 +163,8 @@ const generateRandomVideos = function* (startIndex, limit, searchTerm = '', cele
     // Collect paths only (minimal memory)
     for (const item of items) {
         if (item.isFile() && VIDEO_EXTENSIONS.includes(path.extname(item.name).toLowerCase())) {
+            // Skip root files if celebrity filter is specified
+            if (celebrityFilter) continue;
             allPaths.push({ name: item.name, artist: 'Random', isRoot: true });
         } else if (item.isDirectory()) {
             // Skip if celebrity filter is specified and doesn't match
@@ -146,7 +194,8 @@ const generateRandomVideos = function* (startIndex, limit, searchTerm = '', cele
     const filtered = searchTerm ? 
         allPaths.filter(p => {
             const searchLower = searchTerm.toLowerCase();
-            const titleFormatted = formatName(path.parse(p.name).name);
+            const videoInfo = extractVideoInfo(p.name);
+            const titleFormatted = videoInfo.title;
             const artistFormatted = formatName(p.artist);
             
             return titleFormatted.toLowerCase().includes(searchLower) ||
@@ -154,8 +203,8 @@ const generateRandomVideos = function* (startIndex, limit, searchTerm = '', cele
                    p.name.toLowerCase().includes(searchLower);
         }) : allPaths;
     
-    // Generate random indexes using seed (only if no celebrity filter)
-    if (!celebrityFilter) {
+    // Generate random indexes using seed (only if no celebrity filter and no search)
+    if (!celebrityFilter && !searchTerm) {
         const randomIndexes = [];
         for (let i = 0; i < filtered.length; i++) {
             randomIndexes.push({ index: i, random: seededRandom(randomSeed, i) });
@@ -166,15 +215,17 @@ const generateRandomVideos = function* (startIndex, limit, searchTerm = '', cele
         let yielded = 0;
         for (let i = startIndex; i < randomIndexes.length && yielded < limit; i++, yielded++) {
             const pathData = filtered[randomIndexes[i].index];
-            const videoName = formatName(path.parse(pathData.name).name);
+            const videoInfo = extractVideoInfo(pathData.name);
             const thumbnailName = pathData.isRoot ? 
                 `${path.parse(pathData.name).name}.jpg` : 
                 `${pathData.folder}_${path.parse(pathData.name).name}.jpg`;
             
             yield {
                 id: `${randomSeed}_${i}`,
-                title: videoName,
+                title: videoInfo.title,
                 artist: pathData.artist,
+                quality: videoInfo.quality,
+                duration: videoInfo.duration,
                 videoUrl: pathData.isRoot ? 
                     `/videos/${pathData.name}` : 
                     `/videos/${pathData.folder}/${pathData.name}`,
@@ -183,19 +234,21 @@ const generateRandomVideos = function* (startIndex, limit, searchTerm = '', cele
             };
         }
     } else {
-        // For celebrity filter, show in order
+        // For celebrity filter or search, show in order
         let yielded = 0;
         for (let i = startIndex; i < filtered.length && yielded < limit; i++, yielded++) {
             const pathData = filtered[i];
-            const videoName = formatName(path.parse(pathData.name).name);
+            const videoInfo = extractVideoInfo(pathData.name);
             const thumbnailName = pathData.isRoot ? 
                 `${path.parse(pathData.name).name}.jpg` : 
                 `${pathData.folder}_${path.parse(pathData.name).name}.jpg`;
             
             yield {
                 id: `${pathData.folder || 'root'}_${i}`,
-                title: videoName,
+                title: videoInfo.title,
                 artist: pathData.artist,
+                quality: videoInfo.quality,
+                duration: videoInfo.duration,
                 videoUrl: pathData.isRoot ? 
                     `/videos/${pathData.name}` : 
                     `/videos/${pathData.folder}/${pathData.name}`,
@@ -305,10 +358,12 @@ app.get('/api/videos', (req, res) => {
             }
         }
         
+        const totalCount = countVideos(celebrity);
+        
         res.json({
             videos,
-            hasMore: startIndex + videos.length < videoCount,
-            total: videoCount,
+            hasMore: startIndex + videos.length < totalCount,
+            total: totalCount,
             cached: false // Always fresh data
         });
         
