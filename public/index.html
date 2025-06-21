@@ -132,18 +132,18 @@
                     </div>
                     
                     <div class="filter-group">
-                        <label class="filter-label">Quality:</label>
-                        <select class="filter-select" id="qualitySelect">
+                        <label class="filter-label">Duration:</label>
+                        <select class="filter-select" id="durationSelect">
                             <option value="">All</option>
-                            <option value="720p">720p+</option>
-                            <option value="1080p">1080p+</option>
-                            <option value="4k">4K</option>
+                            <option value="short">Short (0-10 min)</option>
+                            <option value="medium">Medium (10-30 min)</option>
+                            <option value="long">Long (30+ min)</option>
                         </select>
                     </div>
                 </div>
                 
                 <div class="filter-right">
-                    <button class="view-option" data-view="grid" title="Grid View">
+                    <button class="view-option active" data-view="grid" title="Grid View">
                         <i class="fas fa-th"></i>
                     </button>
                     <button class="view-option" data-view="list" title="List View">
@@ -195,8 +195,8 @@
             <div class="no-results-icon">
                 <i class="fas fa-search"></i>
             </div>
-            <h3 class="no-results-title">No videos found</h3>
-            <p class="no-results-text">Try adjusting your search terms or filters</p>
+            <h3 class="no-results-title" id="noResultsTitle">No videos found</h3>
+            <p class="no-results-text" id="noResultsText">Try adjusting your search terms or filters</p>
             <button class="clear-filters-btn" id="clearFiltersBtn">
                 <i class="fas fa-times"></i>
                 Clear All Filters

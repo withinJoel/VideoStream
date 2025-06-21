@@ -279,8 +279,30 @@ const countVideos = (celebrityFilter = '', categoryFilter = '') => {
     return count;
 };
 
+// Helper function to parse duration and check if it matches filter
+const matchesDurationFilter = (duration, durationFilter) => {
+    if (!durationFilter || !duration) return true;
+    
+    // Parse duration string (e.g., "15:30" or "5:45")
+    const parts = duration.split(':');
+    if (parts.length !== 2) return true;
+    
+    const minutes = parseInt(parts[0]) + (parseInt(parts[1]) / 60);
+    
+    switch (durationFilter) {
+        case 'short':
+            return minutes <= 10;
+        case 'medium':
+            return minutes > 10 && minutes <= 30;
+        case 'long':
+            return minutes > 30;
+        default:
+            return true;
+    }
+};
+
 // Enhanced video generator with better performance
-const generateRandomVideos = function* (startIndex, limit, searchTerm = '', celebrityFilter = '', categoryFilter = '', favoritesOnly = false, sortBy = 'random') {
+const generateRandomVideos = function* (startIndex, limit, searchTerm = '', celebrityFilter = '', categoryFilter = '', favoritesOnly = false, sortBy = 'random', durationFilter = '') {
     const items = fs.readdirSync(VIDEOS_DIR, { withFileTypes: true });
     const allPaths = [];
     
@@ -331,6 +353,13 @@ const generateRandomVideos = function* (startIndex, limit, searchTerm = '', cele
         filtered = filtered.filter(p => {
             const categories = extractCategories(p.name);
             return categories.includes(categoryFilter);
+        });
+    }
+    
+    if (durationFilter) {
+        filtered = filtered.filter(p => {
+            const videoInfo = extractVideoInfo(p.name);
+            return matchesDurationFilter(videoInfo.duration, durationFilter);
         });
     }
     
@@ -517,21 +546,16 @@ app.get('/api/videos', (req, res) => {
             category = '', 
             favorites = 'false',
             sort = 'random',
-            quality = ''
+            duration = ''
         } = req.query;
         
         const startIndex = (parseInt(page) - 1) * parseInt(limit);
         const favoritesOnly = favorites === 'true';
         
         const videos = [];
-        const generator = generateRandomVideos(startIndex, parseInt(limit), search, celebrity, category, favoritesOnly, sort);
+        const generator = generateRandomVideos(startIndex, parseInt(limit), search, celebrity, category, favoritesOnly, sort, duration);
         
         for (const video of generator) {
-            // Apply quality filter
-            if (quality && video.quality && !video.quality.toLowerCase().includes(quality.toLowerCase())) {
-                continue;
-            }
-            
             videos.push(video);
             
             // Queue thumbnail generation if missing

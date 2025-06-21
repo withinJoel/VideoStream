@@ -9,7 +9,7 @@ class VideoApp {
             category: '',
             section: 'home',
             sort: 'random',
-            quality: ''
+            duration: ''
         };
         this.currentView = 'grid';
         this.favorites = new Set();
@@ -18,9 +18,6 @@ class VideoApp {
         this.currentVideoId = null;
         this.hoverTimeout = null;
         this.hoverVideo = null;
-        this.relatedVideosPage = 1;
-        this.relatedVideosLoading = false;
-        this.relatedVideosHasMore = true;
         
         // Statistics
         this.stats = {
@@ -117,8 +114,8 @@ class VideoApp {
             this.applyFilters();
         });
 
-        document.getElementById('qualitySelect').addEventListener('change', (e) => {
-            this.currentFilter.quality = e.target.value;
+        document.getElementById('durationSelect').addEventListener('change', (e) => {
+            this.currentFilter.duration = e.target.value;
             this.applyFilters();
         });
 
@@ -210,19 +207,6 @@ class VideoApp {
                 }
             }
         }, 200));
-
-        // Infinite scroll for related videos
-        const relatedVideosContainer = document.getElementById('relatedVideosGrid');
-        if (relatedVideosContainer) {
-            relatedVideosContainer.addEventListener('scroll', this.debounce(() => {
-                const container = relatedVideosContainer;
-                if (container.scrollTop + container.clientHeight >= container.scrollHeight - 100) {
-                    if (this.relatedVideosHasMore && !this.relatedVideosLoading) {
-                        this.loadMoreRelatedVideos();
-                    }
-                }
-            }, 200));
-        }
     }
 
     debounce(func, wait) {
@@ -402,7 +386,7 @@ class VideoApp {
             category: '',
             section: section,
             sort: 'random',
-            quality: ''
+            duration: ''
         };
         
         this.currentPage = 1;
@@ -497,7 +481,7 @@ class VideoApp {
             category: category,
             section: 'category',
             sort: this.currentFilter.sort,
-            quality: this.currentFilter.quality
+            duration: this.currentFilter.duration
         };
         
         this.currentPage = 1;
@@ -518,7 +502,7 @@ class VideoApp {
             category: '',
             section: 'performer',
             sort: this.currentFilter.sort,
-            quality: this.currentFilter.quality
+            duration: this.currentFilter.duration
         };
         
         this.currentPage = 1;
@@ -556,7 +540,7 @@ class VideoApp {
             category: '',
             section: 'search',
             sort: this.currentFilter.sort,
-            quality: this.currentFilter.quality
+            duration: this.currentFilter.duration
         };
         
         this.currentPage = 1;
@@ -683,12 +667,12 @@ class VideoApp {
             category: '',
             section: 'home',
             sort: 'random',
-            quality: ''
+            duration: ''
         };
         
         document.getElementById('searchInput').value = '';
         document.getElementById('sortSelect').value = 'random';
-        document.getElementById('qualitySelect').value = '';
+        document.getElementById('durationSelect').value = '';
         
         this.navigateToSection('home');
     }
@@ -786,8 +770,8 @@ class VideoApp {
                     params.append('sort', this.currentFilter.sort);
                 }
                 
-                if (this.currentFilter.quality) {
-                    params.append('quality', this.currentFilter.quality);
+                if (this.currentFilter.duration) {
+                    params.append('duration', this.currentFilter.duration);
                 }
                 
                 const response = await fetch(`/api/videos?${params}`);
@@ -804,29 +788,56 @@ class VideoApp {
                 
                 document.getElementById('videoCount').textContent = `${this.formatNumber(total)} videos`;
             } else if (reset) {
-                // Only show "no results" if there are active filters
-                const hasActiveFilters = this.currentFilter.search || 
-                                       this.currentFilter.celebrity || 
-                                       this.currentFilter.category || 
-                                       this.currentFilter.quality ||
-                                       (this.currentFilter.section !== 'home' && this.currentFilter.section !== 'categories' && this.currentFilter.section !== 'performers');
-                
-                if (hasActiveFilters) {
-                    noResults.style.display = 'block';
-                }
+                this.showNoResults();
                 document.getElementById('videoCount').textContent = '0 videos';
             }
             
         } catch (error) {
             console.error('Error loading videos:', error);
             if (reset) {
-                noResults.style.display = 'block';
+                this.showNoResults();
             }
             this.showToast('Error loading videos', 'error');
         } finally {
             this.isLoading = false;
             loadingContainer.style.display = 'none';
         }
+    }
+
+    showNoResults() {
+        const noResults = document.getElementById('noResults');
+        const noResultsTitle = document.getElementById('noResultsTitle');
+        const noResultsText = document.getElementById('noResultsText');
+        const clearFiltersBtn = document.getElementById('clearFiltersBtn');
+        
+        // Check if there are active filters
+        const hasActiveFilters = this.currentFilter.search || 
+                               this.currentFilter.celebrity || 
+                               this.currentFilter.category || 
+                               this.currentFilter.duration ||
+                               (this.currentFilter.section !== 'home' && 
+                                this.currentFilter.section !== 'categories' && 
+                                this.currentFilter.section !== 'performers');
+        
+        if (this.currentFilter.section === 'favorites') {
+            noResultsTitle.textContent = 'No favorite videos';
+            noResultsText.textContent = 'You haven\'t added any videos to your favorites yet. Start exploring and add videos you like!';
+            clearFiltersBtn.style.display = 'none';
+        } else if (this.currentFilter.section === 'watch-history') {
+            noResultsTitle.textContent = 'No watch history';
+            noResultsText.textContent = 'You haven\'t watched any videos yet. Start watching to build your history!';
+            clearFiltersBtn.style.display = 'none';
+        } else if (hasActiveFilters) {
+            noResultsTitle.textContent = 'No videos found';
+            noResultsText.textContent = 'Try adjusting your search terms or filters';
+            clearFiltersBtn.style.display = 'inline-flex';
+        } else {
+            noResultsTitle.textContent = 'No videos available';
+            noResultsText.textContent = 'There are no videos to display at the moment';
+            clearFiltersBtn.style.display = 'none';
+        }
+        
+        noResults.style.display = 'block';
     }
 
     renderVideos(videos, reset = false) {
@@ -1111,90 +1122,62 @@ class VideoApp {
 
     async loadRelatedVideos(currentVideo) {
         try {
-            this.relatedVideosPage = 1;
-            this.relatedVideosLoading = false;
-            this.relatedVideosHasMore = true;
-            
-            const relatedVideosGrid = document.getElementById('relatedVideosGrid');
-            relatedVideosGrid.innerHTML = '';
-            
-            await this.loadMoreRelatedVideos(currentVideo);
-        } catch (error) {
-            console.error('Error loading related videos:', error);
-        }
-    }
-
-    async loadMoreRelatedVideos(currentVideo = null) {
-        if (this.relatedVideosLoading || !this.relatedVideosHasMore) return;
-        
-        this.relatedVideosLoading = true;
-        
-        try {
             const params = new URLSearchParams({
-                page: this.relatedVideosPage,
-                limit: 12
+                page: 1,
+                limit: 20
             });
             
-            if (currentVideo) {
-                if (currentVideo.categories && currentVideo.categories.length > 0) {
-                    params.append('category', currentVideo.categories[0]);
-                } else if (currentVideo.artist) {
-                    params.append('celebrity', currentVideo.artist);
-                }
+            if (currentVideo.categories && currentVideo.categories.length > 0) {
+                params.append('category', currentVideo.categories[0]);
+            } else if (currentVideo.artist) {
+                params.append('celebrity', currentVideo.artist);
             }
             
             const response = await fetch(`/api/videos?${params}`);
             const data = await response.json();
             
             if (data.videos) {
-                const relatedVideos = data.videos.filter(v => v.id !== this.currentVideoId);
-                this.renderRelatedVideos(relatedVideos, this.relatedVideosPage === 1);
-                
-                this.relatedVideosHasMore = data.hasMore && relatedVideos.length > 0;
-                this.relatedVideosPage++;
+                const relatedVideos = data.videos.filter(v => v.id !== currentVideo.id);
+                this.renderRelatedVideos(relatedVideos);
             }
         } catch (error) {
-            console.error('Error loading more related videos:', error);
-        } finally {
-            this.relatedVideosLoading = false;
+            console.error('Error loading related videos:', error);
         }
     }
 
-    renderRelatedVideos(videos, reset = false) {
+    renderRelatedVideos(videos) {
         const relatedVideosGrid = document.getElementById('relatedVideosGrid');
-        
-        if (reset) {
-            relatedVideosGrid.innerHTML = '';
-        }
-        
-        videos.forEach(video => {
+        relatedVideosGrid.innerHTML = videos.map(video => {
             const thumbnailUrl = video.thumbnailExists ? video.thumbnailUrl : 'https://images.pexels.com/photos/1181467/pexels-photo-1181467.jpeg?auto=compress&cs=tinysrgb&w=300';
             
-            const relatedCard = document.createElement('div');
-            relatedCard.className = 'related-video-card';
-            relatedCard.dataset.videoId = video.id;
-            relatedCard.innerHTML = `
-                <div class="related-video-thumbnail">
-                    <img src="${thumbnailUrl}" alt="${video.title}" loading="lazy">
-                    ${video.duration ? `<div class="video-duration">${video.duration}</div>` : ''}
-                    <div class="video-rating-small">
-                        <i class="fas fa-star"></i>
-                        ${(video.rating || 4.2).toFixed(1)}
+            return `
+                <div class="related-video-card" data-video-id="${video.id}">
+                    <div class="related-video-thumbnail">
+                        <img src="${thumbnailUrl}" alt="${video.title}" loading="lazy">
+                        ${video.duration ? `<div class="video-duration">${video.duration}</div>` : ''}
+                        <div class="video-rating-small">
+                            <i class="fas fa-star"></i>
+                            ${(video.rating || 4.2).toFixed(1)}
+                        </div>
+                    </div>
+                    <div class="related-video-info">
+                        <div class="related-video-title">${video.title}</div>
+                        <div class="related-video-performer">${video.artist}</div>
+                        <div class="related-video-views">${this.formatNumber(video.views || 0)} views</div>
                     </div>
                 </div>
-                <div class="related-video-info">
-                    <div class="related-video-title">${video.title}</div>
-                    <div class="related-video-performer">${video.artist}</div>
-                    <div class="related-video-views">${this.formatNumber(video.views || 0)} views</div>
-                </div>
             `;
-            
-            relatedCard.addEventListener('click', () => {
-                this.openVideoModal(video);
-                this.addToWatchHistory(video.id);
+        }).join('');
+        
+        relatedVideosGrid.querySelectorAll('.related-video-card').forEach(card => {
+            card.addEventListener('click', () => {
+                const videoId = card.dataset.videoId;
+                const video = videos.find(v => v.id === videoId);
+                if (video) {
+                    this.openVideoModal(video);
+                    this.addToWatchHistory(video.id);
+                }
             });
-            
-            relatedVideosGrid.appendChild(relatedCard);
         });
     }
 
@@ -1207,11 +1190,6 @@ class VideoApp {
         modalVideo.src = '';
         document.body.style.overflow = '';
         this.currentVideoId = null;
-        
-        // Reset related videos state
-        this.relatedVideosPage = 1;
-        this.relatedVideosLoading = false;
-        this.relatedVideosHasMore = true;
     }
 
     async toggleModalFavorite() {
@@ -1256,7 +1234,7 @@ class VideoApp {
         this.setView(this.currentView);
         
         document.getElementById('sortSelect').value = this.currentFilter.sort;
-        document.getElementById('qualitySelect').value = this.currentFilter.quality;
+        document.getElementById('durationSelect').value = this.currentFilter.duration;
     }
 
     showToast(message, type = 'info') {
