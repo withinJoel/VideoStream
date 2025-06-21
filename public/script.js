@@ -17,9 +17,6 @@ class VideoApp {
         this.currentVideoId = null;
         this.hoverTimeout = null;
         this.hoverVideo = null;
-        this.relatedVideosPage = 1;
-        this.relatedVideosLoading = false;
-        this.relatedVideosHasMore = true;
         
         // Statistics
         this.stats = {
@@ -32,48 +29,19 @@ class VideoApp {
     }
 
     async init() {
-        this.loadFromLocalStorage();
         this.setupEventListeners();
         await this.loadInitialData();
         this.updateUI();
     }
 
-    loadFromLocalStorage() {
-        try {
-            const savedFavorites = localStorage.getItem('loveporn_favorites');
-            if (savedFavorites) {
-                this.favorites = new Set(JSON.parse(savedFavorites));
-            }
-            
-            const savedWatchHistory = localStorage.getItem('loveporn_watch_history');
-            if (savedWatchHistory) {
-                this.watchHistory = JSON.parse(savedWatchHistory);
-            }
-            
-            const savedSearchHistory = localStorage.getItem('loveporn_search_history');
-            if (savedSearchHistory) {
-                this.searchHistory = JSON.parse(savedSearchHistory);
-            }
-        } catch (error) {
-            console.error('Error loading from localStorage:', error);
-        }
-    }
-
-    saveToLocalStorage() {
-        try {
-            localStorage.setItem('loveporn_favorites', JSON.stringify(Array.from(this.favorites)));
-            localStorage.setItem('loveporn_watch_history', JSON.stringify(this.watchHistory));
-            localStorage.setItem('loveporn_search_history', JSON.stringify(this.searchHistory));
-        } catch (error) {
-            console.error('Error saving to localStorage:', error);
-        }
-    }
-
     async loadInitialData() {
         try {
             await Promise.all([
+                this.loadFavorites(),
                 this.loadCategories(),
                 this.loadPerformers(),
+                this.loadWatchHistory(),
+                this.loadSearchHistory(),
                 this.loadStats()
             ]);
             
@@ -201,17 +169,6 @@ class VideoApp {
             this.toggleModalFavorite();
         });
 
-        // Modal performer click
-        document.addEventListener('click', (e) => {
-            if (e.target.id === 'modalVideoPerformer') {
-                const performerName = e.target.dataset.performer;
-                if (performerName) {
-                    this.closeVideoModal();
-                    this.filterByPerformer(performerName);
-                }
-            }
-        });
-
         // Close dropdowns when clicking outside
         document.addEventListener('click', (e) => {
             if (!e.target.closest('.search-container')) {
@@ -244,16 +201,6 @@ class VideoApp {
                 }
             }
         }, 200));
-
-        // Related videos infinite scroll
-        const relatedVideosGrid = document.getElementById('relatedVideosGrid');
-        relatedVideosGrid.addEventListener('scroll', this.debounce(() => {
-            if (relatedVideosGrid.scrollTop + relatedVideosGrid.clientHeight >= relatedVideosGrid.scrollHeight - 100) {
-                if (this.relatedVideosHasMore && !this.relatedVideosLoading) {
-                    this.loadMoreRelatedVideos();
-                }
-            }
-        }, 200));
     }
 
     debounce(func, wait) {
@@ -278,6 +225,37 @@ class VideoApp {
             this.stats.totalWatchHistory = data.totalWatchHistory || 0;
         } catch (error) {
             console.error('Error loading stats:', error);
+        }
+    }
+
+    async loadFavorites() {
+        try {
+            const response = await fetch('/api/favorites');
+            const data = await response.json();
+            this.favorites = new Set(data.favorites || []);
+            this.updateFavoritesCount();
+        } catch (error) {
+            console.error('Error loading favorites:', error);
+        }
+    }
+
+    async loadWatchHistory() {
+        try {
+            const response = await fetch('/api/watch-history');
+            const data = await response.json();
+            this.watchHistory = data.history || [];
+        } catch (error) {
+            console.error('Error loading watch history:', error);
+        }
+    }
+
+    async loadSearchHistory() {
+        try {
+            const response = await fetch('/api/search-history');
+            const data = await response.json();
+            this.searchHistory = data.history || [];
+        } catch (error) {
+            console.error('Error loading search history:', error);
         }
     }
 
@@ -544,7 +522,7 @@ class VideoApp {
         const searchTerm = document.getElementById('searchInput').value.trim();
         
         if (searchTerm) {
-            this.addToSearchHistory(searchTerm);
+            await this.addToSearchHistory(searchTerm);
         }
         
         this.currentFilter = {
@@ -574,17 +552,17 @@ class VideoApp {
         document.getElementById('searchSuggestions').style.display = 'none';
     }
 
-    addToSearchHistory(query) {
-        // Remove if already exists
-        this.searchHistory = this.searchHistory.filter(item => item.query !== query);
-        
-        // Add to beginning
-        this.searchHistory.unshift({ query, timestamp: Date.now() });
-        
-        // Keep only last 50 items
-        this.searchHistory = this.searchHistory.slice(0, 50);
-        
-        this.saveToLocalStorage();
+    async addToSearchHistory(query) {
+        try {
+            await fetch('/api/search-history', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ query })
+            });
+            await this.loadSearchHistory();
+        } catch (error) {
+            console.error('Error adding to search history:', error);
+        }
     }
 
     showSearchHistory() {
@@ -742,11 +720,7 @@ class VideoApp {
         loadingContainer.style.display = 'flex';
         
         try {
-            if (this.currentFilter.section === 'favorites') {
-                await this.loadFavoriteVideos(reset);
-                return;
-            }
-            
+            // Handle watch history separately
             if (this.currentFilter.section === 'watch-history') {
                 await this.loadWatchHistoryVideos(reset);
                 return;
@@ -769,6 +743,10 @@ class VideoApp {
                 params.append('category', this.currentFilter.category);
             }
             
+            if (this.currentFilter.section === 'favorites') {
+                params.append('favorites', 'true');
+            }
+            
             if (this.currentFilter.sort && this.currentFilter.sort !== 'random') {
                 params.append('sort', this.currentFilter.sort);
             }
@@ -783,14 +761,18 @@ class VideoApp {
                 
                 document.getElementById('videoCount').textContent = `${this.formatNumber(data.total)} videos`;
             } else if (reset) {
-                this.showNoResults();
+                noResults.style.display = 'block';
                 document.getElementById('videoCount').textContent = '0 videos';
+                document.getElementById('noResultsTitle').textContent = 'No videos found';
+                document.getElementById('noResultsText').textContent = 'Try adjusting your search terms or filters';
             }
             
         } catch (error) {
             console.error('Error loading videos:', error);
             if (reset) {
-                this.showNoResults();
+                noResults.style.display = 'block';
+                document.getElementById('noResultsTitle').textContent = 'Error loading videos';
+                document.getElementById('noResultsText').textContent = 'Please check your connection and try again';
             }
             this.showToast('Error loading videos', 'error');
         } finally {
@@ -799,27 +781,9 @@ class VideoApp {
         }
     }
 
-    async loadFavoriteVideos(reset = false) {
+    async loadWatchHistoryVideos(reset = false) {
         try {
-            if (reset) {
-                document.getElementById('videoGrid').innerHTML = '';
-            }
-            
-            if (this.favorites.size === 0) {
-                if (reset) {
-                    this.showNoResults('No favorite videos', 'Add videos to your favorites to see them here');
-                    document.getElementById('videoCount').textContent = '0 videos';
-                }
-                return;
-            }
-            
-            const params = new URLSearchParams({
-                page: this.currentPage,
-                limit: 20,
-                favorites: 'true'
-            });
-            
-            const response = await fetch(`/api/videos?${params}`);
+            const response = await fetch(`/api/watch-history?page=${this.currentPage}&limit=20`);
             const data = await response.json();
             
             if (data.videos && data.videos.length > 0) {
@@ -827,77 +791,22 @@ class VideoApp {
                 this.hasMore = data.hasMore;
                 this.currentPage++;
                 
-                document.getElementById('videoCount').textContent = `${this.formatNumber(data.total)} videos`;
+                document.getElementById('videoCount').textContent = `${this.formatNumber(data.total)} videos in history`;
             } else if (reset) {
-                this.showNoResults('No favorite videos', 'Add videos to your favorites to see them here');
-                document.getElementById('videoCount').textContent = '0 videos';
-            }
-            
-        } catch (error) {
-            console.error('Error loading favorite videos:', error);
-        }
-    }
-
-    async loadWatchHistoryVideos(reset = false) {
-        try {
-            if (reset) {
-                document.getElementById('videoGrid').innerHTML = '';
-            }
-            
-            if (this.watchHistory.length === 0) {
-                if (reset) {
-                    this.showNoResults('No watch history', 'Videos you watch will appear here');
-                    document.getElementById('videoCount').textContent = '0 videos';
-                }
-                return;
-            }
-            
-            const startIndex = (this.currentPage - 1) * 20;
-            const endIndex = startIndex + 20;
-            const historySlice = this.watchHistory.slice(startIndex, endIndex);
-            
-            if (historySlice.length === 0) {
-                if (reset) {
-                    this.showNoResults('No watch history', 'Videos you watch will appear here');
-                    document.getElementById('videoCount').textContent = '0 videos';
-                }
-                return;
-            }
-            
-            // For now, show placeholder since we need to implement proper video lookup
-            if (reset) {
-                document.getElementById('videoCount').textContent = `${this.watchHistory.length} videos in history`;
-                const videoGrid = document.getElementById('videoGrid');
-                videoGrid.innerHTML = `
-                    <div class="watch-history-placeholder">
-                        <div class="placeholder-icon">
-                            <i class="fas fa-history"></i>
-                        </div>
-                        <h3>Watch History</h3>
-                        <p>Your recently watched videos will appear here.</p>
-                        <p>Currently tracking ${this.watchHistory.length} videos.</p>
-                    </div>
-                `;
+                document.getElementById('noResults').style.display = 'block';
+                document.getElementById('videoCount').textContent = '0 videos in history';
+                document.getElementById('noResultsTitle').textContent = 'No watch history';
+                document.getElementById('noResultsText').textContent = 'Videos you watch will appear here';
             }
             
         } catch (error) {
             console.error('Error loading watch history videos:', error);
+            if (reset) {
+                document.getElementById('noResults').style.display = 'block';
+                document.getElementById('noResultsTitle').textContent = 'Error loading watch history';
+                document.getElementById('noResultsText').textContent = 'Please try again later';
+            }
         }
-    }
-
-    showNoResults(title = 'No videos found', text = 'Try adjusting your search terms or filters') {
-        const noResults = document.getElementById('noResults');
-        const noResultsTitle = document.getElementById('noResultsTitle');
-        const noResultsText = document.getElementById('noResultsText');
-        
-        noResultsTitle.textContent = title;
-        noResultsText.textContent = text;
-        noResults.style.display = 'block';
-        
-        // Hide clear filters button if no filters are active
-        const clearFiltersBtn = document.getElementById('clearFiltersBtn');
-        const hasActiveFilters = this.currentFilter.search || this.currentFilter.celebrity || this.currentFilter.category;
-        clearFiltersBtn.style.display = hasActiveFilters ? 'inline-flex' : 'none';
     }
 
     renderVideos(videos, reset = false) {
@@ -1068,17 +977,19 @@ class VideoApp {
         return stars;
     }
 
-    addToWatchHistory(videoId) {
-        // Remove if already exists
-        this.watchHistory = this.watchHistory.filter(item => item.id !== videoId);
-        
-        // Add to beginning
-        this.watchHistory.unshift({ id: videoId, timestamp: Date.now() });
-        
-        // Keep only last 100 items
-        this.watchHistory = this.watchHistory.slice(0, 100);
-        
-        this.saveToLocalStorage();
+    async addToWatchHistory(videoId) {
+        try {
+            await fetch(`/api/watch-history/${videoId}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ timestamp: Date.now() })
+            });
+            
+            // Update local watch history
+            await this.loadWatchHistory();
+        } catch (error) {
+            console.error('Error adding to watch history:', error);
+        }
     }
 
     async toggleFavorite(videoId, button) {
@@ -1086,16 +997,21 @@ class VideoApp {
             const isFavorite = this.favorites.has(videoId);
             
             if (isFavorite) {
-                this.favorites.delete(videoId);
-                button.classList.remove('active');
-                this.showToast('Removed from favorites', 'success');
+                const response = await fetch(`/api/favorites/${videoId}`, { method: 'DELETE' });
+                if (response.ok) {
+                    this.favorites.delete(videoId);
+                    button.classList.remove('active');
+                    this.showToast('Removed from favorites', 'success');
+                }
             } else {
-                this.favorites.add(videoId);
-                button.classList.add('active');
-                this.showToast('Added to favorites', 'success');
+                const response = await fetch(`/api/favorites/${videoId}`, { method: 'POST' });
+                if (response.ok) {
+                    this.favorites.add(videoId);
+                    button.classList.add('active');
+                    this.showToast('Added to favorites', 'success');
+                }
             }
             
-            this.saveToLocalStorage();
             this.updateFavoritesCount();
         } catch (error) {
             console.error('Error toggling favorite:', error);
@@ -1133,6 +1049,13 @@ class VideoApp {
         modalVideoRating.textContent = (video.rating || 4.2).toFixed(1);
         modalVideoDuration.textContent = video.duration || 'Unknown';
         modalVideoQuality.textContent = video.quality || 'HD';
+        
+        // Add click handler for performer link in modal
+        modalVideoPerformer.addEventListener('click', (e) => {
+            e.preventDefault();
+            this.closeVideoModal();
+            this.filterByPerformer(modalVideoPerformer.dataset.performer);
+        });
         
         if (video.categories && video.categories.length > 0) {
             modalVideoCategories.innerHTML = video.categories.map(cat => 
@@ -1178,90 +1101,62 @@ class VideoApp {
 
     async loadRelatedVideos(currentVideo) {
         try {
-            this.relatedVideosPage = 1;
-            this.relatedVideosLoading = false;
-            this.relatedVideosHasMore = true;
-            
-            const relatedVideosGrid = document.getElementById('relatedVideosGrid');
-            relatedVideosGrid.innerHTML = '';
-            
-            await this.loadMoreRelatedVideos(currentVideo);
-        } catch (error) {
-            console.error('Error loading related videos:', error);
-        }
-    }
-
-    async loadMoreRelatedVideos(currentVideo = null) {
-        if (this.relatedVideosLoading || !this.relatedVideosHasMore) return;
-        
-        this.relatedVideosLoading = true;
-        
-        try {
             const params = new URLSearchParams({
-                page: this.relatedVideosPage,
+                page: 1,
                 limit: 12
             });
             
-            if (currentVideo) {
-                if (currentVideo.categories && currentVideo.categories.length > 0) {
-                    params.append('category', currentVideo.categories[0]);
-                } else if (currentVideo.artist) {
-                    params.append('celebrity', currentVideo.artist);
-                }
+            if (currentVideo.categories && currentVideo.categories.length > 0) {
+                params.append('category', currentVideo.categories[0]);
+            } else if (currentVideo.artist) {
+                params.append('celebrity', currentVideo.artist);
             }
             
             const response = await fetch(`/api/videos?${params}`);
             const data = await response.json();
             
             if (data.videos) {
-                const relatedVideos = data.videos.filter(v => v.id !== this.currentVideoId);
-                this.renderRelatedVideos(relatedVideos, this.relatedVideosPage === 1);
-                
-                this.relatedVideosHasMore = data.hasMore && relatedVideos.length > 0;
-                this.relatedVideosPage++;
+                const relatedVideos = data.videos.filter(v => v.id !== currentVideo.id).slice(0, 10);
+                this.renderRelatedVideos(relatedVideos);
             }
         } catch (error) {
-            console.error('Error loading more related videos:', error);
-        } finally {
-            this.relatedVideosLoading = false;
+            console.error('Error loading related videos:', error);
         }
     }
 
-    renderRelatedVideos(videos, reset = false) {
+    renderRelatedVideos(videos) {
         const relatedVideosGrid = document.getElementById('relatedVideosGrid');
-        
-        if (reset) {
-            relatedVideosGrid.innerHTML = '';
-        }
-        
-        videos.forEach(video => {
+        relatedVideosGrid.innerHTML = videos.map(video => {
             const thumbnailUrl = video.thumbnailExists ? video.thumbnailUrl : 'https://images.pexels.com/photos/1181467/pexels-photo-1181467.jpeg?auto=compress&cs=tinysrgb&w=300';
             
-            const relatedCard = document.createElement('div');
-            relatedCard.className = 'related-video-card';
-            relatedCard.dataset.videoId = video.id;
-            relatedCard.innerHTML = `
-                <div class="related-video-thumbnail">
-                    <img src="${thumbnailUrl}" alt="${video.title}" loading="lazy">
-                    ${video.duration ? `<div class="video-duration">${video.duration}</div>` : ''}
-                    <div class="video-rating-small">
-                        <i class="fas fa-star"></i>
-                        ${(video.rating || 4.2).toFixed(1)}
+            return `
+                <div class="related-video-card" data-video-id="${video.id}">
+                    <div class="related-video-thumbnail">
+                        <img src="${thumbnailUrl}" alt="${video.title}" loading="lazy">
+                        ${video.duration ? `<div class="video-duration">${video.duration}</div>` : ''}
+                        <div class="video-rating-small">
+                            <i class="fas fa-star"></i>
+                            ${(video.rating || 4.2).toFixed(1)}
+                        </div>
+                    </div>
+                    <div class="related-video-info">
+                        <div class="related-video-title">${video.title}</div>
+                        <div class="related-video-performer">${video.artist}</div>
+                        <div class="related-video-views">${this.formatNumber(video.views || 0)} views</div>
                     </div>
                 </div>
-                <div class="related-video-info">
-                    <div class="related-video-title">${video.title}</div>
-                    <div class="related-video-performer">${video.artist}</div>
-                    <div class="related-video-views">${this.formatNumber(video.views || 0)} views</div>
-                </div>
             `;
-            
-            relatedCard.addEventListener('click', () => {
-                this.openVideoModal(video);
-                this.addToWatchHistory(video.id);
+        }).join('');
+        
+        relatedVideosGrid.querySelectorAll('.related-video-card').forEach(card => {
+            card.addEventListener('click', () => {
+                const videoId = card.dataset.videoId;
+                const video = videos.find(v => v.id === videoId);
+                if (video) {
+                    this.openVideoModal(video);
+                    this.addToWatchHistory(video.id);
+                }
             });
-            
-            relatedVideosGrid.appendChild(relatedCard);
         });
     }
 
@@ -1283,14 +1178,19 @@ class VideoApp {
             const isFavorite = this.favorites.has(this.currentVideoId);
             
             if (isFavorite) {
-                this.favorites.delete(this.currentVideoId);
-                this.showToast('Removed from favorites', 'success');
+                const response = await fetch(`/api/favorites/${this.currentVideoId}`, { method: 'DELETE' });
+                if (response.ok) {
+                    this.favorites.delete(this.currentVideoId);
+                    this.showToast('Removed from favorites', 'success');
+                }
             } else {
-                this.favorites.add(this.currentVideoId);
-                this.showToast('Added to favorites', 'success');
+                const response = await fetch(`/api/favorites/${this.currentVideoId}`, { method: 'POST' });
+                if (response.ok) {
+                    this.favorites.add(this.currentVideoId);
+                    this.showToast('Added to favorites', 'success');
+                }
             }
             
-            this.saveToLocalStorage();
             this.updateModalActionButtons();
             this.updateFavoritesCount();
             
