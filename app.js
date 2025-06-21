@@ -238,47 +238,6 @@ const getAllCategories = () => {
     return categoriesCache;
 };
 
-// Quick file count with caching
-const countVideos = (celebrityFilter = '', categoryFilter = '') => {
-    const cacheKey = `count_${celebrityFilter}_${categoryFilter}`;
-    if (videoCache.has(cacheKey)) {
-        return videoCache.get(cacheKey);
-    }
-    
-    let count = 0;
-    const items = fs.readdirSync(VIDEOS_DIR, { withFileTypes: true });
-    
-    for (const item of items) {
-        if (item.isFile() && VIDEO_EXTENSIONS.includes(path.extname(item.name).toLowerCase())) {
-            if (!celebrityFilter) {
-                if (!categoryFilter || extractCategories(item.name).includes(categoryFilter)) {
-                    count++;
-                }
-            }
-        } else if (item.isDirectory()) {
-            if (celebrityFilter && item.name !== celebrityFilter) {
-                continue;
-            }
-            
-            try {
-                const subItems = fs.readdirSync(path.join(VIDEOS_DIR, item.name), { withFileTypes: true });
-                subItems.forEach(sub => {
-                    if (sub.isFile() && VIDEO_EXTENSIONS.includes(path.extname(sub.name).toLowerCase())) {
-                        if (!categoryFilter || extractCategories(sub.name).includes(categoryFilter)) {
-                            count++;
-                        }
-                    }
-                });
-            } catch (err) {
-                // Skip problematic directories
-            }
-        }
-    }
-    
-    videoCache.set(cacheKey, count);
-    return count;
-};
-
 // Helper function to parse duration and check if it matches filter
 const matchesDurationFilter = (duration, durationFilter) => {
     if (!durationFilter || !duration) return true;
@@ -299,6 +258,55 @@ const matchesDurationFilter = (duration, durationFilter) => {
         default:
             return true;
     }
+};
+
+// Quick file count with caching
+const countVideos = (celebrityFilter = '', categoryFilter = '', durationFilter = '') => {
+    const cacheKey = `count_${celebrityFilter}_${categoryFilter}_${durationFilter}`;
+    if (videoCache.has(cacheKey)) {
+        return videoCache.get(cacheKey);
+    }
+    
+    let count = 0;
+    const items = fs.readdirSync(VIDEOS_DIR, { withFileTypes: true });
+    
+    for (const item of items) {
+        if (item.isFile() && VIDEO_EXTENSIONS.includes(path.extname(item.name).toLowerCase())) {
+            if (!celebrityFilter) {
+                const videoInfo = extractVideoInfo(item.name);
+                const matchesCategory = !categoryFilter || videoInfo.categories.includes(categoryFilter);
+                const matchesDuration = matchesDurationFilter(videoInfo.duration, durationFilter);
+                
+                if (matchesCategory && matchesDuration) {
+                    count++;
+                }
+            }
+        } else if (item.isDirectory()) {
+            if (celebrityFilter && item.name !== celebrityFilter) {
+                continue;
+            }
+            
+            try {
+                const subItems = fs.readdirSync(path.join(VIDEOS_DIR, item.name), { withFileTypes: true });
+                subItems.forEach(sub => {
+                    if (sub.isFile() && VIDEO_EXTENSIONS.includes(path.extname(sub.name).toLowerCase())) {
+                        const videoInfo = extractVideoInfo(sub.name);
+                        const matchesCategory = !categoryFilter || videoInfo.categories.includes(categoryFilter);
+                        const matchesDuration = matchesDurationFilter(videoInfo.duration, durationFilter);
+                        
+                        if (matchesCategory && matchesDuration) {
+                            count++;
+                        }
+                    }
+                });
+            } catch (err) {
+                // Skip problematic directories
+            }
+        }
+    }
+    
+    videoCache.set(cacheKey, count);
+    return count;
 };
 
 // Enhanced video generator with better performance
@@ -429,6 +437,15 @@ const generateRandomVideos = function* (startIndex, limit, searchTerm = '', cele
             `/videos/${pathData.name}` : 
             `/videos/${pathData.folder}/${pathData.name}`;
         
+        // Get actual duration from ffmpeg if not available from filename
+        let actualDuration = videoInfo.duration;
+        if (!actualDuration) {
+            const fullVideoPath = pathData.isRoot ? 
+                path.join(VIDEOS_DIR, pathData.name) : 
+                path.join(VIDEOS_DIR, pathData.folder, pathData.name);
+            actualDuration = await getVideoDuration(fullVideoPath);
+        }
+        
         // Get or generate stats
         const views = videoViews.get(videoId) || Math.floor(Math.random() * 1000000) + 1000;
         const rating = videoRatings.get(videoId) || (Math.random() * 2 + 3); // 3-5 stars
@@ -438,7 +455,7 @@ const generateRandomVideos = function* (startIndex, limit, searchTerm = '', cele
             title: videoInfo.title,
             artist: pathData.artist,
             quality: videoInfo.quality,
-            duration: videoInfo.duration,
+            duration: actualDuration,
             categories: videoInfo.categories,
             videoUrl: videoPath,
             thumbnailUrl: `/thumbnails/${thumbnailName}`,
@@ -570,7 +587,7 @@ app.get('/api/videos', (req, res) => {
             }
         }
         
-        const totalCount = favoritesOnly ? favorites.size : countVideos(celebrity, category);
+        const totalCount = favoritesOnly ? favorites.size : countVideos(celebrity, category, duration);
         
         res.json({
             videos,

@@ -31,18 +31,50 @@ class VideoApp {
 
     async init() {
         this.setupEventListeners();
+        this.loadFromLocalStorage();
         await this.loadInitialData();
         this.updateUI();
+    }
+
+    loadFromLocalStorage() {
+        try {
+            // Load favorites from localStorage
+            const savedFavorites = localStorage.getItem('loveporn_favorites');
+            if (savedFavorites) {
+                this.favorites = new Set(JSON.parse(savedFavorites));
+            }
+            
+            // Load watch history from localStorage
+            const savedWatchHistory = localStorage.getItem('loveporn_watch_history');
+            if (savedWatchHistory) {
+                this.watchHistory = JSON.parse(savedWatchHistory);
+            }
+            
+            // Load search history from localStorage
+            const savedSearchHistory = localStorage.getItem('loveporn_search_history');
+            if (savedSearchHistory) {
+                this.searchHistory = JSON.parse(savedSearchHistory);
+            }
+        } catch (error) {
+            console.error('Error loading from localStorage:', error);
+        }
+    }
+
+    saveToLocalStorage() {
+        try {
+            localStorage.setItem('loveporn_favorites', JSON.stringify(Array.from(this.favorites)));
+            localStorage.setItem('loveporn_watch_history', JSON.stringify(this.watchHistory));
+            localStorage.setItem('loveporn_search_history', JSON.stringify(this.searchHistory));
+        } catch (error) {
+            console.error('Error saving to localStorage:', error);
+        }
     }
 
     async loadInitialData() {
         try {
             await Promise.all([
-                this.loadFavorites(),
                 this.loadCategories(),
                 this.loadPerformers(),
-                this.loadWatchHistory(),
-                this.loadSearchHistory(),
                 this.loadStats()
             ]);
             
@@ -231,37 +263,6 @@ class VideoApp {
             this.stats.totalWatchHistory = data.totalWatchHistory || 0;
         } catch (error) {
             console.error('Error loading stats:', error);
-        }
-    }
-
-    async loadFavorites() {
-        try {
-            const response = await fetch('/api/favorites');
-            const data = await response.json();
-            this.favorites = new Set(data.favorites || []);
-            this.updateFavoritesCount();
-        } catch (error) {
-            console.error('Error loading favorites:', error);
-        }
-    }
-
-    async loadWatchHistory() {
-        try {
-            const response = await fetch('/api/watch-history');
-            const data = await response.json();
-            this.watchHistory = data.videos || [];
-        } catch (error) {
-            console.error('Error loading watch history:', error);
-        }
-    }
-
-    async loadSearchHistory() {
-        try {
-            const response = await fetch('/api/search-history');
-            const data = await response.json();
-            this.searchHistory = data.history || [];
-        } catch (error) {
-            console.error('Error loading search history:', error);
         }
     }
 
@@ -564,12 +565,16 @@ class VideoApp {
 
     async addToSearchHistory(query) {
         try {
-            await fetch('/api/search-history', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ query })
-            });
-            await this.loadSearchHistory();
+            // Remove if already exists
+            this.searchHistory = this.searchHistory.filter(item => item.query !== query);
+            
+            // Add to beginning
+            this.searchHistory.unshift({ query, timestamp: Date.now() });
+            
+            // Keep only last 50 items
+            this.searchHistory = this.searchHistory.slice(0, 50);
+            
+            this.saveToLocalStorage();
         } catch (error) {
             console.error('Error adding to search history:', error);
         }
@@ -737,12 +742,29 @@ class VideoApp {
             let hasMore = false;
 
             if (this.currentFilter.section === 'watch-history') {
-                // Handle watch history separately
-                const response = await fetch(`/api/watch-history?page=${this.currentPage}&limit=20`);
+                // Handle watch history from localStorage
+                const startIndex = (this.currentPage - 1) * 20;
+                const endIndex = startIndex + 20;
+                const paginatedHistory = this.watchHistory.slice(startIndex, endIndex);
+                
+                videos = paginatedHistory;
+                total = this.watchHistory.length;
+                hasMore = endIndex < this.watchHistory.length;
+            } else if (this.currentFilter.section === 'favorites') {
+                // Handle favorites from localStorage
+                const params = new URLSearchParams({
+                    page: this.currentPage,
+                    limit: 20,
+                    favorites: 'true'
+                });
+                
+                const response = await fetch(`/api/videos?${params}`);
                 const data = await response.json();
-                videos = data.videos || [];
-                total = data.total || 0;
-                hasMore = data.hasMore || false;
+                
+                // Filter by localStorage favorites
+                videos = data.videos.filter(video => this.favorites.has(video.id));
+                total = videos.length;
+                hasMore = false; // Since we're filtering client-side
             } else {
                 // Regular video loading
                 const params = new URLSearchParams({
@@ -760,10 +782,6 @@ class VideoApp {
                 
                 if (this.currentFilter.category) {
                     params.append('category', this.currentFilter.category);
-                }
-                
-                if (this.currentFilter.section === 'favorites') {
-                    params.append('favorites', 'true');
                 }
                 
                 if (this.currentFilter.sort && this.currentFilter.sort !== 'random') {
@@ -934,7 +952,7 @@ class VideoApp {
         [playBtn, img].forEach(element => {
             element.addEventListener('click', () => {
                 this.openVideoModal(video);
-                this.addToWatchHistory(video.id);
+                this.addToWatchHistory(video);
             });
         });
         
@@ -1008,13 +1026,21 @@ class VideoApp {
         return stars;
     }
 
-    async addToWatchHistory(videoId) {
+    async addToWatchHistory(video) {
         try {
-            await fetch(`/api/watch-history/${videoId}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ timestamp: Date.now() })
+            // Remove if already exists
+            this.watchHistory = this.watchHistory.filter(item => item.id !== video.id);
+            
+            // Add to beginning with full video data
+            this.watchHistory.unshift({
+                ...video,
+                watchedAt: Date.now()
             });
+            
+            // Keep only last 100 items
+            this.watchHistory = this.watchHistory.slice(0, 100);
+            
+            this.saveToLocalStorage();
         } catch (error) {
             console.error('Error adding to watch history:', error);
         }
@@ -1025,21 +1051,16 @@ class VideoApp {
             const isFavorite = this.favorites.has(videoId);
             
             if (isFavorite) {
-                const response = await fetch(`/api/favorites/${videoId}`, { method: 'DELETE' });
-                if (response.ok) {
-                    this.favorites.delete(videoId);
-                    button.classList.remove('active');
-                    this.showToast('Removed from favorites', 'success');
-                }
+                this.favorites.delete(videoId);
+                button.classList.remove('active');
+                this.showToast('Removed from favorites', 'success');
             } else {
-                const response = await fetch(`/api/favorites/${videoId}`, { method: 'POST' });
-                if (response.ok) {
-                    this.favorites.add(videoId);
-                    button.classList.add('active');
-                    this.showToast('Added to favorites', 'success');
-                }
+                this.favorites.add(videoId);
+                button.classList.add('active');
+                this.showToast('Added to favorites', 'success');
             }
             
+            this.saveToLocalStorage();
             this.updateFavoritesCount();
         } catch (error) {
             console.error('Error toggling favorite:', error);
@@ -1077,6 +1098,13 @@ class VideoApp {
         modalVideoRating.textContent = (video.rating || 4.2).toFixed(1);
         modalVideoDuration.textContent = video.duration || 'Unknown';
         modalVideoQuality.textContent = video.quality || 'HD';
+        
+        // Add click handler for performer name in modal
+        modalVideoPerformer.addEventListener('click', (e) => {
+            e.preventDefault();
+            this.closeVideoModal();
+            this.filterByPerformer(modalVideoPerformer.dataset.performer);
+        });
         
         if (video.categories && video.categories.length > 0) {
             modalVideoCategories.innerHTML = video.categories.map(cat => 
@@ -1129,7 +1157,7 @@ class VideoApp {
             
             if (currentVideo.categories && currentVideo.categories.length > 0) {
                 params.append('category', currentVideo.categories[0]);
-            } else if (currentVideo.artist) {
+            } else if (currentVideo.artist && currentVideo.artist !== 'Random') {
                 params.append('celebrity', currentVideo.artist);
             }
             
@@ -1175,7 +1203,7 @@ class VideoApp {
                 const video = videos.find(v => v.id === videoId);
                 if (video) {
                     this.openVideoModal(video);
-                    this.addToWatchHistory(video.id);
+                    this.addToWatchHistory(video);
                 }
             });
         });
@@ -1199,19 +1227,14 @@ class VideoApp {
             const isFavorite = this.favorites.has(this.currentVideoId);
             
             if (isFavorite) {
-                const response = await fetch(`/api/favorites/${this.currentVideoId}`, { method: 'DELETE' });
-                if (response.ok) {
-                    this.favorites.delete(this.currentVideoId);
-                    this.showToast('Removed from favorites', 'success');
-                }
+                this.favorites.delete(this.currentVideoId);
+                this.showToast('Removed from favorites', 'success');
             } else {
-                const response = await fetch(`/api/favorites/${this.currentVideoId}`, { method: 'POST' });
-                if (response.ok) {
-                    this.favorites.add(this.currentVideoId);
-                    this.showToast('Added to favorites', 'success');
-                }
+                this.favorites.add(this.currentVideoId);
+                this.showToast('Added to favorites', 'success');
             }
             
+            this.saveToLocalStorage();
             this.updateModalActionButtons();
             this.updateFavoritesCount();
             
