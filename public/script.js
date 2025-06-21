@@ -239,6 +239,20 @@ class VideoApp {
                 }
             }
         }, 200));
+
+        // Infinite scroll for related videos
+        this.setupRelatedVideosInfiniteScroll();
+    }
+
+    setupRelatedVideosInfiniteScroll() {
+        const relatedVideosContainer = document.getElementById('relatedVideosGrid');
+        if (relatedVideosContainer) {
+            relatedVideosContainer.addEventListener('scroll', this.debounce(() => {
+                if (relatedVideosContainer.scrollTop + relatedVideosContainer.clientHeight >= relatedVideosContainer.scrollHeight - 100) {
+                    this.loadMoreRelatedVideos();
+                }
+            }, 200));
+        }
     }
 
     debounce(func, wait) {
@@ -1089,6 +1103,7 @@ class VideoApp {
         const modalVideoCategories = document.getElementById('modalVideoCategories');
         
         modalVideo.src = `/api/video-stream/${video.id}`;
+        modalVideo.autoplay = true; // Enable autoplay
         modalVideo.load();
         
         modalVideoTitle.textContent = video.title;
@@ -1150,6 +1165,10 @@ class VideoApp {
 
     async loadRelatedVideos(currentVideo) {
         try {
+            this.relatedVideosPage = 1;
+            this.relatedVideosHasMore = true;
+            this.currentRelatedVideo = currentVideo;
+            
             const params = new URLSearchParams({
                 page: 1,
                 limit: 20
@@ -1166,16 +1185,52 @@ class VideoApp {
             
             if (data.videos) {
                 const relatedVideos = data.videos.filter(v => v.id !== currentVideo.id);
-                this.renderRelatedVideos(relatedVideos);
+                this.renderRelatedVideos(relatedVideos, true);
+                this.relatedVideosHasMore = data.hasMore;
+                this.relatedVideosPage = 2;
             }
         } catch (error) {
             console.error('Error loading related videos:', error);
         }
     }
 
-    renderRelatedVideos(videos) {
+    async loadMoreRelatedVideos() {
+        if (!this.relatedVideosHasMore || !this.currentRelatedVideo) return;
+        
+        try {
+            const params = new URLSearchParams({
+                page: this.relatedVideosPage,
+                limit: 20
+            });
+            
+            if (this.currentRelatedVideo.categories && this.currentRelatedVideo.categories.length > 0) {
+                params.append('category', this.currentRelatedVideo.categories[0]);
+            } else if (this.currentRelatedVideo.artist && this.currentRelatedVideo.artist !== 'Random') {
+                params.append('celebrity', this.currentRelatedVideo.artist);
+            }
+            
+            const response = await fetch(`/api/videos?${params}`);
+            const data = await response.json();
+            
+            if (data.videos) {
+                const relatedVideos = data.videos.filter(v => v.id !== this.currentRelatedVideo.id);
+                this.renderRelatedVideos(relatedVideos, false);
+                this.relatedVideosHasMore = data.hasMore;
+                this.relatedVideosPage++;
+            }
+        } catch (error) {
+            console.error('Error loading more related videos:', error);
+        }
+    }
+
+    renderRelatedVideos(videos, reset = false) {
         const relatedVideosGrid = document.getElementById('relatedVideosGrid');
-        relatedVideosGrid.innerHTML = videos.map(video => {
+        
+        if (reset) {
+            relatedVideosGrid.innerHTML = '';
+        }
+        
+        const videosHTML = videos.map(video => {
             const thumbnailUrl = video.thumbnailExists ? video.thumbnailUrl : 'https://images.pexels.com/photos/1181467/pexels-photo-1181467.jpeg?auto=compress&cs=tinysrgb&w=300';
             
             return `
@@ -1197,7 +1252,11 @@ class VideoApp {
             `;
         }).join('');
         
-        relatedVideosGrid.querySelectorAll('.related-video-card').forEach(card => {
+        relatedVideosGrid.insertAdjacentHTML('beforeend', videosHTML);
+        
+        // Add event listeners to new cards
+        relatedVideosGrid.querySelectorAll('.related-video-card:not([data-listener])').forEach(card => {
+            card.setAttribute('data-listener', 'true');
             card.addEventListener('click', () => {
                 const videoId = card.dataset.videoId;
                 const video = videos.find(v => v.id === videoId);
@@ -1218,6 +1277,7 @@ class VideoApp {
         modalVideo.src = '';
         document.body.style.overflow = '';
         this.currentVideoId = null;
+        this.currentRelatedVideo = null;
     }
 
     async toggleModalFavorite() {

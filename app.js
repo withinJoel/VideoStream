@@ -158,6 +158,28 @@ const getFileDate = (pathData) => {
     }
 };
 
+// Helper function to parse duration and check if it matches filter
+const matchesDurationFilter = (duration, durationFilter) => {
+    if (!durationFilter || !duration) return true;
+    
+    // Parse duration string (e.g., "15:30" or "5:45")
+    const parts = duration.split(':');
+    if (parts.length !== 2) return true;
+    
+    const minutes = parseInt(parts[0]) + (parseInt(parts[1]) / 60);
+    
+    switch (durationFilter) {
+        case 'short':
+            return minutes <= 10;
+        case 'medium':
+            return minutes > 10 && minutes <= 30;
+        case 'long':
+            return minutes > 30;
+        default:
+            return true;
+    }
+};
+
 // Get all celebrity folders (performers) with caching
 const getCelebrityFolders = () => {
     const now = Date.now();
@@ -236,28 +258,6 @@ const getAllCategories = () => {
     }));
     
     return categoriesCache;
-};
-
-// Helper function to parse duration and check if it matches filter
-const matchesDurationFilter = (duration, durationFilter) => {
-    if (!durationFilter || !duration) return true;
-    
-    // Parse duration string (e.g., "15:30" or "5:45")
-    const parts = duration.split(':');
-    if (parts.length !== 2) return true;
-    
-    const minutes = parseInt(parts[0]) + (parseInt(parts[1]) / 60);
-    
-    switch (durationFilter) {
-        case 'short':
-            return minutes <= 10;
-        case 'medium':
-            return minutes > 10 && minutes <= 30;
-        case 'long':
-            return minutes > 30;
-        default:
-            return true;
-    }
 };
 
 // Quick file count with caching
