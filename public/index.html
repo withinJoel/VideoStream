@@ -42,25 +42,19 @@
             </div>
             
             <div class="header-right">
-                <button class="header-btn favorites-btn" id="favoritesBtn" title="Favorites">
-                    <i class="fas fa-heart"></i>
-                    <span class="favorites-count">0</span>
-                </button>
-                <button class="header-btn playlist-btn" title="Playlists">
-                    <i class="fas fa-list"></i>
-                </button>
                 <div class="user-menu">
                     <button class="user-avatar" id="userMenuBtn">
                         <i class="fas fa-user"></i>
                     </button>
                     <div class="user-dropdown" id="userDropdown">
-                        <a href="#" class="dropdown-item">
-                            <i class="fas fa-history"></i>
-                            Watch History
-                        </a>
                         <a href="#" class="dropdown-item" id="favoritesDropdownBtn">
                             <i class="fas fa-heart"></i>
                             Favorite Videos
+                            <span class="favorites-count">0</span>
+                        </a>
+                        <a href="#" class="dropdown-item" id="watchHistoryBtn">
+                            <i class="fas fa-history"></i>
+                            Watch History
                         </a>
                         <div class="dropdown-divider"></div>
                         <a href="#" class="dropdown-item">
@@ -103,6 +97,10 @@
                     <i class="fas fa-heart"></i>
                     Favorites
                 </a>
+                <a href="#" class="mobile-nav-link" data-section="watch-history">
+                    <i class="fas fa-history"></i>
+                    Watch History
+                </a>
             </nav>
             
             <div class="mobile-nav-section">
@@ -135,18 +133,6 @@
                             <option value="oldest">Oldest</option>
                             <option value="most-viewed">Most Viewed</option>
                             <option value="highest-rated">Highest Rated</option>
-                            <option value="longest">Longest</option>
-                            <option value="shortest">Shortest</option>
-                        </select>
-                    </div>
-                    
-                    <div class="filter-group">
-                        <label class="filter-label">Duration:</label>
-                        <select class="filter-select" id="durationSelect">
-                            <option value="">All</option>
-                            <option value="short">Under 10 min</option>
-                            <option value="medium">10-20 min</option>
-                            <option value="long">20+ min</option>
                         </select>
                     </div>
                     
@@ -167,9 +153,6 @@
                     </button>
                     <button class="shuffle-btn" id="shuffleBtn" title="Shuffle">
                         <i class="fas fa-random"></i>
-                    </button>
-                    <button class="filter-toggle-btn" id="filterToggleBtn" title="More Filters">
-                        <i class="fas fa-filter"></i>
                     </button>
                 </div>
             </div>
@@ -217,14 +200,6 @@
             <!-- Videos will be loaded dynamically -->
         </div>
 
-        <!-- Load More Button -->
-        <div class="load-more-container">
-            <button class="load-more-btn" id="loadMoreBtn" style="display: none;">
-                <i class="fas fa-plus"></i>
-                Load More Videos
-            </button>
-        </div>
-
         <!-- No Results -->
         <div class="no-results" id="noResults" style="display: none;">
             <div class="no-results-icon">
@@ -254,9 +229,6 @@
                     <button class="modal-action-btn" id="modalShareBtn" title="Share">
                         <i class="fas fa-share"></i>
                     </button>
-                    <button class="modal-action-btn" id="modalDownloadBtn" title="Download">
-                        <i class="fas fa-download"></i>
-                    </button>
                 </div>
             </div>
             
@@ -270,9 +242,6 @@
                         <div class="video-overlay-controls">
                             <button class="video-control-btn favorite-video-btn" id="modalFavoriteBtn">
                                 <i class="fas fa-heart"></i>
-                            </button>
-                            <button class="video-control-btn playlist-add-btn" id="modalPlaylistBtn">
-                                <i class="fas fa-plus"></i>
                             </button>
                         </div>
                     </div>
@@ -288,8 +257,8 @@
                                         <span id="modalVideoViews">0</span> views
                                     </span>
                                     <span class="video-stat">
-                                        <i class="fas fa-thumbs-up"></i>
-                                        <span id="modalVideoLikes">0</span>
+                                        <i class="fas fa-star"></i>
+                                        <span id="modalVideoRating">4.2</span>
                                     </span>
                                     <span class="video-stat">
                                         <i class="fas fa-clock"></i>
@@ -303,14 +272,6 @@
                             </div>
                             <div class="video-meta-right">
                                 <div class="video-actions">
-                                    <button class="action-btn like-btn" id="modalLikeBtn">
-                                        <i class="fas fa-thumbs-up"></i>
-                                        <span>Like</span>
-                                    </button>
-                                    <button class="action-btn dislike-btn" id="modalDislikeBtn">
-                                        <i class="fas fa-thumbs-down"></i>
-                                        <span>Dislike</span>
-                                    </button>
                                     <button class="action-btn favorite-btn" id="modalFavBtn">
                                         <i class="fas fa-heart"></i>
                                         <span>Favorite</span>

@@ -37,10 +37,9 @@ let lastScanTime = 0;
 const watchers = new Map();
 let randomSeed = Math.random();
 
-// Enhanced storage with watch history and playlists
+// Enhanced storage with watch history
 let favorites = new Set();
 let watchHistory = [];
-let playlists = new Map();
 let videoRatings = new Map();
 let videoViews = new Map();
 let searchHistory = [];
@@ -347,15 +346,15 @@ const generateRandomVideos = function* (startIndex, limit, searchTerm = '', cele
     // Enhanced sorting
     if (sortBy === 'newest') {
         filtered.sort((a, b) => {
-            const aPath = a.isRoot ? path.join(VIDEOS_DIR, a.name) : path.join(VIDEOS_DIR, a.folder, a.name);
-            const bPath = b.isRoot ? path.join(VIDEOS_DIR, b.name) : path.join(VIDEOS_DIR, b.folder, b.name);
-            try {
-                const aStat = fs.statSync(aPath);
-                const bStat = fs.statSync(bPath);
-                return bStat.mtime - aStat.mtime;
-            } catch (err) {
-                return 0;
-            }
+            const aDate = getFileDate(a);
+            const bDate = getFileDate(b);
+            return bDate - aDate;
+        });
+    } else if (sortBy === 'oldest') {
+        filtered.sort((a, b) => {
+            const aDate = getFileDate(a);
+            const bDate = getFileDate(b);
+            return aDate - bDate;
         });
     } else if (sortBy === 'most-viewed') {
         filtered.sort((a, b) => {
@@ -364,6 +363,14 @@ const generateRandomVideos = function* (startIndex, limit, searchTerm = '', cele
             const aViews = videoViews.get(aId) || 0;
             const bViews = videoViews.get(bId) || 0;
             return bViews - aViews;
+        });
+    } else if (sortBy === 'highest-rated') {
+        filtered.sort((a, b) => {
+            const aId = a.isRoot ? `root_${path.parse(a.name).name}` : `${a.folder}_${path.parse(a.name).name}`;
+            const bId = b.isRoot ? `root_${path.parse(b.name).name}` : `${b.folder}_${path.parse(b.name).name}`;
+            const aRating = videoRatings.get(aId) || 4.0;
+            const bRating = videoRatings.get(bId) || 4.0;
+            return bRating - aRating;
         });
     } else if (sortBy === 'random') {
         // Randomize
@@ -410,7 +417,7 @@ const generateRandomVideos = function* (startIndex, limit, searchTerm = '', cele
             isFavorite: favorites.has(videoId),
             views: views,
             rating: rating,
-            uploadDate: getFileDate(pathData) // Fixed: Call getFileDate function directly
+            uploadDate: getFileDate(pathData)
         };
     }
 };
@@ -510,8 +517,7 @@ app.get('/api/videos', (req, res) => {
             category = '', 
             favorites = 'false',
             sort = 'random',
-            quality = '',
-            duration = ''
+            quality = ''
         } = req.query;
         
         const startIndex = (parseInt(page) - 1) * parseInt(limit);
@@ -756,76 +762,6 @@ app.post('/api/rate/:id', (req, res) => {
     }
 });
 
-// Playlist management
-app.post('/api/playlists', (req, res) => {
-    try {
-        const { name, description = '' } = req.body;
-        const id = Date.now().toString();
-        
-        playlists.set(id, {
-            id,
-            name,
-            description,
-            videos: [],
-            createdAt: Date.now(),
-            updatedAt: Date.now()
-        });
-        
-        res.json({ message: 'Playlist created', playlist: playlists.get(id) });
-    } catch (err) {
-        res.status(500).json({ error: 'Failed to create playlist' });
-    }
-});
-
-app.get('/api/playlists', (req, res) => {
-    try {
-        const playlistArray = Array.from(playlists.values());
-        res.json({ playlists: playlistArray });
-    } catch (err) {
-        res.status(500).json({ error: 'Failed to get playlists' });
-    }
-});
-
-app.post('/api/playlists/:playlistId/videos/:videoId', (req, res) => {
-    try {
-        const { playlistId, videoId } = req.params;
-        const playlist = playlists.get(playlistId);
-        
-        if (!playlist) {
-            return res.status(404).json({ error: 'Playlist not found' });
-        }
-        
-        if (!playlist.videos.includes(videoId)) {
-            playlist.videos.push(videoId);
-            playlist.updatedAt = Date.now();
-            playlists.set(playlistId, playlist);
-        }
-        
-        res.json({ message: 'Video added to playlist', playlist });
-    } catch (err) {
-        res.status(500).json({ error: 'Failed to add video to playlist' });
-    }
-});
-
-app.delete('/api/playlists/:playlistId/videos/:videoId', (req, res) => {
-    try {
-        const { playlistId, videoId } = req.params;
-        const playlist = playlists.get(playlistId);
-        
-        if (!playlist) {
-            return res.status(404).json({ error: 'Playlist not found' });
-        }
-        
-        playlist.videos = playlist.videos.filter(id => id !== videoId);
-        playlist.updatedAt = Date.now();
-        playlists.set(playlistId, playlist);
-        
-        res.json({ message: 'Video removed from playlist', playlist });
-    } catch (err) {
-        res.status(500).json({ error: 'Failed to remove video from playlist' });
-    }
-});
-
 // Search history
 app.post('/api/search-history', (req, res) => {
     try {
@@ -913,7 +849,6 @@ app.get('/api/stats', (req, res) => {
         totalVideos: videoCount,
         totalFavorites: favorites.size,
         totalWatchHistory: watchHistory.length,
-        totalPlaylists: playlists.size,
         watchedDirectories: watchers.size,
         pendingThumbnails: thumbnailQueue.size,
         cacheSize: videoCache.size,
@@ -981,7 +916,7 @@ app.get('/', (req, res) => {
 });
 
 // Initialize
-console.log('🚀 Initializing enhanced video platform...');
+console.log('🚀 Initializing ultra-fast celebrity video server...');
 videoCount = countVideos();
 setupWatchers();
 
@@ -995,9 +930,9 @@ setInterval(() => {
 }, 60000); // Every minute
 
 app.listen(PORT, () => {
-    console.log(`⚡ Enhanced Video Platform: http://localhost:${PORT}`);
+    console.log(`⚡ Ultra-Fast Celebrity Video Server: http://localhost:${PORT}`);
     console.log(`📹 Found ${videoCount} videos`);
     console.log(`🔥 Real-time updates enabled`);
     console.log(`💾 Memory-optimized streaming with hover preview`);
-    console.log(`⭐ Enhanced features: Watch History, Playlists, Ratings, Trending`);
+    console.log(`⭐ Enhanced features: Watch History, Favorites, Ratings, Trending`);
 });
