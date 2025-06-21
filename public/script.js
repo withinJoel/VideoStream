@@ -7,32 +7,64 @@ class VideoApp {
             search: '',
             celebrity: '',
             category: '',
-            section: 'home'
+            section: 'home',
+            sort: 'random',
+            duration: '',
+            quality: ''
         };
-        this.isGridView = true;
+        this.currentView = 'grid';
         this.favorites = new Set();
+        this.likes = new Set();
+        this.dislikes = new Set();
+        this.viewHistory = [];
+        this.currentVideoId = null;
+        
+        // Statistics
+        this.stats = {
+            totalVideos: 0,
+            totalPerformers: 0,
+            totalCategories: 0
+        };
         
         this.init();
     }
 
     async init() {
         this.setupEventListeners();
-        await this.loadFavorites();
-        await this.loadCategories();
-        await this.loadPerformers();
-        await this.loadVideos(true);
+        await this.loadInitialData();
+        this.updateUI();
+    }
+
+    async loadInitialData() {
+        try {
+            await Promise.all([
+                this.loadFavorites(),
+                this.loadCategories(),
+                this.loadPerformers(),
+                this.loadStats()
+            ]);
+            
+            // Load videos after initial data is loaded
+            await this.loadVideos(true);
+        } catch (error) {
+            console.error('Error loading initial data:', error);
+            this.showToast('Error loading data', 'error');
+        }
     }
 
     setupEventListeners() {
-        // Menu toggle
-        document.getElementById('menuToggle').addEventListener('click', () => {
-            document.getElementById('sidebar').classList.toggle('collapsed');
+        // Mobile menu
+        document.getElementById('mobileMenuBtn').addEventListener('click', () => {
+            document.getElementById('mobileNav').classList.add('active');
+        });
+
+        document.getElementById('mobileNavClose').addEventListener('click', () => {
+            document.getElementById('mobileNav').classList.remove('active');
         });
 
         // Home button
         document.getElementById('homeButton').addEventListener('click', () => {
-            this.resetFilters();
-            this.loadVideos(true);
+            this.navigateToSection('home');
         });
 
         // Search functionality
@@ -40,7 +72,7 @@ class VideoApp {
         const searchBtn = document.getElementById('searchBtn');
         
         searchInput.addEventListener('input', this.debounce(() => {
-            this.handleSearch();
+            this.handleSearchInput();
         }, 300));
         
         searchInput.addEventListener('keypress', (e) => {
@@ -60,9 +92,46 @@ class VideoApp {
             }
         });
 
+        // Navigation
+        document.addEventListener('click', (e) => {
+            const navLink = e.target.closest('.nav-link, .mobile-nav-link');
+            if (navLink) {
+                e.preventDefault();
+                const section = navLink.dataset.section;
+                if (section) {
+                    this.navigateToSection(section);
+                    // Close mobile nav if open
+                    document.getElementById('mobileNav').classList.remove('active');
+                }
+            }
+        });
+
+        // Filter controls
+        document.getElementById('sortSelect').addEventListener('change', (e) => {
+            this.currentFilter.sort = e.target.value;
+            this.applyFilters();
+        });
+
+        document.getElementById('durationSelect').addEventListener('change', (e) => {
+            this.currentFilter.duration = e.target.value;
+            this.applyFilters();
+        });
+
+        document.getElementById('qualitySelect').addEventListener('change', (e) => {
+            this.currentFilter.quality = e.target.value;
+            this.applyFilters();
+        });
+
         // View toggle
-        document.getElementById('viewToggle').addEventListener('click', () => {
+        document.getElementById('viewToggleBtn').addEventListener('click', () => {
             this.toggleView();
+        });
+
+        // View options
+        document.querySelectorAll('.view-option').forEach(btn => {
+            btn.addEventListener('click', () => {
+                this.setView(btn.dataset.view);
+            });
         });
 
         // Shuffle button
@@ -75,42 +144,81 @@ class VideoApp {
             this.loadVideos(false);
         });
 
-        // Navigation items
-        document.addEventListener('click', (e) => {
-            if (e.target.closest('.nav-item')) {
-                e.preventDefault();
-                const navItem = e.target.closest('.nav-item');
-                this.handleNavigation(navItem);
-            }
+        // Favorites button
+        document.getElementById('favoritesBtn').addEventListener('click', () => {
+            this.navigateToSection('favorites');
+        });
+
+        // User menu
+        document.getElementById('userMenuBtn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            const dropdown = document.getElementById('userDropdown');
+            dropdown.classList.toggle('active');
+        });
+
+        // Clear filters
+        document.getElementById('clearFiltersBtn').addEventListener('click', () => {
+            this.clearAllFilters();
         });
 
         // Video modal
-        document.getElementById('modalOverlay').addEventListener('click', () => {
+        document.getElementById('modalBackdrop').addEventListener('click', () => {
             this.closeVideoModal();
         });
         
-        document.getElementById('modalClose').addEventListener('click', () => {
+        document.getElementById('modalCloseBtn').addEventListener('click', () => {
             this.closeVideoModal();
         });
 
-        // Modal favorite button
+        // Modal actions
         document.getElementById('modalFavoriteBtn').addEventListener('click', () => {
             this.toggleModalFavorite();
         });
 
-        // Close modal with Escape key
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') {
-                this.closeVideoModal();
-            }
+        document.getElementById('modalLikeBtn').addEventListener('click', () => {
+            this.toggleModalLike();
         });
 
-        // Click outside search suggestions to close
+        document.getElementById('modalDislikeBtn').addEventListener('click', () => {
+            this.toggleModalDislike();
+        });
+
+        document.getElementById('modalFavBtn').addEventListener('click', () => {
+            this.toggleModalFavorite();
+        });
+
+        // Close dropdowns when clicking outside
         document.addEventListener('click', (e) => {
             if (!e.target.closest('.search-container')) {
                 document.getElementById('searchSuggestions').style.display = 'none';
             }
+            
+            if (!e.target.closest('.user-menu')) {
+                document.getElementById('userDropdown').classList.remove('active');
+            }
         });
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                this.closeVideoModal();
+                document.getElementById('mobileNav').classList.remove('active');
+            }
+            
+            if (e.key === '/' && !e.target.matches('input, textarea')) {
+                e.preventDefault();
+                document.getElementById('searchInput').focus();
+            }
+        });
+
+        // Infinite scroll (optional)
+        window.addEventListener('scroll', this.debounce(() => {
+            if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 1000) {
+                if (this.hasMore && !this.isLoading) {
+                    this.loadVideos(false);
+                }
+            }
+        }, 200));
     }
 
     debounce(func, wait) {
@@ -125,49 +233,334 @@ class VideoApp {
         };
     }
 
-    resetFilters() {
+    async loadStats() {
+        try {
+            const response = await fetch('/api/stats');
+            const data = await response.json();
+            
+            this.stats.totalVideos = data.totalVideos || 0;
+            
+            // Update hero stats
+            document.getElementById('totalVideosCount').textContent = this.formatNumber(this.stats.totalVideos);
+            document.getElementById('totalPerformersCount').textContent = this.formatNumber(this.stats.totalPerformers);
+            document.getElementById('totalCategoriesCount').textContent = this.formatNumber(this.stats.totalCategories);
+        } catch (error) {
+            console.error('Error loading stats:', error);
+        }
+    }
+
+    async loadFavorites() {
+        try {
+            const response = await fetch('/api/favorites');
+            const data = await response.json();
+            this.favorites = new Set(data.favorites || []);
+            this.updateFavoritesCount();
+        } catch (error) {
+            console.error('Error loading favorites:', error);
+        }
+    }
+
+    async loadCategories() {
+        try {
+            const response = await fetch('/api/categories');
+            const data = await response.json();
+            
+            this.stats.totalCategories = data.categories.length;
+            this.renderCategories(data.categories);
+            this.renderMobileCategories(data.categories);
+        } catch (error) {
+            console.error('Error loading categories:', error);
+        }
+    }
+
+    async loadPerformers() {
+        try {
+            const response = await fetch('/api/celebrities');
+            const data = await response.json();
+            
+            this.stats.totalPerformers = data.celebrities.length;
+            this.renderPerformers(data.celebrities);
+            this.renderMobilePerformers(data.celebrities);
+        } catch (error) {
+            console.error('Error loading performers:', error);
+        }
+    }
+
+    renderCategories(categories) {
+        const categoriesGrid = document.getElementById('categoriesGrid');
+        categoriesGrid.innerHTML = categories.map(category => `
+            <div class="category-card" data-category="${category.name}">
+                <div class="category-icon">
+                    <i class="fas fa-tag"></i>
+                </div>
+                <div class="category-name">${category.displayName}</div>
+                <div class="category-count">${this.formatNumber(category.count)} videos</div>
+            </div>
+        `).join('');
+
+        // Add click handlers
+        categoriesGrid.querySelectorAll('.category-card').forEach(card => {
+            card.addEventListener('click', () => {
+                const categoryName = card.dataset.category;
+                this.filterByCategory(categoryName);
+            });
+        });
+    }
+
+    renderPerformers(performers) {
+        const performersGrid = document.getElementById('performersGrid');
+        performersGrid.innerHTML = performers.map(performer => `
+            <div class="performer-card" data-performer="${performer.name}">
+                <div class="performer-avatar">
+                    <i class="fas fa-user"></i>
+                </div>
+                <div class="performer-info">
+                    <div class="performer-name">${performer.displayName}</div>
+                    <div class="performer-video-count">${this.formatNumber(performer.videoCount)} videos</div>
+                </div>
+            </div>
+        `).join('');
+
+        // Add click handlers
+        performersGrid.querySelectorAll('.performer-card').forEach(card => {
+            card.addEventListener('click', () => {
+                const performerName = card.dataset.performer;
+                this.filterByPerformer(performerName);
+            });
+        });
+    }
+
+    renderMobileCategories(categories) {
+        const mobileCategories = document.getElementById('mobileCategoriesList');
+        mobileCategories.innerHTML = categories.slice(0, 10).map(category => `
+            <a href="#" class="mobile-category-item" data-category="${category.name}">
+                <span>${category.displayName}</span>
+                <span class="mobile-item-count">${category.count}</span>
+            </a>
+        `).join('');
+
+        // Add click handlers
+        mobileCategories.querySelectorAll('.mobile-category-item').forEach(item => {
+            item.addEventListener('click', (e) => {
+                e.preventDefault();
+                const categoryName = item.dataset.category;
+                this.filterByCategory(categoryName);
+                document.getElementById('mobileNav').classList.remove('active');
+            });
+        });
+    }
+
+    renderMobilePerformers(performers) {
+        const mobilePerformers = document.getElementById('mobilePerformersList');
+        mobilePerformers.innerHTML = performers.slice(0, 10).map(performer => `
+            <a href="#" class="mobile-performer-item" data-performer="${performer.name}">
+                <span>${performer.displayName}</span>
+                <span class="mobile-item-count">${performer.videoCount}</span>
+            </a>
+        `).join('');
+
+        // Add click handlers
+        mobilePerformers.querySelectorAll('.mobile-performer-item').forEach(item => {
+            item.addEventListener('click', (e) => {
+                e.preventDefault();
+                const performerName = item.dataset.performer;
+                this.filterByPerformer(performerName);
+                document.getElementById('mobileNav').classList.remove('active');
+            });
+        });
+    }
+
+    navigateToSection(section) {
+        // Update active nav items
+        document.querySelectorAll('.nav-link, .mobile-nav-link').forEach(link => {
+            link.classList.remove('active');
+        });
+        
+        document.querySelectorAll(`[data-section="${section}"]`).forEach(link => {
+            link.classList.add('active');
+        });
+
+        // Reset filters and set section
         this.currentFilter = {
             search: '',
             celebrity: '',
             category: '',
-            section: 'home'
+            section: section,
+            sort: 'random',
+            duration: '',
+            quality: ''
         };
+        
         this.currentPage = 1;
         this.hasMore = true;
+
+        // Update UI based on section
+        this.updateContentForSection(section);
         
         // Clear search input
         document.getElementById('searchInput').value = '';
         
-        // Update active nav item
-        document.querySelectorAll('.nav-item').forEach(item => {
-            item.classList.remove('active');
-        });
-        document.querySelector('[data-section="home"]').classList.add('active');
-        
-        // Update content title
-        document.getElementById('contentTitle').textContent = 'All Videos';
-        document.getElementById('currentFilter').textContent = 'All';
+        // Load content
+        if (section === 'categories') {
+            this.showCategoriesGrid();
+        } else if (section === 'performers') {
+            this.showPerformersGrid();
+        } else {
+            this.showVideoGrid();
+            this.loadVideos(true);
+        }
     }
 
-    async handleSearch() {
+    updateContentForSection(section) {
+        let title = 'All Videos';
+        let breadcrumb = 'Home';
+        
+        switch (section) {
+            case 'home':
+                title = 'All Videos';
+                breadcrumb = 'Home';
+                break;
+            case 'trending':
+                title = 'Trending Videos';
+                breadcrumb = 'Home / Trending';
+                break;
+            case 'new':
+                title = 'New Videos';
+                breadcrumb = 'Home / New';
+                break;
+            case 'top-rated':
+                title = 'Top Rated Videos';
+                breadcrumb = 'Home / Top Rated';
+                break;
+            case 'favorites':
+                title = 'Favorite Videos';
+                breadcrumb = 'Home / Favorites';
+                break;
+            case 'categories':
+                title = 'All Categories';
+                breadcrumb = 'Home / Categories';
+                break;
+            case 'performers':
+                title = 'All Performers';
+                breadcrumb = 'Home / Performers';
+                break;
+        }
+        
+        document.getElementById('contentTitle').textContent = title;
+        document.getElementById('contentBreadcrumb').innerHTML = breadcrumb.split(' / ').map(crumb => `<span>${crumb}</span>`).join('');
+    }
+
+    showCategoriesGrid() {
+        document.getElementById('heroSection').style.display = 'none';
+        document.getElementById('filterBar').style.display = 'none';
+        document.getElementById('videoGrid').style.display = 'none';
+        document.getElementById('performersGrid').style.display = 'none';
+        document.getElementById('categoriesGrid').style.display = 'grid';
+        document.getElementById('loadMoreBtn').style.display = 'none';
+        document.getElementById('noResults').style.display = 'none';
+    }
+
+    showPerformersGrid() {
+        document.getElementById('heroSection').style.display = 'none';
+        document.getElementById('filterBar').style.display = 'none';
+        document.getElementById('videoGrid').style.display = 'none';
+        document.getElementById('categoriesGrid').style.display = 'none';
+        document.getElementById('performersGrid').style.display = 'grid';
+        document.getElementById('loadMoreBtn').style.display = 'none';
+        document.getElementById('noResults').style.display = 'none';
+    }
+
+    showVideoGrid() {
+        document.getElementById('heroSection').style.display = this.currentFilter.section === 'home' ? 'flex' : 'none';
+        document.getElementById('filterBar').style.display = 'block';
+        document.getElementById('categoriesGrid').style.display = 'none';
+        document.getElementById('performersGrid').style.display = 'none';
+        document.getElementById('videoGrid').style.display = 'grid';
+    }
+
+    filterByCategory(category) {
+        this.currentFilter = {
+            search: '',
+            celebrity: '',
+            category: category,
+            section: 'category',
+            sort: this.currentFilter.sort,
+            duration: this.currentFilter.duration,
+            quality: this.currentFilter.quality
+        };
+        
+        this.currentPage = 1;
+        this.hasMore = true;
+        
+        this.updateContentForSection('category');
+        document.getElementById('contentTitle').textContent = `Category: ${this.formatName(category)}`;
+        document.getElementById('contentBreadcrumb').innerHTML = `<span>Home</span><span>Categories</span><span>${this.formatName(category)}</span>`;
+        
+        this.showVideoGrid();
+        this.loadVideos(true);
+    }
+
+    filterByPerformer(performer) {
+        this.currentFilter = {
+            search: '',
+            celebrity: performer,
+            category: '',
+            section: 'performer',
+            sort: this.currentFilter.sort,
+            duration: this.currentFilter.duration,
+            quality: this.currentFilter.quality
+        };
+        
+        this.currentPage = 1;
+        this.hasMore = true;
+        
+        this.updateContentForSection('performer');
+        document.getElementById('contentTitle').textContent = `Performer: ${this.formatName(performer)}`;
+        document.getElementById('contentBreadcrumb').innerHTML = `<span>Home</span><span>Performers</span><span>${this.formatName(performer)}</span>`;
+        
+        this.showVideoGrid();
+        this.loadVideos(true);
+    }
+
+    handleSearchInput() {
         const searchTerm = document.getElementById('searchInput').value.trim();
-        this.currentFilter.search = searchTerm;
-        this.currentFilter.celebrity = '';
-        this.currentFilter.category = '';
-        this.currentFilter.section = 'search';
+        if (searchTerm.length >= 2) {
+            this.showSearchSuggestions(searchTerm);
+        } else {
+            document.getElementById('searchSuggestions').style.display = 'none';
+        }
+    }
+
+    handleSearch() {
+        const searchTerm = document.getElementById('searchInput').value.trim();
+        
+        this.currentFilter = {
+            search: searchTerm,
+            celebrity: '',
+            category: '',
+            section: 'search',
+            sort: this.currentFilter.sort,
+            duration: this.currentFilter.duration,
+            quality: this.currentFilter.quality
+        };
+        
         this.currentPage = 1;
         this.hasMore = true;
         
         // Update UI
-        document.getElementById('contentTitle').textContent = searchTerm ? `Search: "${searchTerm}"` : 'All Videos';
-        document.getElementById('currentFilter').textContent = searchTerm || 'All';
+        const title = searchTerm ? `Search: "${searchTerm}"` : 'All Videos';
+        const breadcrumb = searchTerm ? `<span>Home</span><span>Search</span><span>"${searchTerm}"</span>` : '<span>Home</span>';
+        
+        document.getElementById('contentTitle').textContent = title;
+        document.getElementById('contentBreadcrumb').innerHTML = breadcrumb;
         
         // Update active nav
-        document.querySelectorAll('.nav-item').forEach(item => {
+        document.querySelectorAll('.nav-link, .mobile-nav-link').forEach(item => {
             item.classList.remove('active');
         });
         
-        await this.loadVideos(true);
+        this.showVideoGrid();
+        this.loadVideos(true);
         
         // Hide search suggestions
         document.getElementById('searchSuggestions').style.display = 'none';
@@ -218,192 +611,79 @@ class VideoApp {
         }
     }
 
-    handleNavigation(navItem) {
-        // Remove active class from all nav items
-        document.querySelectorAll('.nav-item').forEach(item => {
-            item.classList.remove('active');
-        });
-        
-        // Add active class to clicked item
-        navItem.classList.add('active');
-        
-        // Handle different navigation types
-        if (navItem.dataset.section) {
-            this.filterBySection(navItem.dataset.section);
-        } else if (navItem.dataset.category) {
-            this.filterByCategory(navItem.dataset.category);
-        } else if (navItem.dataset.performer) {
-            this.filterByPerformer(navItem.dataset.performer);
-        }
+    applyFilters() {
+        this.currentPage = 1;
+        this.hasMore = true;
+        this.loadVideos(true);
     }
 
-    filterBySection(section) {
+    clearAllFilters() {
         this.currentFilter = {
             search: '',
             celebrity: '',
             category: '',
-            section: section
+            section: 'home',
+            sort: 'random',
+            duration: '',
+            quality: ''
         };
-        this.currentPage = 1;
-        this.hasMore = true;
         
-        // Update UI based on section
-        let title = 'All Videos';
-        let filter = 'All';
-        
-        switch (section) {
-            case 'favorites':
-                title = 'Favorite Videos';
-                filter = 'Favorites';
-                break;
-            case 'trending':
-                title = 'Trending Videos';
-                filter = 'Trending';
-                break;
-            case 'new':
-                title = 'New Videos';
-                filter = 'New';
-                break;
-        }
-        
-        document.getElementById('contentTitle').textContent = title;
-        document.getElementById('currentFilter').textContent = filter;
+        // Reset UI
         document.getElementById('searchInput').value = '';
+        document.getElementById('sortSelect').value = 'random';
+        document.getElementById('durationSelect').value = '';
+        document.getElementById('qualitySelect').value = '';
         
-        this.loadVideos(true);
-    }
-
-    filterByCategory(category) {
-        this.currentFilter = {
-            search: '',
-            celebrity: '',
-            category: category === 'all' ? '' : category,
-            section: 'category'
-        };
-        this.currentPage = 1;
-        this.hasMore = true;
-        
-        const title = category === 'all' ? 'All Videos' : `Category: ${this.formatName(category)}`;
-        const filter = category === 'all' ? 'All' : this.formatName(category);
-        
-        document.getElementById('contentTitle').textContent = title;
-        document.getElementById('currentFilter').textContent = filter;
-        document.getElementById('searchInput').value = '';
-        
-        this.loadVideos(true);
-    }
-
-    filterByPerformer(performer) {
-        this.currentFilter = {
-            search: '',
-            celebrity: performer,
-            category: '',
-            section: 'performer'
-        };
-        this.currentPage = 1;
-        this.hasMore = true;
-        
-        document.getElementById('contentTitle').textContent = `Performer: ${this.formatName(performer)}`;
-        document.getElementById('currentFilter').textContent = this.formatName(performer);
-        document.getElementById('searchInput').value = '';
-        
-        this.loadVideos(true);
+        this.navigateToSection('home');
     }
 
     toggleView() {
-        this.isGridView = !this.isGridView;
+        this.currentView = this.currentView === 'grid' ? 'list' : 'grid';
+        this.setView(this.currentView);
+    }
+
+    setView(view) {
+        this.currentView = view;
         const videoGrid = document.getElementById('videoGrid');
-        const viewToggle = document.getElementById('viewToggle');
+        const viewOptions = document.querySelectorAll('.view-option');
+        const viewToggleBtn = document.getElementById('viewToggleBtn');
         
-        if (this.isGridView) {
-            videoGrid.classList.remove('list-view');
-            viewToggle.innerHTML = '<i class="fas fa-list"></i>';
-            viewToggle.title = 'List View';
-        } else {
+        // Update grid class
+        if (view === 'list') {
             videoGrid.classList.add('list-view');
-            viewToggle.innerHTML = '<i class="fas fa-th-large"></i>';
-            viewToggle.title = 'Grid View';
+            viewToggleBtn.innerHTML = '<i class="fas fa-th"></i>';
+        } else {
+            videoGrid.classList.remove('list-view');
+            viewToggleBtn.innerHTML = '<i class="fas fa-list"></i>';
         }
+        
+        // Update view option buttons
+        viewOptions.forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.view === view);
+        });
     }
 
     async shuffleVideos() {
         try {
-            await fetch('/api/reshuffle', { method: 'POST' });
-            this.currentPage = 1;
-            this.hasMore = true;
-            await this.loadVideos(true);
-            
-            // Show feedback
-            const shuffleBtn = document.getElementById('shuffleBtn');
-            shuffleBtn.innerHTML = '<i class="fas fa-check"></i>';
-            setTimeout(() => {
-                shuffleBtn.innerHTML = '<i class="fas fa-random"></i>';
-            }, 1000);
+            const response = await fetch('/api/reshuffle', { method: 'POST' });
+            if (response.ok) {
+                this.currentPage = 1;
+                this.hasMore = true;
+                await this.loadVideos(true);
+                
+                // Show feedback
+                const shuffleBtn = document.getElementById('shuffleBtn');
+                const originalHTML = shuffleBtn.innerHTML;
+                shuffleBtn.innerHTML = '<i class="fas fa-check"></i>';
+                setTimeout(() => {
+                    shuffleBtn.innerHTML = originalHTML;
+                }, 1000);
+                
+                this.showToast('Videos shuffled!', 'success');
+            }
         } catch (error) {
             console.error('Error shuffling videos:', error);
-        }
-    }
-
-    async loadFavorites() {
-        try {
-            const response = await fetch('/api/favorites');
-            const data = await response.json();
-            this.favorites = new Set(data.favorites || []);
-        } catch (error) {
-            console.error('Error loading favorites:', error);
-        }
-    }
-
-    async loadCategories() {
-        try {
-            const response = await fetch('/api/categories');
-            const data = await response.json();
-            
-            const categoriesList = document.getElementById('categoriesList');
-            const existingAll = categoriesList.querySelector('[data-category="all"]').parentElement;
-            
-            // Clear existing categories except "All Videos"
-            categoriesList.innerHTML = '';
-            categoriesList.appendChild(existingAll);
-            
-            // Add categories
-            data.categories.forEach(category => {
-                const li = document.createElement('li');
-                li.innerHTML = `
-                    <a href="#" class="nav-item" data-category="${category.name}">
-                        <i class="fas fa-tag"></i> 
-                        ${category.displayName} 
-                        <span class="count">(${category.count})</span>
-                    </a>
-                `;
-                categoriesList.appendChild(li);
-            });
-        } catch (error) {
-            console.error('Error loading categories:', error);
-        }
-    }
-
-    async loadPerformers() {
-        try {
-            const response = await fetch('/api/celebrities');
-            const data = await response.json();
-            
-            const performersList = document.getElementById('performersList');
-            performersList.innerHTML = '';
-            
-            data.celebrities.forEach(performer => {
-                const li = document.createElement('li');
-                li.innerHTML = `
-                    <a href="#" class="nav-item" data-performer="${performer.name}">
-                        <i class="fas fa-user"></i> 
-                        ${performer.displayName} 
-                        <span class="count">(${performer.videoCount})</span>
-                    </a>
-                `;
-                performersList.appendChild(li);
-            });
-        } catch (error) {
-            console.error('Error loading performers:', error);
+            this.showToast('Error shuffling videos', 'error');
         }
     }
 
@@ -411,7 +691,7 @@ class VideoApp {
         if (this.isLoading) return;
         
         this.isLoading = true;
-        const loading = document.getElementById('loading');
+        const loadingContainer = document.getElementById('loadingContainer');
         const loadMoreBtn = document.getElementById('loadMoreBtn');
         const noResults = document.getElementById('noResults');
         
@@ -421,7 +701,7 @@ class VideoApp {
             noResults.style.display = 'none';
         }
         
-        loading.style.display = 'flex';
+        loadingContainer.style.display = 'flex';
         loadMoreBtn.style.display = 'none';
         
         try {
@@ -430,6 +710,7 @@ class VideoApp {
                 limit: 20
             });
             
+            // Add filters
             if (this.currentFilter.search) {
                 params.append('search', this.currentFilter.search);
             }
@@ -446,6 +727,19 @@ class VideoApp {
                 params.append('favorites', 'true');
             }
             
+            // Add sorting and filtering
+            if (this.currentFilter.sort && this.currentFilter.sort !== 'random') {
+                params.append('sort', this.currentFilter.sort);
+            }
+            
+            if (this.currentFilter.duration) {
+                params.append('duration', this.currentFilter.duration);
+            }
+            
+            if (this.currentFilter.quality) {
+                params.append('quality', this.currentFilter.quality);
+            }
+            
             const response = await fetch(`/api/videos?${params}`);
             const data = await response.json();
             
@@ -455,7 +749,7 @@ class VideoApp {
                 this.currentPage++;
                 
                 // Update video count
-                document.getElementById('videoCount').textContent = `${data.total} videos`;
+                document.getElementById('videoCount').textContent = `${this.formatNumber(data.total)} videos`;
                 
                 if (this.hasMore) {
                     loadMoreBtn.style.display = 'block';
@@ -470,9 +764,10 @@ class VideoApp {
             if (reset) {
                 noResults.style.display = 'block';
             }
+            this.showToast('Error loading videos', 'error');
         } finally {
             this.isLoading = false;
-            loading.style.display = 'none';
+            loadingContainer.style.display = 'none';
         }
     }
 
@@ -495,30 +790,51 @@ class VideoApp {
         card.dataset.videoId = video.id;
         
         const isFavorite = this.favorites.has(video.id);
+        const thumbnailUrl = video.thumbnailExists ? video.thumbnailUrl : 'https://images.pexels.com/photos/1181467/pexels-photo-1181467.jpeg?auto=compress&cs=tinysrgb&w=400';
+        
+        // Generate random stats for demo
+        const views = Math.floor(Math.random() * 1000000) + 1000;
+        const likes = Math.floor(Math.random() * 10000) + 100;
         
         card.innerHTML = `
             <div class="video-thumbnail">
-                <img src="${video.thumbnailExists ? video.thumbnailUrl : '/placeholder-thumbnail.jpg'}" 
+                <img src="${thumbnailUrl}" 
                      alt="${video.title}" 
                      loading="lazy"
-                     onerror="this.src='/placeholder-thumbnail.jpg'">
+                     onerror="this.src='https://images.pexels.com/photos/1181467/pexels-photo-1181467.jpeg?auto=compress&cs=tinysrgb&w=400'">
                 <div class="video-overlay">
                     <button class="play-btn">
                         <i class="fas fa-play"></i>
                     </button>
-                    <button class="favorite-btn ${isFavorite ? 'active' : ''}" data-video-id="${video.id}">
-                        <i class="fas fa-heart"></i>
-                    </button>
                 </div>
+                <button class="video-favorite-btn ${isFavorite ? 'active' : ''}" data-video-id="${video.id}">
+                    <i class="fas fa-heart"></i>
+                </button>
                 ${video.duration ? `<div class="video-duration">${video.duration}</div>` : ''}
                 ${video.quality ? `<div class="video-quality">${video.quality}</div>` : ''}
             </div>
             <div class="video-info">
                 <h3 class="video-title">${video.title}</h3>
-                <p class="video-artist">${video.artist}</p>
+                <a href="#" class="video-performer" data-performer="${video.artist}">${video.artist}</a>
+                <div class="video-stats">
+                    <span class="video-stat">
+                        <i class="fas fa-eye"></i>
+                        ${this.formatNumber(views)}
+                    </span>
+                    <span class="video-stat">
+                        <i class="fas fa-thumbs-up"></i>
+                        ${this.formatNumber(likes)}
+                    </span>
+                    ${video.duration ? `
+                        <span class="video-stat">
+                            <i class="fas fa-clock"></i>
+                            ${video.duration}
+                        </span>
+                    ` : ''}
+                </div>
                 ${video.categories ? `
                     <div class="video-categories">
-                        ${video.categories.map(cat => `<span class="category-tag">${this.formatName(cat)}</span>`).join('')}
+                        ${video.categories.slice(0, 3).map(cat => `<span class="category-tag">${this.formatName(cat)}</span>`).join('')}
                     </div>
                 ` : ''}
             </div>
@@ -527,17 +843,23 @@ class VideoApp {
         // Add event listeners
         const playBtn = card.querySelector('.play-btn');
         const thumbnail = card.querySelector('.video-thumbnail img');
-        const favoriteBtn = card.querySelector('.favorite-btn');
+        const favoriteBtn = card.querySelector('.video-favorite-btn');
+        const performerLink = card.querySelector('.video-performer');
         
         [playBtn, thumbnail].forEach(element => {
             element.addEventListener('click', () => {
-                this.openVideoModal(video);
+                this.openVideoModal(video, views, likes);
             });
         });
         
         favoriteBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             this.toggleFavorite(video.id, favoriteBtn);
+        });
+        
+        performerLink.addEventListener('click', (e) => {
+            e.preventDefault();
+            this.filterByPerformer(performerLink.dataset.performer);
         });
         
         return card;
@@ -548,60 +870,175 @@ class VideoApp {
             const isFavorite = this.favorites.has(videoId);
             
             if (isFavorite) {
-                await fetch(`/api/favorites/${videoId}`, { method: 'DELETE' });
-                this.favorites.delete(videoId);
-                button.classList.remove('active');
+                const response = await fetch(`/api/favorites/${videoId}`, { method: 'DELETE' });
+                if (response.ok) {
+                    this.favorites.delete(videoId);
+                    button.classList.remove('active');
+                    this.showToast('Removed from favorites', 'success');
+                }
             } else {
-                await fetch(`/api/favorites/${videoId}`, { method: 'POST' });
-                this.favorites.add(videoId);
-                button.classList.add('active');
+                const response = await fetch(`/api/favorites/${videoId}`, { method: 'POST' });
+                if (response.ok) {
+                    this.favorites.add(videoId);
+                    button.classList.add('active');
+                    this.showToast('Added to favorites', 'success');
+                }
             }
+            
+            this.updateFavoritesCount();
         } catch (error) {
             console.error('Error toggling favorite:', error);
+            this.showToast('Error updating favorites', 'error');
         }
     }
 
-    openVideoModal(video) {
+    updateFavoritesCount() {
+        document.getElementById('favoritesBtn').querySelector('.favorites-count').textContent = this.favorites.size;
+    }
+
+    openVideoModal(video, views = 0, likes = 0) {
+        this.currentVideoId = video.id;
+        
         const modal = document.getElementById('videoModal');
         const modalVideo = document.getElementById('modalVideo');
-        const modalTitle = document.getElementById('modalTitle');
-        const modalArtist = document.getElementById('modalArtist');
-        const modalDuration = document.getElementById('modalDuration');
-        const modalQuality = document.getElementById('modalQuality');
-        const modalCategories = document.getElementById('modalCategories');
-        const modalFavoriteBtn = document.getElementById('modalFavoriteBtn');
+        const modalVideoTitle = document.getElementById('modalVideoTitle');
+        const modalVideoPerformer = document.getElementById('modalVideoPerformer');
+        const modalVideoViews = document.getElementById('modalVideoViews');
+        const modalVideoLikes = document.getElementById('modalVideoLikes');
+        const modalVideoDuration = document.getElementById('modalVideoDuration');
+        const modalVideoQuality = document.getElementById('modalVideoQuality');
+        const modalVideoCategories = document.getElementById('modalVideoCategories');
         
         // Set video source
         modalVideo.src = video.videoUrl;
         modalVideo.load();
         
         // Set video info
-        modalTitle.textContent = video.title;
-        modalArtist.textContent = video.artist;
-        modalDuration.textContent = video.duration || 'Unknown';
-        modalQuality.textContent = video.quality || 'Unknown';
+        modalVideoTitle.textContent = video.title;
+        modalVideoPerformer.textContent = video.artist;
+        modalVideoPerformer.dataset.performer = video.artist;
+        modalVideoViews.textContent = this.formatNumber(views);
+        modalVideoLikes.textContent = this.formatNumber(likes);
+        modalVideoDuration.textContent = video.duration || 'Unknown';
+        modalVideoQuality.textContent = video.quality || 'HD';
         
         // Set categories
         if (video.categories && video.categories.length > 0) {
-            modalCategories.innerHTML = video.categories.map(cat => 
-                `<span class="category-tag">${this.formatName(cat)}</span>`
+            modalVideoCategories.innerHTML = video.categories.map(cat => 
+                `<span class="category-tag" data-category="${cat}">${this.formatName(cat)}</span>`
             ).join('');
+            
+            // Add click handlers to category tags
+            modalVideoCategories.querySelectorAll('.category-tag').forEach(tag => {
+                tag.addEventListener('click', () => {
+                    this.closeVideoModal();
+                    this.filterByCategory(tag.dataset.category);
+                });
+            });
         } else {
-            modalCategories.innerHTML = '';
+            modalVideoCategories.innerHTML = '';
         }
         
-        // Set favorite button
-        const isFavorite = this.favorites.has(video.id);
-        modalFavoriteBtn.classList.toggle('active', isFavorite);
-        modalFavoriteBtn.innerHTML = `
-            <i class="fas fa-heart"></i>
-            <span>${isFavorite ? 'Remove from Favorites' : 'Add to Favorites'}</span>
-        `;
-        modalFavoriteBtn.dataset.videoId = video.id;
+        // Update action buttons
+        this.updateModalActionButtons();
+        
+        // Load related videos
+        this.loadRelatedVideos(video);
         
         // Show modal
         modal.classList.add('active');
         document.body.style.overflow = 'hidden';
+        
+        // Add to view history
+        this.addToViewHistory(video.id);
+    }
+
+    updateModalActionButtons() {
+        const videoId = this.currentVideoId;
+        const isFavorite = this.favorites.has(videoId);
+        const isLiked = this.likes.has(videoId);
+        const isDisliked = this.dislikes.has(videoId);
+        
+        // Update favorite buttons
+        const favoriteButtons = [
+            document.getElementById('modalFavoriteBtn'),
+            document.getElementById('modalFavBtn')
+        ];
+        
+        favoriteButtons.forEach(btn => {
+            if (btn) {
+                btn.classList.toggle('active', isFavorite);
+                const span = btn.querySelector('span');
+                if (span) {
+                    span.textContent = isFavorite ? 'Remove from Favorites' : 'Add to Favorites';
+                }
+            }
+        });
+        
+        // Update like/dislike buttons
+        const likeBtn = document.getElementById('modalLikeBtn');
+        const dislikeBtn = document.getElementById('modalDislikeBtn');
+        
+        likeBtn.classList.toggle('active', isLiked);
+        dislikeBtn.classList.toggle('active', isDisliked);
+    }
+
+    async loadRelatedVideos(currentVideo) {
+        try {
+            // Load videos from the same category or performer
+            const params = new URLSearchParams({
+                page: 1,
+                limit: 8
+            });
+            
+            if (currentVideo.categories && currentVideo.categories.length > 0) {
+                params.append('category', currentVideo.categories[0]);
+            } else if (currentVideo.artist) {
+                params.append('celebrity', currentVideo.artist);
+            }
+            
+            const response = await fetch(`/api/videos?${params}`);
+            const data = await response.json();
+            
+            if (data.videos) {
+                // Filter out current video
+                const relatedVideos = data.videos.filter(v => v.id !== currentVideo.id).slice(0, 6);
+                this.renderRelatedVideos(relatedVideos);
+            }
+        } catch (error) {
+            console.error('Error loading related videos:', error);
+        }
+    }
+
+    renderRelatedVideos(videos) {
+        const relatedVideosGrid = document.getElementById('relatedVideosGrid');
+        relatedVideosGrid.innerHTML = videos.map(video => {
+            const thumbnailUrl = video.thumbnailExists ? video.thumbnailUrl : 'https://images.pexels.com/photos/1181467/pexels-photo-1181467.jpeg?auto=compress&cs=tinysrgb&w=300';
+            
+            return `
+                <div class="related-video-card" data-video-id="${video.id}">
+                    <div class="related-video-thumbnail">
+                        <img src="${thumbnailUrl}" alt="${video.title}" loading="lazy">
+                        ${video.duration ? `<div class="video-duration">${video.duration}</div>` : ''}
+                    </div>
+                    <div class="related-video-info">
+                        <div class="related-video-title">${video.title}</div>
+                        <div class="related-video-performer">${video.artist}</div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+        
+        // Add click handlers
+        relatedVideosGrid.querySelectorAll('.related-video-card').forEach(card => {
+            card.addEventListener('click', () => {
+                const videoId = card.dataset.videoId;
+                const video = videos.find(v => v.id === videoId);
+                if (video) {
+                    this.openVideoModal(video, Math.floor(Math.random() * 1000000) + 1000, Math.floor(Math.random() * 10000) + 100);
+                }
+            });
+        });
     }
 
     closeVideoModal() {
@@ -612,43 +1049,115 @@ class VideoApp {
         modalVideo.pause();
         modalVideo.src = '';
         document.body.style.overflow = '';
+        this.currentVideoId = null;
     }
 
     async toggleModalFavorite() {
-        const modalFavoriteBtn = document.getElementById('modalFavoriteBtn');
-        const videoId = modalFavoriteBtn.dataset.videoId;
+        if (!this.currentVideoId) return;
         
         try {
-            const isFavorite = this.favorites.has(videoId);
+            const isFavorite = this.favorites.has(this.currentVideoId);
             
             if (isFavorite) {
-                await fetch(`/api/favorites/${videoId}`, { method: 'DELETE' });
-                this.favorites.delete(videoId);
-                modalFavoriteBtn.classList.remove('active');
-                modalFavoriteBtn.innerHTML = `
-                    <i class="fas fa-heart"></i>
-                    <span>Add to Favorites</span>
-                `;
+                const response = await fetch(`/api/favorites/${this.currentVideoId}`, { method: 'DELETE' });
+                if (response.ok) {
+                    this.favorites.delete(this.currentVideoId);
+                    this.showToast('Removed from favorites', 'success');
+                }
             } else {
-                await fetch(`/api/favorites/${videoId}`, { method: 'POST' });
-                this.favorites.add(videoId);
-                modalFavoriteBtn.classList.add('active');
-                modalFavoriteBtn.innerHTML = `
-                    <i class="fas fa-heart"></i>
-                    <span>Remove from Favorites</span>
-                `;
+                const response = await fetch(`/api/favorites/${this.currentVideoId}`, { method: 'POST' });
+                if (response.ok) {
+                    this.favorites.add(this.currentVideoId);
+                    this.showToast('Added to favorites', 'success');
+                }
             }
             
+            this.updateModalActionButtons();
+            this.updateFavoritesCount();
+            
             // Update the corresponding card in the grid
-            const videoCard = document.querySelector(`[data-video-id="${videoId}"]`);
+            const videoCard = document.querySelector(`[data-video-id="${this.currentVideoId}"]`);
             if (videoCard) {
-                const cardFavoriteBtn = videoCard.querySelector('.favorite-btn');
-                cardFavoriteBtn.classList.toggle('active', this.favorites.has(videoId));
+                const cardFavoriteBtn = videoCard.querySelector('.video-favorite-btn');
+                if (cardFavoriteBtn) {
+                    cardFavoriteBtn.classList.toggle('active', this.favorites.has(this.currentVideoId));
+                }
             }
             
         } catch (error) {
             console.error('Error toggling favorite:', error);
+            this.showToast('Error updating favorites', 'error');
         }
+    }
+
+    toggleModalLike() {
+        if (!this.currentVideoId) return;
+        
+        const isLiked = this.likes.has(this.currentVideoId);
+        
+        if (isLiked) {
+            this.likes.delete(this.currentVideoId);
+        } else {
+            this.likes.add(this.currentVideoId);
+            // Remove from dislikes if present
+            this.dislikes.delete(this.currentVideoId);
+        }
+        
+        this.updateModalActionButtons();
+        this.showToast(isLiked ? 'Like removed' : 'Video liked', 'success');
+    }
+
+    toggleModalDislike() {
+        if (!this.currentVideoId) return;
+        
+        const isDisliked = this.dislikes.has(this.currentVideoId);
+        
+        if (isDisliked) {
+            this.dislikes.delete(this.currentVideoId);
+        } else {
+            this.dislikes.add(this.currentVideoId);
+            // Remove from likes if present
+            this.likes.delete(this.currentVideoId);
+        }
+        
+        this.updateModalActionButtons();
+        this.showToast(isDisliked ? 'Dislike removed' : 'Video disliked', 'success');
+    }
+
+    addToViewHistory(videoId) {
+        // Remove if already exists
+        this.viewHistory = this.viewHistory.filter(id => id !== videoId);
+        // Add to beginning
+        this.viewHistory.unshift(videoId);
+        // Keep only last 50 items
+        this.viewHistory = this.viewHistory.slice(0, 50);
+    }
+
+    updateUI() {
+        // Update any UI elements that need initial state
+        this.updateFavoritesCount();
+        
+        // Set initial view
+        this.setView(this.currentView);
+        
+        // Update filter selects
+        document.getElementById('sortSelect').value = this.currentFilter.sort;
+        document.getElementById('durationSelect').value = this.currentFilter.duration;
+        document.getElementById('qualitySelect').value = this.currentFilter.quality;
+    }
+
+    showToast(message, type = 'info') {
+        const toastContainer = document.getElementById('toastContainer');
+        const toast = document.createElement('div');
+        toast.className = `toast ${type}`;
+        toast.textContent = message;
+        
+        toastContainer.appendChild(toast);
+        
+        // Remove after 3 seconds
+        setTimeout(() => {
+            toast.remove();
+        }, 3000);
     }
 
     formatName(name) {
@@ -656,6 +1165,15 @@ class VideoApp {
                    .split(' ')
                    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
                    .join(' ');
+    }
+
+    formatNumber(num) {
+        if (num >= 1000000) {
+            return (num / 1000000).toFixed(1) + 'M';
+        } else if (num >= 1000) {
+            return (num / 1000).toFixed(1) + 'K';
+        }
+        return num.toString();
     }
 }
 
