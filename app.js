@@ -64,33 +64,56 @@ const extractCategories = (filename) => {
     const categories = [];
     
     const categoryMap = {
-        'anal': ['anal', 'anal-sex'],
-        'gangbang': ['gang-bang', 'gangbang'],
-        'lesbian': ['lesbian', 'girl-girl'],
-        'milf': ['milf', 'mature', 'mom', 'mommy'],
-        'teen': ['teen', '18+', 'young', 'young'],
-        'hardcore': ['hardcore', 'rough', 'hard', 'roughsex', 'rough-sex', 'hard-core'],
-        'blowjob': ['blowjob', 'oral', 'bj', 'deepthroat', 'blow-job'],
-        'threesome': ['threesome', '3some', 'mmf', 'ffm'],
-        'creampie': ['creampie', 'internal', 'cum-inside'],
-        'big-tits': ['big-tits', 'busty', 'boobs', 'big-boobs'],
-        'pov': ['pov', 'point-of-view'],
-        'interracial': ['interracial', 'bbc', 'mixed'],
-        'amateur': ['amateur', 'homemade', 'real'],
-        'fetish': ['fetish', 'kink', 'bdsm'],
-        'latina': ['latina', 'latin', 'hispanic'],
-        'asian': ['asian', 'japanese', 'chinese', 'korean'],
-        'ebony': ['ebony', 'black', 'african'],
-        'blonde': ['blonde', 'blond'],
-        'brunette': ['brunette', 'brown-hair'],
-        'redhead': ['redhead', 'ginger'],
-        'big-ass': ['big-ass', 'big-butt', 'pawg'],
-        'small-tits': ['small-tits', 'petite', 'tiny'],
-        'squirting': ['squirting', 'squirt'],
-        'masturbation': ['masturbation', 'solo', 'self'],
-        'public': ['public', 'outdoor'],
-        'vintage': ['vintage', 'retro', 'classic'],
-        'compilation': ['compilation', 'comp']
+        'anal': ['anal', 'anal-sex', 'ass-fuck'],
+        'gangbang': ['gang-bang', 'gangbang', 'group-sex', 'orgy'],
+        'lesbian': ['lesbian', 'girl-girl', 'lez', 'sapphic'],
+        'milf': ['milf', 'mature', 'mom', 'mommy', 'cougar'],
+        'teen': ['teen', '18+', 'young', 'college', 'schoolgirl'],
+        'hardcore': ['hardcore', 'rough', 'hard', 'roughsex', 'rough-sex', 'hard-core', 'extreme'],
+        'blowjob': ['blowjob', 'oral', 'bj', 'deepthroat', 'blow-job', 'fellatio', 'head'],
+        'threesome': ['threesome', '3some', 'mmf', 'ffm', 'mfm', 'fmf'],
+        'creampie': ['creampie', 'internal', 'cum-inside', 'cream-pie'],
+        'big-tits': ['big-tits', 'busty', 'boobs', 'big-boobs', 'huge-tits', 'massive-tits'],
+        'pov': ['pov', 'point-of-view', 'first-person'],
+        'interracial': ['interracial', 'bbc', 'mixed', 'ir'],
+        'amateur': ['amateur', 'homemade', 'real', 'home-video'],
+        'fetish': ['fetish', 'kink', 'bdsm', 'bondage', 'domination'],
+        'latina': ['latina', 'latin', 'hispanic', 'spanish'],
+        'asian': ['asian', 'japanese', 'chinese', 'korean', 'thai', 'vietnamese'],
+        'ebony': ['ebony', 'black', 'african', 'bbc'],
+        'blonde': ['blonde', 'blond', 'fair-hair'],
+        'brunette': ['brunette', 'brown-hair', 'dark-hair'],
+        'redhead': ['redhead', 'ginger', 'red-hair'],
+        'big-ass': ['big-ass', 'big-butt', 'pawg', 'bubble-butt', 'thick'],
+        'small-tits': ['small-tits', 'petite', 'tiny', 'flat-chest'],
+        'squirting': ['squirting', 'squirt', 'female-ejaculation'],
+        'masturbation': ['masturbation', 'solo', 'self', 'fingering'],
+        'public': ['public', 'outdoor', 'outside', 'exhibitionist'],
+        'vintage': ['vintage', 'retro', 'classic', 'old-school'],
+        'compilation': ['compilation', 'comp', 'best-of'],
+        'facial': ['facial', 'cum-shot', 'cumshot', 'money-shot'],
+        'handjob': ['handjob', 'hand-job', 'hj', 'manual'],
+        'footjob': ['footjob', 'foot-job', 'feet', 'foot-fetish'],
+        'titjob': ['titjob', 'tit-job', 'boob-job', 'titty-fuck'],
+        'doggystyle': ['doggystyle', 'doggy', 'from-behind', 'rear-entry'],
+        'missionary': ['missionary', 'face-to-face', 'vanilla'],
+        'cowgirl': ['cowgirl', 'riding', 'on-top', 'reverse-cowgirl'],
+        'dp': ['dp', 'double-penetration', 'double-p', 'dvp'],
+        'bbc': ['bbc', 'big-black-cock', 'interracial-bbc'],
+        'casting': ['casting', 'audition', 'first-time', 'interview'],
+        'massage': ['massage', 'sensual-massage', 'oil', 'spa'],
+        'shower': ['shower', 'bathroom', 'wet', 'bath'],
+        'kitchen': ['kitchen', 'cooking', 'chef'],
+        'office': ['office', 'secretary', 'boss', 'workplace'],
+        'car': ['car', 'vehicle', 'driving', 'backseat'],
+        'beach': ['beach', 'sand', 'ocean', 'vacation'],
+        'pool': ['pool', 'swimming', 'poolside', 'water'],
+        'hotel': ['hotel', 'motel', 'room', 'vacation'],
+        'party': ['party', 'celebration', 'drunk', 'wild'],
+        'wedding': ['wedding', 'bride', 'married', 'honeymoon'],
+        'christmas': ['christmas', 'xmas', 'holiday', 'santa'],
+        'halloween': ['halloween', 'costume', 'spooky', 'trick'],
+        'valentine': ['valentine', 'romantic', 'love', 'hearts']
     };
     
     for (const [category, keywords] of Object.entries(categoryMap)) {
@@ -155,28 +178,6 @@ const getFileDate = (pathData) => {
         return stats.mtime;
     } catch (err) {
         return new Date();
-    }
-};
-
-// Helper function to parse duration and check if it matches filter
-const matchesDurationFilter = (duration, durationFilter) => {
-    if (!durationFilter || !duration) return true;
-    
-    // Parse duration string (e.g., "15:30" or "5:45")
-    const parts = duration.split(':');
-    if (parts.length !== 2) return true;
-    
-    const minutes = parseInt(parts[0]) + (parseInt(parts[1]) / 60);
-    
-    switch (durationFilter) {
-        case 'short':
-            return minutes <= 10;
-        case 'medium':
-            return minutes > 10 && minutes <= 30;
-        case 'long':
-            return minutes > 30;
-        default:
-            return true;
     }
 };
 
@@ -261,8 +262,8 @@ const getAllCategories = () => {
 };
 
 // Quick file count with caching
-const countVideos = (celebrityFilter = '', categoryFilter = '', durationFilter = '') => {
-    const cacheKey = `count_${celebrityFilter}_${categoryFilter}_${durationFilter}`;
+const countVideos = (celebrityFilter = '', categoryFilter = '') => {
+    const cacheKey = `count_${celebrityFilter}_${categoryFilter}`;
     if (videoCache.has(cacheKey)) {
         return videoCache.get(cacheKey);
     }
@@ -273,11 +274,7 @@ const countVideos = (celebrityFilter = '', categoryFilter = '', durationFilter =
     for (const item of items) {
         if (item.isFile() && VIDEO_EXTENSIONS.includes(path.extname(item.name).toLowerCase())) {
             if (!celebrityFilter) {
-                const videoInfo = extractVideoInfo(item.name);
-                const matchesCategory = !categoryFilter || videoInfo.categories.includes(categoryFilter);
-                const matchesDuration = matchesDurationFilter(videoInfo.duration, durationFilter);
-                
-                if (matchesCategory && matchesDuration) {
+                if (!categoryFilter || extractCategories(item.name).includes(categoryFilter)) {
                     count++;
                 }
             }
@@ -290,11 +287,7 @@ const countVideos = (celebrityFilter = '', categoryFilter = '', durationFilter =
                 const subItems = fs.readdirSync(path.join(VIDEOS_DIR, item.name), { withFileTypes: true });
                 subItems.forEach(sub => {
                     if (sub.isFile() && VIDEO_EXTENSIONS.includes(path.extname(sub.name).toLowerCase())) {
-                        const videoInfo = extractVideoInfo(sub.name);
-                        const matchesCategory = !categoryFilter || videoInfo.categories.includes(categoryFilter);
-                        const matchesDuration = matchesDurationFilter(videoInfo.duration, durationFilter);
-                        
-                        if (matchesCategory && matchesDuration) {
+                        if (!categoryFilter || extractCategories(sub.name).includes(categoryFilter)) {
                             count++;
                         }
                     }
@@ -310,7 +303,7 @@ const countVideos = (celebrityFilter = '', categoryFilter = '', durationFilter =
 };
 
 // Enhanced video generator with better performance
-const generateRandomVideos = function* (startIndex, limit, searchTerm = '', celebrityFilter = '', categoryFilter = '', favoritesOnly = false, sortBy = 'random', durationFilter = '') {
+const generateRandomVideos = function* (startIndex, limit, searchTerm = '', celebrityFilter = '', categoryFilter = '', favoritesOnly = false, sortBy = 'random') {
     const items = fs.readdirSync(VIDEOS_DIR, { withFileTypes: true });
     const allPaths = [];
     
@@ -361,13 +354,6 @@ const generateRandomVideos = function* (startIndex, limit, searchTerm = '', cele
         filtered = filtered.filter(p => {
             const categories = extractCategories(p.name);
             return categories.includes(categoryFilter);
-        });
-    }
-    
-    if (durationFilter) {
-        filtered = filtered.filter(p => {
-            const videoInfo = extractVideoInfo(p.name);
-            return matchesDurationFilter(videoInfo.duration, durationFilter);
         });
     }
     
@@ -562,15 +548,14 @@ app.get('/api/videos', (req, res) => {
             celebrity = '', 
             category = '', 
             favorites = 'false',
-            sort = 'random',
-            duration = ''
+            sort = 'random'
         } = req.query;
         
         const startIndex = (parseInt(page) - 1) * parseInt(limit);
         const favoritesOnly = favorites === 'true';
         
         const videos = [];
-        const generator = generateRandomVideos(startIndex, parseInt(limit), search, celebrity, category, favoritesOnly, sort, duration);
+        const generator = generateRandomVideos(startIndex, parseInt(limit), search, celebrity, category, favoritesOnly, sort);
         
         for (const video of generator) {
             videos.push(video);
@@ -587,7 +572,7 @@ app.get('/api/videos', (req, res) => {
             }
         }
         
-        const totalCount = favoritesOnly ? favorites.size : countVideos(celebrity, category, duration);
+        const totalCount = favoritesOnly ? favorites.size : countVideos(celebrity, category);
         
         res.json({
             videos,

@@ -8,8 +8,7 @@ class VideoApp {
             celebrity: '',
             category: '',
             section: 'home',
-            sort: 'random',
-            duration: ''
+            sort: 'random'
         };
         this.currentView = 'grid';
         this.favorites = new Set();
@@ -18,6 +17,9 @@ class VideoApp {
         this.currentVideoId = null;
         this.hoverTimeout = null;
         this.hoverVideo = null;
+        this.relatedVideosPage = 1;
+        this.relatedVideosLoading = false;
+        this.relatedVideosHasMore = true;
         
         // Statistics
         this.stats = {
@@ -30,27 +32,24 @@ class VideoApp {
     }
 
     async init() {
-        this.setupEventListeners();
         this.loadFromLocalStorage();
+        this.setupEventListeners();
         await this.loadInitialData();
         this.updateUI();
     }
 
     loadFromLocalStorage() {
         try {
-            // Load favorites from localStorage
             const savedFavorites = localStorage.getItem('loveporn_favorites');
             if (savedFavorites) {
                 this.favorites = new Set(JSON.parse(savedFavorites));
             }
             
-            // Load watch history from localStorage
             const savedWatchHistory = localStorage.getItem('loveporn_watch_history');
             if (savedWatchHistory) {
                 this.watchHistory = JSON.parse(savedWatchHistory);
             }
             
-            // Load search history from localStorage
             const savedSearchHistory = localStorage.getItem('loveporn_search_history');
             if (savedSearchHistory) {
                 this.searchHistory = JSON.parse(savedSearchHistory);
@@ -146,11 +145,6 @@ class VideoApp {
             this.applyFilters();
         });
 
-        document.getElementById('durationSelect').addEventListener('change', (e) => {
-            this.currentFilter.duration = e.target.value;
-            this.applyFilters();
-        });
-
         // View options
         document.querySelectorAll('.view-option').forEach(btn => {
             btn.addEventListener('click', () => {
@@ -207,6 +201,17 @@ class VideoApp {
             this.toggleModalFavorite();
         });
 
+        // Modal performer click
+        document.addEventListener('click', (e) => {
+            if (e.target.id === 'modalVideoPerformer') {
+                const performerName = e.target.dataset.performer;
+                if (performerName) {
+                    this.closeVideoModal();
+                    this.filterByPerformer(performerName);
+                }
+            }
+        });
+
         // Close dropdowns when clicking outside
         document.addEventListener('click', (e) => {
             if (!e.target.closest('.search-container')) {
@@ -231,7 +236,7 @@ class VideoApp {
             }
         });
 
-        // Infinite scroll for main content
+        // Infinite scroll
         window.addEventListener('scroll', this.debounce(() => {
             if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 1000) {
                 if (this.hasMore && !this.isLoading) {
@@ -240,19 +245,15 @@ class VideoApp {
             }
         }, 200));
 
-        // Infinite scroll for related videos
-        this.setupRelatedVideosInfiniteScroll();
-    }
-
-    setupRelatedVideosInfiniteScroll() {
-        const relatedVideosContainer = document.getElementById('relatedVideosGrid');
-        if (relatedVideosContainer) {
-            relatedVideosContainer.addEventListener('scroll', this.debounce(() => {
-                if (relatedVideosContainer.scrollTop + relatedVideosContainer.clientHeight >= relatedVideosContainer.scrollHeight - 100) {
+        // Related videos infinite scroll
+        const relatedVideosGrid = document.getElementById('relatedVideosGrid');
+        relatedVideosGrid.addEventListener('scroll', this.debounce(() => {
+            if (relatedVideosGrid.scrollTop + relatedVideosGrid.clientHeight >= relatedVideosGrid.scrollHeight - 100) {
+                if (this.relatedVideosHasMore && !this.relatedVideosLoading) {
                     this.loadMoreRelatedVideos();
                 }
-            }, 200));
-        }
+            }
+        }, 200));
     }
 
     debounce(func, wait) {
@@ -400,8 +401,7 @@ class VideoApp {
             celebrity: '',
             category: '',
             section: section,
-            sort: 'random',
-            duration: ''
+            sort: 'random'
         };
         
         this.currentPage = 1;
@@ -495,8 +495,7 @@ class VideoApp {
             celebrity: '',
             category: category,
             section: 'category',
-            sort: this.currentFilter.sort,
-            duration: this.currentFilter.duration
+            sort: this.currentFilter.sort
         };
         
         this.currentPage = 1;
@@ -516,8 +515,7 @@ class VideoApp {
             celebrity: performer,
             category: '',
             section: 'performer',
-            sort: this.currentFilter.sort,
-            duration: this.currentFilter.duration
+            sort: this.currentFilter.sort
         };
         
         this.currentPage = 1;
@@ -546,7 +544,7 @@ class VideoApp {
         const searchTerm = document.getElementById('searchInput').value.trim();
         
         if (searchTerm) {
-            await this.addToSearchHistory(searchTerm);
+            this.addToSearchHistory(searchTerm);
         }
         
         this.currentFilter = {
@@ -554,8 +552,7 @@ class VideoApp {
             celebrity: '',
             category: '',
             section: 'search',
-            sort: this.currentFilter.sort,
-            duration: this.currentFilter.duration
+            sort: this.currentFilter.sort
         };
         
         this.currentPage = 1;
@@ -577,21 +574,17 @@ class VideoApp {
         document.getElementById('searchSuggestions').style.display = 'none';
     }
 
-    async addToSearchHistory(query) {
-        try {
-            // Remove if already exists
-            this.searchHistory = this.searchHistory.filter(item => item.query !== query);
-            
-            // Add to beginning
-            this.searchHistory.unshift({ query, timestamp: Date.now() });
-            
-            // Keep only last 50 items
-            this.searchHistory = this.searchHistory.slice(0, 50);
-            
-            this.saveToLocalStorage();
-        } catch (error) {
-            console.error('Error adding to search history:', error);
-        }
+    addToSearchHistory(query) {
+        // Remove if already exists
+        this.searchHistory = this.searchHistory.filter(item => item.query !== query);
+        
+        // Add to beginning
+        this.searchHistory.unshift({ query, timestamp: Date.now() });
+        
+        // Keep only last 50 items
+        this.searchHistory = this.searchHistory.slice(0, 50);
+        
+        this.saveToLocalStorage();
     }
 
     showSearchHistory() {
@@ -685,13 +678,11 @@ class VideoApp {
             celebrity: '',
             category: '',
             section: 'home',
-            sort: 'random',
-            duration: ''
+            sort: 'random'
         };
         
         document.getElementById('searchInput').value = '';
         document.getElementById('sortSelect').value = 'random';
-        document.getElementById('durationSelect').value = '';
         
         this.navigateToSection('home');
     }
@@ -751,74 +742,46 @@ class VideoApp {
         loadingContainer.style.display = 'flex';
         
         try {
-            let videos = [];
-            let total = 0;
-            let hasMore = false;
-
-            if (this.currentFilter.section === 'watch-history') {
-                // Handle watch history from localStorage
-                const startIndex = (this.currentPage - 1) * 20;
-                const endIndex = startIndex + 20;
-                const paginatedHistory = this.watchHistory.slice(startIndex, endIndex);
-                
-                videos = paginatedHistory;
-                total = this.watchHistory.length;
-                hasMore = endIndex < this.watchHistory.length;
-            } else if (this.currentFilter.section === 'favorites') {
-                // Handle favorites from localStorage
-                const params = new URLSearchParams({
-                    page: this.currentPage,
-                    limit: 20,
-                    favorites: 'true'
-                });
-                
-                const response = await fetch(`/api/videos?${params}`);
-                const data = await response.json();
-                
-                // Filter by localStorage favorites
-                videos = data.videos.filter(video => this.favorites.has(video.id));
-                total = videos.length;
-                hasMore = false; // Since we're filtering client-side
-            } else {
-                // Regular video loading
-                const params = new URLSearchParams({
-                    page: this.currentPage,
-                    limit: 20
-                });
-                
-                if (this.currentFilter.search) {
-                    params.append('search', this.currentFilter.search);
-                }
-                
-                if (this.currentFilter.celebrity) {
-                    params.append('celebrity', this.currentFilter.celebrity);
-                }
-                
-                if (this.currentFilter.category) {
-                    params.append('category', this.currentFilter.category);
-                }
-                
-                if (this.currentFilter.sort && this.currentFilter.sort !== 'random') {
-                    params.append('sort', this.currentFilter.sort);
-                }
-                
-                if (this.currentFilter.duration) {
-                    params.append('duration', this.currentFilter.duration);
-                }
-                
-                const response = await fetch(`/api/videos?${params}`);
-                const data = await response.json();
-                videos = data.videos || [];
-                total = data.total || 0;
-                hasMore = data.hasMore || false;
+            if (this.currentFilter.section === 'favorites') {
+                await this.loadFavoriteVideos(reset);
+                return;
             }
             
-            if (videos && videos.length > 0) {
-                this.renderVideos(videos, reset);
-                this.hasMore = hasMore;
+            if (this.currentFilter.section === 'watch-history') {
+                await this.loadWatchHistoryVideos(reset);
+                return;
+            }
+            
+            const params = new URLSearchParams({
+                page: this.currentPage,
+                limit: 20
+            });
+            
+            if (this.currentFilter.search) {
+                params.append('search', this.currentFilter.search);
+            }
+            
+            if (this.currentFilter.celebrity) {
+                params.append('celebrity', this.currentFilter.celebrity);
+            }
+            
+            if (this.currentFilter.category) {
+                params.append('category', this.currentFilter.category);
+            }
+            
+            if (this.currentFilter.sort && this.currentFilter.sort !== 'random') {
+                params.append('sort', this.currentFilter.sort);
+            }
+            
+            const response = await fetch(`/api/videos?${params}`);
+            const data = await response.json();
+            
+            if (data.videos && data.videos.length > 0) {
+                this.renderVideos(data.videos, reset);
+                this.hasMore = data.hasMore;
                 this.currentPage++;
                 
-                document.getElementById('videoCount').textContent = `${this.formatNumber(total)} videos`;
+                document.getElementById('videoCount').textContent = `${this.formatNumber(data.total)} videos`;
             } else if (reset) {
                 this.showNoResults();
                 document.getElementById('videoCount').textContent = '0 videos';
@@ -836,40 +799,105 @@ class VideoApp {
         }
     }
 
-    showNoResults() {
+    async loadFavoriteVideos(reset = false) {
+        try {
+            if (reset) {
+                document.getElementById('videoGrid').innerHTML = '';
+            }
+            
+            if (this.favorites.size === 0) {
+                if (reset) {
+                    this.showNoResults('No favorite videos', 'Add videos to your favorites to see them here');
+                    document.getElementById('videoCount').textContent = '0 videos';
+                }
+                return;
+            }
+            
+            const params = new URLSearchParams({
+                page: this.currentPage,
+                limit: 20,
+                favorites: 'true'
+            });
+            
+            const response = await fetch(`/api/videos?${params}`);
+            const data = await response.json();
+            
+            if (data.videos && data.videos.length > 0) {
+                this.renderVideos(data.videos, reset);
+                this.hasMore = data.hasMore;
+                this.currentPage++;
+                
+                document.getElementById('videoCount').textContent = `${this.formatNumber(data.total)} videos`;
+            } else if (reset) {
+                this.showNoResults('No favorite videos', 'Add videos to your favorites to see them here');
+                document.getElementById('videoCount').textContent = '0 videos';
+            }
+            
+        } catch (error) {
+            console.error('Error loading favorite videos:', error);
+        }
+    }
+
+    async loadWatchHistoryVideos(reset = false) {
+        try {
+            if (reset) {
+                document.getElementById('videoGrid').innerHTML = '';
+            }
+            
+            if (this.watchHistory.length === 0) {
+                if (reset) {
+                    this.showNoResults('No watch history', 'Videos you watch will appear here');
+                    document.getElementById('videoCount').textContent = '0 videos';
+                }
+                return;
+            }
+            
+            const startIndex = (this.currentPage - 1) * 20;
+            const endIndex = startIndex + 20;
+            const historySlice = this.watchHistory.slice(startIndex, endIndex);
+            
+            if (historySlice.length === 0) {
+                if (reset) {
+                    this.showNoResults('No watch history', 'Videos you watch will appear here');
+                    document.getElementById('videoCount').textContent = '0 videos';
+                }
+                return;
+            }
+            
+            // For now, show placeholder since we need to implement proper video lookup
+            if (reset) {
+                document.getElementById('videoCount').textContent = `${this.watchHistory.length} videos in history`;
+                const videoGrid = document.getElementById('videoGrid');
+                videoGrid.innerHTML = `
+                    <div class="watch-history-placeholder">
+                        <div class="placeholder-icon">
+                            <i class="fas fa-history"></i>
+                        </div>
+                        <h3>Watch History</h3>
+                        <p>Your recently watched videos will appear here.</p>
+                        <p>Currently tracking ${this.watchHistory.length} videos.</p>
+                    </div>
+                `;
+            }
+            
+        } catch (error) {
+            console.error('Error loading watch history videos:', error);
+        }
+    }
+
+    showNoResults(title = 'No videos found', text = 'Try adjusting your search terms or filters') {
         const noResults = document.getElementById('noResults');
         const noResultsTitle = document.getElementById('noResultsTitle');
         const noResultsText = document.getElementById('noResultsText');
-        const clearFiltersBtn = document.getElementById('clearFiltersBtn');
         
-        // Check if there are active filters
-        const hasActiveFilters = this.currentFilter.search || 
-                               this.currentFilter.celebrity || 
-                               this.currentFilter.category || 
-                               this.currentFilter.duration ||
-                               (this.currentFilter.section !== 'home' && 
-                                this.currentFilter.section !== 'categories' && 
-                                this.currentFilter.section !== 'performers');
-        
-        if (this.currentFilter.section === 'favorites') {
-            noResultsTitle.textContent = 'No favorite videos';
-            noResultsText.textContent = 'You haven\'t added any videos to your favorites yet. Start exploring and add videos you like!';
-            clearFiltersBtn.style.display = 'none';
-        } else if (this.currentFilter.section === 'watch-history') {
-            noResultsTitle.textContent = 'No watch history';
-            noResultsText.textContent = 'You haven\'t watched any videos yet. Start watching to build your history!';
-            clearFiltersBtn.style.display = 'none';
-        } else if (hasActiveFilters) {
-            noResultsTitle.textContent = 'No videos found';
-            noResultsText.textContent = 'Try adjusting your search terms or filters';
-            clearFiltersBtn.style.display = 'inline-flex';
-        } else {
-            noResultsTitle.textContent = 'No videos available';
-            noResultsText.textContent = 'There are no videos to display at the moment';
-            clearFiltersBtn.style.display = 'none';
-        }
-        
+        noResultsTitle.textContent = title;
+        noResultsText.textContent = text;
         noResults.style.display = 'block';
+        
+        // Hide clear filters button if no filters are active
+        const clearFiltersBtn = document.getElementById('clearFiltersBtn');
+        const hasActiveFilters = this.currentFilter.search || this.currentFilter.celebrity || this.currentFilter.category;
+        clearFiltersBtn.style.display = hasActiveFilters ? 'inline-flex' : 'none';
     }
 
     renderVideos(videos, reset = false) {
@@ -966,7 +994,7 @@ class VideoApp {
         [playBtn, img].forEach(element => {
             element.addEventListener('click', () => {
                 this.openVideoModal(video);
-                this.addToWatchHistory(video);
+                this.addToWatchHistory(video.id);
             });
         });
         
@@ -1040,24 +1068,17 @@ class VideoApp {
         return stars;
     }
 
-    async addToWatchHistory(video) {
-        try {
-            // Remove if already exists
-            this.watchHistory = this.watchHistory.filter(item => item.id !== video.id);
-            
-            // Add to beginning with full video data
-            this.watchHistory.unshift({
-                ...video,
-                watchedAt: Date.now()
-            });
-            
-            // Keep only last 100 items
-            this.watchHistory = this.watchHistory.slice(0, 100);
-            
-            this.saveToLocalStorage();
-        } catch (error) {
-            console.error('Error adding to watch history:', error);
-        }
+    addToWatchHistory(videoId) {
+        // Remove if already exists
+        this.watchHistory = this.watchHistory.filter(item => item.id !== videoId);
+        
+        // Add to beginning
+        this.watchHistory.unshift({ id: videoId, timestamp: Date.now() });
+        
+        // Keep only last 100 items
+        this.watchHistory = this.watchHistory.slice(0, 100);
+        
+        this.saveToLocalStorage();
     }
 
     async toggleFavorite(videoId, button) {
@@ -1103,7 +1124,6 @@ class VideoApp {
         const modalVideoCategories = document.getElementById('modalVideoCategories');
         
         modalVideo.src = `/api/video-stream/${video.id}`;
-        modalVideo.autoplay = true; // Enable autoplay
         modalVideo.load();
         
         modalVideoTitle.textContent = video.title;
@@ -1113,13 +1133,6 @@ class VideoApp {
         modalVideoRating.textContent = (video.rating || 4.2).toFixed(1);
         modalVideoDuration.textContent = video.duration || 'Unknown';
         modalVideoQuality.textContent = video.quality || 'HD';
-        
-        // Add click handler for performer name in modal
-        modalVideoPerformer.addEventListener('click', (e) => {
-            e.preventDefault();
-            this.closeVideoModal();
-            this.filterByPerformer(modalVideoPerformer.dataset.performer);
-        });
         
         if (video.categories && video.categories.length > 0) {
             modalVideoCategories.innerHTML = video.categories.map(cat => 
@@ -1166,60 +1179,51 @@ class VideoApp {
     async loadRelatedVideos(currentVideo) {
         try {
             this.relatedVideosPage = 1;
+            this.relatedVideosLoading = false;
             this.relatedVideosHasMore = true;
-            this.currentRelatedVideo = currentVideo;
             
-            const params = new URLSearchParams({
-                page: 1,
-                limit: 20
-            });
+            const relatedVideosGrid = document.getElementById('relatedVideosGrid');
+            relatedVideosGrid.innerHTML = '';
             
-            if (currentVideo.categories && currentVideo.categories.length > 0) {
-                params.append('category', currentVideo.categories[0]);
-            } else if (currentVideo.artist && currentVideo.artist !== 'Random') {
-                params.append('celebrity', currentVideo.artist);
-            }
-            
-            const response = await fetch(`/api/videos?${params}`);
-            const data = await response.json();
-            
-            if (data.videos) {
-                const relatedVideos = data.videos.filter(v => v.id !== currentVideo.id);
-                this.renderRelatedVideos(relatedVideos, true);
-                this.relatedVideosHasMore = data.hasMore;
-                this.relatedVideosPage = 2;
-            }
+            await this.loadMoreRelatedVideos(currentVideo);
         } catch (error) {
             console.error('Error loading related videos:', error);
         }
     }
 
-    async loadMoreRelatedVideos() {
-        if (!this.relatedVideosHasMore || !this.currentRelatedVideo) return;
+    async loadMoreRelatedVideos(currentVideo = null) {
+        if (this.relatedVideosLoading || !this.relatedVideosHasMore) return;
+        
+        this.relatedVideosLoading = true;
         
         try {
             const params = new URLSearchParams({
                 page: this.relatedVideosPage,
-                limit: 20
+                limit: 12
             });
             
-            if (this.currentRelatedVideo.categories && this.currentRelatedVideo.categories.length > 0) {
-                params.append('category', this.currentRelatedVideo.categories[0]);
-            } else if (this.currentRelatedVideo.artist && this.currentRelatedVideo.artist !== 'Random') {
-                params.append('celebrity', this.currentRelatedVideo.artist);
+            if (currentVideo) {
+                if (currentVideo.categories && currentVideo.categories.length > 0) {
+                    params.append('category', currentVideo.categories[0]);
+                } else if (currentVideo.artist) {
+                    params.append('celebrity', currentVideo.artist);
+                }
             }
             
             const response = await fetch(`/api/videos?${params}`);
             const data = await response.json();
             
             if (data.videos) {
-                const relatedVideos = data.videos.filter(v => v.id !== this.currentRelatedVideo.id);
-                this.renderRelatedVideos(relatedVideos, false);
-                this.relatedVideosHasMore = data.hasMore;
+                const relatedVideos = data.videos.filter(v => v.id !== this.currentVideoId);
+                this.renderRelatedVideos(relatedVideos, this.relatedVideosPage === 1);
+                
+                this.relatedVideosHasMore = data.hasMore && relatedVideos.length > 0;
                 this.relatedVideosPage++;
             }
         } catch (error) {
             console.error('Error loading more related videos:', error);
+        } finally {
+            this.relatedVideosLoading = false;
         }
     }
 
@@ -1230,41 +1234,34 @@ class VideoApp {
             relatedVideosGrid.innerHTML = '';
         }
         
-        const videosHTML = videos.map(video => {
+        videos.forEach(video => {
             const thumbnailUrl = video.thumbnailExists ? video.thumbnailUrl : 'https://images.pexels.com/photos/1181467/pexels-photo-1181467.jpeg?auto=compress&cs=tinysrgb&w=300';
             
-            return `
-                <div class="related-video-card" data-video-id="${video.id}">
-                    <div class="related-video-thumbnail">
-                        <img src="${thumbnailUrl}" alt="${video.title}" loading="lazy">
-                        ${video.duration ? `<div class="video-duration">${video.duration}</div>` : ''}
-                        <div class="video-rating-small">
-                            <i class="fas fa-star"></i>
-                            ${(video.rating || 4.2).toFixed(1)}
-                        </div>
-                    </div>
-                    <div class="related-video-info">
-                        <div class="related-video-title">${video.title}</div>
-                        <div class="related-video-performer">${video.artist}</div>
-                        <div class="related-video-views">${this.formatNumber(video.views || 0)} views</div>
+            const relatedCard = document.createElement('div');
+            relatedCard.className = 'related-video-card';
+            relatedCard.dataset.videoId = video.id;
+            relatedCard.innerHTML = `
+                <div class="related-video-thumbnail">
+                    <img src="${thumbnailUrl}" alt="${video.title}" loading="lazy">
+                    ${video.duration ? `<div class="video-duration">${video.duration}</div>` : ''}
+                    <div class="video-rating-small">
+                        <i class="fas fa-star"></i>
+                        ${(video.rating || 4.2).toFixed(1)}
                     </div>
                 </div>
+                <div class="related-video-info">
+                    <div class="related-video-title">${video.title}</div>
+                    <div class="related-video-performer">${video.artist}</div>
+                    <div class="related-video-views">${this.formatNumber(video.views || 0)} views</div>
+                </div>
             `;
-        }).join('');
-        
-        relatedVideosGrid.insertAdjacentHTML('beforeend', videosHTML);
-        
-        // Add event listeners to new cards
-        relatedVideosGrid.querySelectorAll('.related-video-card:not([data-listener])').forEach(card => {
-            card.setAttribute('data-listener', 'true');
-            card.addEventListener('click', () => {
-                const videoId = card.dataset.videoId;
-                const video = videos.find(v => v.id === videoId);
-                if (video) {
-                    this.openVideoModal(video);
-                    this.addToWatchHistory(video);
-                }
+            
+            relatedCard.addEventListener('click', () => {
+                this.openVideoModal(video);
+                this.addToWatchHistory(video.id);
             });
+            
+            relatedVideosGrid.appendChild(relatedCard);
         });
     }
 
@@ -1277,7 +1274,6 @@ class VideoApp {
         modalVideo.src = '';
         document.body.style.overflow = '';
         this.currentVideoId = null;
-        this.currentRelatedVideo = null;
     }
 
     async toggleModalFavorite() {
@@ -1317,7 +1313,6 @@ class VideoApp {
         this.setView(this.currentView);
         
         document.getElementById('sortSelect').value = this.currentFilter.sort;
-        document.getElementById('durationSelect').value = this.currentFilter.duration;
     }
 
     showToast(message, type = 'info') {
