@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VideoStream - Premium Content Platform</title>
+    <title>CelebStream - Premium Celebrity Content Platform</title>
     <style>
 :root {
     --primary-bg: #141414;
@@ -23,6 +23,7 @@
     --gradient-card: linear-gradient(145deg, #181818 0%, #1f1f1f 100%);
     --gradient-hover: linear-gradient(145deg, #333333 0%, #2a2a2a 100%);
     --blur-backdrop: blur(20px);
+    --sidebar-width: 280px;
 }
 
 * {
@@ -57,6 +58,172 @@ body::before {
     z-index: -1;
 }
 
+/* Layout Container */
+.app-container {
+    display: flex;
+    min-height: 100vh;
+}
+
+/* Sidebar Styles */
+.sidebar {
+    width: var(--sidebar-width);
+    background: linear-gradient(180deg, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.9) 100%);
+    backdrop-filter: var(--blur-backdrop);
+    -webkit-backdrop-filter: var(--blur-backdrop);
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100vh;
+    z-index: 1000;
+    overflow-y: auto;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transform: translateX(0);
+}
+
+.sidebar.hidden {
+    transform: translateX(-100%);
+}
+
+.sidebar-header {
+    padding: 2rem 1.5rem 1rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.sidebar-logo {
+    font-size: 1.8rem;
+    font-weight: 900;
+    background: var(--gradient-primary);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    letter-spacing: -0.05em;
+    margin-bottom: 0.5rem;
+}
+
+.sidebar-subtitle {
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    font-weight: 400;
+    opacity: 0.8;
+}
+
+.celebrities-section {
+    padding: 1.5rem;
+}
+
+.section-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.section-title::before {
+    content: '⭐';
+    font-size: 1rem;
+}
+
+.celebrity-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.celebrity-item {
+    padding: 0.8rem 1rem;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: relative;
+    overflow: hidden;
+}
+
+.celebrity-item::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(229, 9, 20, 0.1), transparent);
+    transition: left 0.6s ease;
+}
+
+.celebrity-item:hover {
+    background: rgba(229, 9, 20, 0.1);
+    border-color: rgba(229, 9, 20, 0.3);
+    transform: translateX(4px);
+}
+
+.celebrity-item:hover::before {
+    left: 100%;
+}
+
+.celebrity-item.active {
+    background: var(--gradient-primary);
+    border-color: var(--accent-color);
+    color: white;
+}
+
+.celebrity-name {
+    font-weight: 500;
+    font-size: 0.9rem;
+}
+
+.celebrity-count {
+    background: rgba(255, 255, 255, 0.2);
+    padding: 0.2rem 0.6rem;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.celebrity-item.active .celebrity-count {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+.sidebar-toggle {
+    position: fixed;
+    top: 20px;
+    left: 20px;
+    z-index: 1001;
+    background: rgba(0, 0, 0, 0.8);
+    backdrop-filter: var(--blur-backdrop);
+    -webkit-backdrop-filter: var(--blur-backdrop);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    padding: 0.8rem;
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    display: none;
+}
+
+.sidebar-toggle:hover {
+    background: rgba(229, 9, 20, 0.8);
+    border-color: var(--accent-color);
+}
+
+/* Main Content */
+.main-content {
+    flex: 1;
+    margin-left: var(--sidebar-width);
+    transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.main-content.expanded {
+    margin-left: 0;
+}
+
 /* Header Styles */
 .header {
     background: linear-gradient(180deg, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.7) 70%, transparent 100%);
@@ -64,16 +231,13 @@ body::before {
     -webkit-backdrop-filter: var(--blur-backdrop);
     border-bottom: 1px solid rgba(255, 255, 255, 0.05);
     padding: 1.5rem 4%;
-    position: fixed;
+    position: sticky;
     top: 0;
-    left: 0;
-    right: 0;
-    z-index: 1000;
+    z-index: 999;
     display: flex;
     align-items: center;
     justify-content: space-between;
     transition: all 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-    transform: translateZ(0);
 }
 
 .header.scrolled {
@@ -85,8 +249,14 @@ body::before {
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 2rem;
+}
+
 .logo {
-    font-size: 2.8rem;
+    font-size: 2.2rem;
     font-weight: 900;
     background: var(--gradient-primary);
     -webkit-background-clip: text;
@@ -98,20 +268,14 @@ body::before {
     cursor: pointer;
 }
 
-.logo::after {
-    content: '';
-    position: absolute;
-    bottom: -4px;
-    left: 0;
-    width: 0;
-    height: 3px;
-    background: var(--gradient-primary);
-    border-radius: 2px;
-    transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.logo:hover::after {
-    width: 100%;
+.current-view {
+    color: var(--text-secondary);
+    font-size: 1rem;
+    font-weight: 400;
+    padding: 0.5rem 1rem;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .search-container {
@@ -164,6 +328,41 @@ body::before {
     transform: translateY(-50%) scale(1.1);
 }
 
+.search-suggestions {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: rgba(0, 0, 0, 0.95);
+    backdrop-filter: var(--blur-backdrop);
+    -webkit-backdrop-filter: var(--blur-backdrop);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    margin-top: 4px;
+    max-height: 300px;
+    overflow-y: auto;
+    z-index: 1000;
+    display: none;
+}
+
+.suggestion-item {
+    padding: 0.8rem 1rem;
+    cursor: pointer;
+    transition: background 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+}
+
+.suggestion-item:hover {
+    background: rgba(229, 9, 20, 0.1);
+}
+
+.suggestion-icon {
+    font-size: 1rem;
+    opacity: 0.7;
+}
+
 .user-menu {
     display: flex;
     align-items: center;
@@ -206,10 +405,9 @@ body::before {
     left: 100%;
 }
 
-/* Main Content */
-.main-content {
-    margin-top: 100px;
-    padding: 3rem 4%;
+/* Content Area */
+.content-area {
+    padding: 2rem 4%;
     min-height: calc(100vh - 100px);
 }
 
@@ -355,6 +553,15 @@ body::before {
     font-weight: 400;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     opacity: 0.9;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.video-artist::before {
+    content: '⭐';
+    font-size: 0.8rem;
+    opacity: 0.7;
 }
 
 .video-card:hover .video-artist {
@@ -492,6 +699,14 @@ body::before {
     font-size: 1.1rem;
     font-weight: 400;
     opacity: 0.9;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.modal-artist::before {
+    content: '⭐';
+    font-size: 1rem;
 }
 
 .close {
@@ -543,27 +758,6 @@ body::before {
     background: linear-gradient(135deg, var(--text-secondary) 0%, #505050 100%);
 }
 
-/* Focus & Selection */
-.video-card:focus {
-    outline: 2px solid var(--accent-color);
-    outline-offset: 4px;
-    border-radius: 12px;
-}
-
-.search-bar:focus {
-    outline: none;
-}
-
-::selection {
-    background: rgba(229, 9, 20, 0.8);
-    color: var(--text-primary);
-}
-
-::-moz-selection {
-    background: rgba(229, 9, 20, 0.8);
-    color: var(--text-primary);
-}
-
 /* Responsive Design */
 @media (max-width: 1200px) {
     .videos-grid {
@@ -573,6 +767,22 @@ body::before {
 }
 
 @media (max-width: 768px) {
+    .sidebar {
+        transform: translateX(-100%);
+    }
+    
+    .sidebar.visible {
+        transform: translateX(0);
+    }
+    
+    .sidebar-toggle {
+        display: block;
+    }
+    
+    .main-content {
+        margin-left: 0;
+    }
+    
     .header {
         padding: 1.2rem 3%;
         flex-direction: column;
@@ -580,30 +790,18 @@ body::before {
         background: rgba(0, 0, 0, 0.95);
     }
 
-    .header.scrolled {
-        padding: 1.2rem 3%;
+    .header-left {
+        width: 100%;
+        justify-content: space-between;
     }
 
     .search-container {
         margin: 0;
         max-width: 100%;
-        order: 2;
         width: 100%;
     }
 
-    .user-menu {
-        order: 1;
-        align-self: flex-end;
-    }
-
-    .logo {
-        font-size: 2.2rem;
-        order: 0;
-        align-self: flex-start;
-    }
-
-    .main-content {
-        margin-top: 140px;
+    .content-area {
         padding: 2rem 3%;
     }
 
@@ -633,7 +831,7 @@ body::before {
 }
 
 @media (max-width: 480px) {
-    .main-content {
+    .content-area {
         padding: 1.5rem 2%;
     }
 
@@ -643,7 +841,7 @@ body::before {
     }
     
     .logo {
-        font-size: 2rem;
+        font-size: 1.8rem;
     }
 
     .search-bar {
@@ -671,6 +869,25 @@ body::before {
     }
 }
 
+/* Animations */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.scroll-sentinel {
+    height: 20px;
+    margin: 20px 0;
+    background: transparent;
+    pointer-events: none;
+}
+
 /* Reduced Motion */
 @media (prefers-reduced-motion: reduce) {
     * {
@@ -688,54 +905,59 @@ body::before {
         transform: translate(-50%, -50%) scale(1);
     }
 }
-
-/* Enhanced hover states for better UX */
-@media (hover: hover) {
-    .video-card {
-        transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-    }
-    
-    .video-card:hover {
-        transform: translateY(-12px) scale(1.04);
-        box-shadow: 
-            0 25px 50px rgba(0, 0, 0, 0.5),
-            0 0 0 1px rgba(255, 255, 255, 0.15),
-            0 0 20px rgba(229, 9, 20, 0.1);
-    }
-}
-
-/* Dark mode enhancements */
-@media (prefers-color-scheme: dark) {
-    body {
-        background: radial-gradient(ellipse at center, #1a1a1a 0%, #141414 70%, #0a0a0a 100%);
-    }
-}
     </style>
 </head>
 <body>
-    <header class="header" id="header">
-        <div class="logo">VideoStream</div>
-        <div class="search-container">
-            <input type="text" class="search-bar" placeholder="Search for videos or creators..." id="searchInput" autocomplete="off">
-            <div class="search-icon">🔍</div>
-        </div>
-        <div class="user-menu">
-            <div class="user-avatar">U</div>
-        </div>
-    </header>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-logo">CelebStream</div>
+                <div class="sidebar-subtitle">Premium Celebrity Content</div>
+            </div>
+            
+            <div class="celebrities-section">
+                <div class="section-title">Featured Stars</div>
+                <div class="celebrity-list" id="celebrityList">
+                    <!-- Celebrity items will be loaded here -->
+                </div>
+            </div>
+        </aside>
 
-    <main class="main-content">
-        <div class="videos-grid" id="videosGrid"></div>
-        <div class="loading" id="loading" style="display: none;">
-            <div class="loading-spinner"></div>
-            Loading more content...
-        </div>
-        <div class="no-results" id="noResults" style="display: none;">
-            <div class="no-results-icon">🎬</div>
-            <div>No content found</div>
-            <div style="font-size: 0.9rem; margin-top: 0.5rem; opacity: 0.7;">Try a different search term</div>
-        </div>
-    </main>
+        <!-- Sidebar Toggle Button -->
+        <button class="sidebar-toggle" id="sidebarToggle">☰</button>
+
+        <!-- Main Content -->
+        <main class="main-content" id="mainContent">
+            <header class="header" id="header">
+                <div class="header-left">
+                    <div class="logo">CelebStream</div>
+                    <div class="current-view" id="currentView">All Stars</div>
+                </div>
+                <div class="search-container">
+                    <input type="text" class="search-bar" placeholder="Search for celebrities or videos..." id="searchInput" autocomplete="off">
+                    <div class="search-icon">🔍</div>
+                    <div class="search-suggestions" id="searchSuggestions"></div>
+                </div>
+                <div class="user-menu">
+                    <div class="user-avatar">U</div>
+                </div>
+            </header>
+
+            <div class="content-area">
+                <div class="videos-grid" id="videosGrid"></div>
+                <div class="loading" id="loading" style="display: none;">
+                    <div class="loading-spinner"></div>
+                    Loading more content...
+                </div>
+                <div class="no-results" id="noResults" style="display: none;">
+                    <div class="no-results-icon">🎬</div>
+                    <div>No content found</div>
+                    <div style="font-size: 0.9rem; margin-top: 0.5rem; opacity: 0.7;">Try a different search term or celebrity</div>
+                </div>
+            </div>
+        </main>
+    </div>
 
     <!-- Video Modal -->
     <div id="videoModal" class="modal">
@@ -754,26 +976,34 @@ body::before {
     </div>
 
     <script>
-       class VideoStreamApp {
+class CelebStreamApp {
     constructor() {
         this.currentPage = 1;
         this.isLoading = false;
         this.hasMore = true;
         this.searchTerm = '';
+        this.currentCelebrity = '';
         this.searchTimeout = null;
+        this.allCelebrities = [];
         
         this.initializeElements();
         this.bindEvents();
+        this.loadCelebrities();
         this.loadVideos();
-        // Setup intersection observer after initial load
         setTimeout(() => this.setupIntersectionObserver(), 100);
     }
 
     initializeElements() {
+        this.sidebar = document.getElementById('sidebar');
+        this.sidebarToggle = document.getElementById('sidebarToggle');
+        this.mainContent = document.getElementById('mainContent');
+        this.celebrityList = document.getElementById('celebrityList');
+        this.currentView = document.getElementById('currentView');
         this.videosGrid = document.getElementById('videosGrid');
         this.loading = document.getElementById('loading');
         this.noResults = document.getElementById('noResults');
         this.searchInput = document.getElementById('searchInput');
+        this.searchSuggestions = document.getElementById('searchSuggestions');
         this.modal = document.getElementById('videoModal');
         this.modalVideo = document.getElementById('modalVideo');
         this.modalTitle = document.getElementById('modalTitle');
@@ -783,17 +1013,14 @@ body::before {
     }
 
     setupIntersectionObserver() {
-        // Remove existing observer if it exists
         if (this.observer) {
             this.observer.disconnect();
         }
 
-        // Remove existing sentinel if it exists
         if (this.sentinel) {
             this.sentinel.remove();
         }
 
-        // Create a sentinel element for infinite scroll
         this.sentinel = document.createElement('div');
         this.sentinel.className = 'scroll-sentinel';
         this.sentinel.style.cssText = `
@@ -803,13 +1030,11 @@ body::before {
             pointer-events: none;
         `;
         
-        // Append sentinel after the videos grid
         this.videosGrid.parentNode.insertBefore(this.sentinel, this.videosGrid.nextSibling);
 
         this.observer = new IntersectionObserver((entries) => {
             entries.forEach(entry => {
                 if (entry.isIntersecting && !this.isLoading && this.hasMore) {
-                    console.log('Sentinel intersected - loading more videos');
                     this.loadMoreVideos();
                 }
             });
@@ -819,10 +1044,16 @@ body::before {
         });
 
         this.observer.observe(this.sentinel);
-        console.log('Intersection observer setup complete');
     }
 
     bindEvents() {
+        // Sidebar toggle
+        if (this.sidebarToggle) {
+            this.sidebarToggle.addEventListener('click', () => {
+                this.sidebar.classList.toggle('visible');
+            });
+        }
+
         // Header scroll effect
         let ticking = false;
         window.addEventListener('scroll', () => {
@@ -841,21 +1072,35 @@ body::before {
             }
         });
 
-        // Search functionality with debouncing
+        // Search functionality
         if (this.searchInput) {
             this.searchInput.addEventListener('input', (e) => {
                 clearTimeout(this.searchTimeout);
                 this.searchTimeout = setTimeout(() => {
                     this.handleSearch(e.target.value);
                 }, 300);
+                this.showSearchSuggestions(e.target.value);
             });
 
-            // Search on Enter key
             this.searchInput.addEventListener('keydown', (e) => {
                 if (e.key === 'Enter') {
                     clearTimeout(this.searchTimeout);
                     this.handleSearch(e.target.value);
+                    this.hideSearchSuggestions();
                 }
+                if (e.key === 'Escape') {
+                    this.hideSearchSuggestions();
+                }
+            });
+
+            this.searchInput.addEventListener('focus', () => {
+                if (this.searchInput.value) {
+                    this.showSearchSuggestions(this.searchInput.value);
+                }
+            });
+
+            this.searchInput.addEventListener('blur', () => {
+                setTimeout(() => this.hideSearchSuggestions(), 200);
             });
         }
 
@@ -873,6 +1118,7 @@ body::before {
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
                 this.closeVideoModal();
+                this.hideSearchSuggestions();
             }
         });
 
@@ -882,26 +1128,129 @@ body::before {
                 e.stopPropagation();
             });
 
-            // Handle video errors gracefully
             this.modalVideo.addEventListener('error', (e) => {
                 console.warn('Video playback error:', e);
             });
         }
+
+        // Close sidebar when clicking outside on mobile
+        document.addEventListener('click', (e) => {
+            if (window.innerWidth <= 768) {
+                if (!this.sidebar.contains(e.target) && !this.sidebarToggle.contains(e.target)) {
+                    this.sidebar.classList.remove('visible');
+                }
+            }
+        });
+    }
+
+    async loadCelebrities() {
+        try {
+            const response = await fetch('/api/celebrities');
+            const data = await response.json();
+            
+            this.renderCelebrities(data.celebrities);
+            
+            // Also load all celebrities for search suggestions
+            const allResponse = await fetch('/api/celebrities/all');
+            const allData = await allResponse.json();
+            this.allCelebrities = allData.celebrities;
+        } catch (error) {
+            console.error('Error loading celebrities:', error);
+        }
+    }
+
+    renderCelebrities(celebrities) {
+        if (!this.celebrityList) return;
+        
+        this.celebrityList.innerHTML = '';
+        
+        celebrities.forEach(celebrity => {
+            const item = document.createElement('div');
+            item.className = 'celebrity-item';
+            item.innerHTML = `
+                <div class="celebrity-name">${celebrity.displayName}</div>
+                <div class="celebrity-count">${celebrity.videoCount}</div>
+            `;
+            
+            item.addEventListener('click', () => {
+                this.selectCelebrity(celebrity.name, celebrity.displayName);
+            });
+            
+            this.celebrityList.appendChild(item);
+        });
+    }
+
+    selectCelebrity(celebrityName, displayName) {
+        // Update active state
+        document.querySelectorAll('.celebrity-item').forEach(item => {
+            item.classList.remove('active');
+        });
+        event.target.closest('.celebrity-item').classList.add('active');
+        
+        // Update current view
+        this.currentCelebrity = celebrityName;
+        if (this.currentView) {
+            this.currentView.textContent = displayName;
+        }
+        
+        // Clear search and load celebrity videos
+        this.searchTerm = '';
+        if (this.searchInput) {
+            this.searchInput.value = '';
+        }
+        
+        this.loadVideos(true);
+        
+        // Close sidebar on mobile
+        if (window.innerWidth <= 768) {
+            this.sidebar.classList.remove('visible');
+        }
+    }
+
+    showSearchSuggestions(query) {
+        if (!query.trim() || !this.searchSuggestions) return;
+        
+        const filtered = this.allCelebrities.filter(celebrity =>
+            celebrity.displayName.toLowerCase().includes(query.toLowerCase())
+        ).slice(0, 8);
+        
+        if (filtered.length === 0) {
+            this.hideSearchSuggestions();
+            return;
+        }
+        
+        this.searchSuggestions.innerHTML = '';
+        
+        filtered.forEach(celebrity => {
+            const item = document.createElement('div');
+            item.className = 'suggestion-item';
+            item.innerHTML = `
+                <div class="suggestion-icon">⭐</div>
+                <div>${celebrity.displayName}</div>
+            `;
+            
+            item.addEventListener('click', () => {
+                this.searchInput.value = celebrity.displayName;
+                this.selectCelebrity(celebrity.name, celebrity.displayName);
+                this.hideSearchSuggestions();
+            });
+            
+            this.searchSuggestions.appendChild(item);
+        });
+        
+        this.searchSuggestions.style.display = 'block';
+    }
+
+    hideSearchSuggestions() {
+        if (this.searchSuggestions) {
+            this.searchSuggestions.style.display = 'none';
+        }
     }
 
     async loadVideos(reset = false) {
-        if (this.isLoading) {
-            console.log('Already loading, skipping request');
-            return;
-        }
+        if (this.isLoading) return;
+        if (!this.hasMore && !reset) return;
 
-        if (!this.hasMore && !reset) {
-            console.log('No more videos to load');
-            return;
-        }
-
-        console.log(`Loading videos - Page: ${this.currentPage}, Reset: ${reset}, Search: "${this.searchTerm}"`);
-        
         this.isLoading = true;
         
         if (this.loading) {
@@ -920,14 +1269,20 @@ body::before {
         }
 
         try {
-            const response = await fetch(`/api/videos?page=${this.currentPage}&limit=20&search=${encodeURIComponent(this.searchTerm)}`);
+            const params = new URLSearchParams({
+                page: this.currentPage,
+                limit: 20,
+                search: this.searchTerm,
+                celebrity: this.currentCelebrity
+            });
+
+            const response = await fetch(`/api/videos?${params}`);
             
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
             
             const data = await response.json();
-            console.log(`Loaded ${data.videos.length} videos, hasMore: ${data.hasMore}`);
 
             if (data.videos.length === 0 && this.currentPage === 1) {
                 if (this.noResults) {
@@ -938,7 +1293,6 @@ body::before {
                 this.hasMore = data.hasMore;
                 this.currentPage++;
                 
-                // Re-setup observer if this was a reset (search)
                 if (reset) {
                     setTimeout(() => this.setupIntersectionObserver(), 100);
                 }
@@ -957,7 +1311,6 @@ body::before {
     }
 
     loadMoreVideos() {
-        console.log('loadMoreVideos called');
         if (!this.isLoading && this.hasMore) {
             this.loadVideos();
         }
@@ -971,7 +1324,6 @@ body::before {
         videos.forEach((video, index) => {
             const videoCard = this.createVideoCard(video);
             
-            // Add staggered animation delay
             videoCard.style.animationDelay = `${index * 0.1}s`;
             videoCard.style.animation = 'fadeInUp 0.6s ease forwards';
             videoCard.style.opacity = '0';
@@ -1005,7 +1357,6 @@ body::before {
             </div>
         `;
 
-        // Add click and keyboard event listeners
         card.addEventListener('click', () => this.openVideoModal(video));
         card.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' || e.key === ' ') {
@@ -1026,7 +1377,6 @@ body::before {
         this.modal.style.display = 'block';
         document.body.style.overflow = 'hidden';
         
-        // Focus management for accessibility
         if (this.closeModal) {
             this.closeModal.focus();
         }
@@ -1040,14 +1390,25 @@ body::before {
         this.modalVideo.src = '';
         document.body.style.overflow = 'auto';
         
-        // Return focus to the document
         document.body.focus();
     }
 
     handleSearch(term) {
         this.searchTerm = term.trim();
-        console.log('Searching for:', this.searchTerm);
+        this.currentCelebrity = '';
+        
+        // Clear celebrity selection
+        document.querySelectorAll('.celebrity-item').forEach(item => {
+            item.classList.remove('active');
+        });
+        
+        // Update current view
+        if (this.currentView) {
+            this.currentView.textContent = this.searchTerm ? `Search: ${this.searchTerm}` : 'All Stars';
+        }
+        
         this.loadVideos(true);
+        this.hideSearchSuggestions();
     }
 
     showError(message) {
@@ -1066,7 +1427,6 @@ body::before {
         return div.innerHTML;
     }
 
-    // Cleanup method
     destroy() {
         if (this.observer) {
             this.observer.disconnect();
@@ -1078,41 +1438,10 @@ body::before {
     }
 }
 
-// Add fade in animation keyframes
-const style = document.createElement('style');
-style.textContent = `
-    @keyframes fadeInUp {
-        from {
-            opacity: 0;
-            transform: translateY(20px);
-        }
-        to {
-            opacity: 1;
-            transform: translateY(0);
-        }
-    }
-    
-    .scroll-sentinel {
-        height: 20px;
-        margin: 20px 0;
-        background: transparent;
-        pointer-events: none;
-    }
-`;
-document.head.appendChild(style);
-
 // Initialize the app when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
-    window.videoApp = new VideoStreamApp();
+    window.celebApp = new CelebStreamApp();
 });
-
-// Add service worker for better performance (optional)
-if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-        // Service worker registration would go here
-        // navigator.serviceWorker.register('/sw.js');
-    });
-}
     </script>
 </body>
 </html>

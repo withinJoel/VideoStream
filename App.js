@@ -40,6 +40,53 @@ const seededRandom = (seed, index) => {
     return x - Math.floor(x);
 };
 
+// Helper function to format names (replace _ with space and capitalize)
+const formatName = (name) => {
+    return name.replace(/_/g, ' ')
+               .split(' ')
+               .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+               .join(' ');
+};
+
+// Get all celebrity folders
+const getCelebrityFolders = () => {
+    try {
+        const items = fs.readdirSync(VIDEOS_DIR, { withFileTypes: true });
+        const folders = items
+            .filter(item => item.isDirectory())
+            .map(item => ({
+                name: item.name,
+                displayName: formatName(item.name),
+                videoCount: 0
+            }));
+
+        // Count videos in each folder
+        folders.forEach(folder => {
+            try {
+                const folderPath = path.join(VIDEOS_DIR, folder.name);
+                const subItems = fs.readdirSync(folderPath, { withFileTypes: true });
+                folder.videoCount = subItems.filter(sub => 
+                    sub.isFile() && VIDEO_EXTENSIONS.includes(path.extname(sub.name).toLowerCase())
+                ).length;
+            } catch (err) {
+                folder.videoCount = 0;
+            }
+        });
+
+        return folders.filter(folder => folder.videoCount > 0);
+    } catch (err) {
+        console.error('Error getting celebrity folders:', err);
+        return [];
+    }
+};
+
+// Get random celebrity folders
+const getRandomCelebrities = (count = 10) => {
+    const allFolders = getCelebrityFolders();
+    const shuffled = allFolders.sort(() => 0.5 - Math.random());
+    return shuffled.slice(0, count);
+};
+
 // Quick file count (no metadata stored)
 const countVideos = () => {
     let count = 0;
@@ -63,7 +110,7 @@ const countVideos = () => {
 };
 
 // 🎲 STREAMING RANDOM VIDEO GENERATOR (zero memory storage)
-const generateRandomVideos = function* (startIndex, limit, searchTerm = '') {
+const generateRandomVideos = function* (startIndex, limit, searchTerm = '', celebrityFilter = '') {
     const items = fs.readdirSync(VIDEOS_DIR, { withFileTypes: true });
     const allPaths = [];
     
@@ -72,11 +119,21 @@ const generateRandomVideos = function* (startIndex, limit, searchTerm = '') {
         if (item.isFile() && VIDEO_EXTENSIONS.includes(path.extname(item.name).toLowerCase())) {
             allPaths.push({ name: item.name, artist: 'Random', isRoot: true });
         } else if (item.isDirectory()) {
+            // Skip if celebrity filter is specified and doesn't match
+            if (celebrityFilter && item.name !== celebrityFilter) {
+                continue;
+            }
+            
             try {
                 const subItems = fs.readdirSync(path.join(VIDEOS_DIR, item.name), { withFileTypes: true });
                 for (const sub of subItems) {
                     if (sub.isFile() && VIDEO_EXTENSIONS.includes(path.extname(sub.name).toLowerCase())) {
-                        allPaths.push({ name: sub.name, artist: item.name, isRoot: false, folder: item.name });
+                        allPaths.push({ 
+                            name: sub.name, 
+                            artist: formatName(item.name), 
+                            isRoot: false, 
+                            folder: item.name 
+                        });
                     }
                 }
             } catch (err) {
@@ -87,37 +144,65 @@ const generateRandomVideos = function* (startIndex, limit, searchTerm = '') {
     
     // Apply search filter if needed
     const filtered = searchTerm ? 
-        allPaths.filter(p => 
-            p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            p.artist.toLowerCase().includes(searchTerm.toLowerCase())
-        ) : allPaths;
+        allPaths.filter(p => {
+            const searchLower = searchTerm.toLowerCase();
+            const titleFormatted = formatName(path.parse(p.name).name);
+            const artistFormatted = formatName(p.artist);
+            
+            return titleFormatted.toLowerCase().includes(searchLower) ||
+                   artistFormatted.toLowerCase().includes(searchLower) ||
+                   p.name.toLowerCase().includes(searchLower);
+        }) : allPaths;
     
-    // Generate random indexes using seed
-    const randomIndexes = [];
-    for (let i = 0; i < filtered.length; i++) {
-        randomIndexes.push({ index: i, random: seededRandom(randomSeed, i) });
-    }
-    randomIndexes.sort((a, b) => a.random - b.random);
-    
-    // Yield videos in random order
-    let yielded = 0;
-    for (let i = startIndex; i < randomIndexes.length && yielded < limit; i++, yielded++) {
-        const pathData = filtered[randomIndexes[i].index];
-        const videoName = path.parse(pathData.name).name;
-        const thumbnailName = pathData.isRoot ? 
-            `${videoName}.jpg` : 
-            `${pathData.artist}_${videoName}.jpg`;
+    // Generate random indexes using seed (only if no celebrity filter)
+    if (!celebrityFilter) {
+        const randomIndexes = [];
+        for (let i = 0; i < filtered.length; i++) {
+            randomIndexes.push({ index: i, random: seededRandom(randomSeed, i) });
+        }
+        randomIndexes.sort((a, b) => a.random - b.random);
         
-        yield {
-            id: `${randomSeed}_${i}`, // Deterministic but random-looking
-            title: videoName,
-            artist: pathData.artist,
-            videoUrl: pathData.isRoot ? 
-                `/videos/${pathData.name}` : 
-                `/videos/${pathData.folder}/${pathData.name}`,
-            thumbnailUrl: `/thumbnails/${thumbnailName}`,
-            thumbnailExists: fs.existsSync(path.join(THUMBNAILS_DIR, thumbnailName))
-        };
+        // Yield videos in random order
+        let yielded = 0;
+        for (let i = startIndex; i < randomIndexes.length && yielded < limit; i++, yielded++) {
+            const pathData = filtered[randomIndexes[i].index];
+            const videoName = formatName(path.parse(pathData.name).name);
+            const thumbnailName = pathData.isRoot ? 
+                `${path.parse(pathData.name).name}.jpg` : 
+                `${pathData.folder}_${path.parse(pathData.name).name}.jpg`;
+            
+            yield {
+                id: `${randomSeed}_${i}`,
+                title: videoName,
+                artist: pathData.artist,
+                videoUrl: pathData.isRoot ? 
+                    `/videos/${pathData.name}` : 
+                    `/videos/${pathData.folder}/${pathData.name}`,
+                thumbnailUrl: `/thumbnails/${thumbnailName}`,
+                thumbnailExists: fs.existsSync(path.join(THUMBNAILS_DIR, thumbnailName))
+            };
+        }
+    } else {
+        // For celebrity filter, show in order
+        let yielded = 0;
+        for (let i = startIndex; i < filtered.length && yielded < limit; i++, yielded++) {
+            const pathData = filtered[i];
+            const videoName = formatName(path.parse(pathData.name).name);
+            const thumbnailName = pathData.isRoot ? 
+                `${path.parse(pathData.name).name}.jpg` : 
+                `${pathData.folder}_${path.parse(pathData.name).name}.jpg`;
+            
+            yield {
+                id: `${pathData.folder || 'root'}_${i}`,
+                title: videoName,
+                artist: pathData.artist,
+                videoUrl: pathData.isRoot ? 
+                    `/videos/${pathData.name}` : 
+                    `/videos/${pathData.folder}/${pathData.name}`,
+                thumbnailUrl: `/thumbnails/${thumbnailName}`,
+                thumbnailExists: fs.existsSync(path.join(THUMBNAILS_DIR, thumbnailName))
+            };
+        }
     }
 };
 
@@ -199,11 +284,11 @@ setInterval(processThumbnailQueue, 2000);
 // ⚡ ULTRA-FAST API ENDPOINTS
 app.get('/api/videos', (req, res) => {
     try {
-        const { page = 1, limit = 20, search = '' } = req.query;
+        const { page = 1, limit = 20, search = '', celebrity = '' } = req.query;
         const startIndex = (parseInt(page) - 1) * parseInt(limit);
         
         const videos = [];
-        const generator = generateRandomVideos(startIndex, parseInt(limit), search);
+        const generator = generateRandomVideos(startIndex, parseInt(limit), search, celebrity);
         
         for (const video of generator) {
             videos.push(video);
@@ -230,6 +315,28 @@ app.get('/api/videos', (req, res) => {
     } catch (err) {
         console.error('Error:', err);
         res.status(500).json({ error: 'Failed to fetch videos' });
+    }
+});
+
+// Get random celebrities for sidebar
+app.get('/api/celebrities', (req, res) => {
+    try {
+        const celebrities = getRandomCelebrities(10);
+        res.json({ celebrities });
+    } catch (err) {
+        console.error('Error getting celebrities:', err);
+        res.status(500).json({ error: 'Failed to fetch celebrities' });
+    }
+});
+
+// Get all celebrities (for search suggestions)
+app.get('/api/celebrities/all', (req, res) => {
+    try {
+        const celebrities = getCelebrityFolders();
+        res.json({ celebrities });
+    } catch (err) {
+        console.error('Error getting all celebrities:', err);
+        res.status(500).json({ error: 'Failed to fetch all celebrities' });
     }
 });
 
@@ -271,7 +378,7 @@ app.get('/', (req, res) => {
 });
 
 // Initialize
-console.log('🚀 Initializing ultra-fast video server...');
+console.log('🚀 Initializing ultra-fast celebrity video server...');
 videoCount = countVideos();
 setupWatchers();
 
@@ -281,7 +388,7 @@ setInterval(() => {
 }, 30000);
 
 app.listen(PORT, () => {
-    console.log(`⚡ Ultra-Fast Random Video Server: http://localhost:${PORT}`);
+    console.log(`⚡ Ultra-Fast Celebrity Video Server: http://localhost:${PORT}`);
     console.log(`📹 Found ${videoCount} videos`);
     console.log(`🔥 Real-time updates enabled`);
     console.log(`💾 Memory-optimized streaming`);
