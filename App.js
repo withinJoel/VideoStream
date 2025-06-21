@@ -13,6 +13,7 @@ const app = express();
 const PORT = 3000;
 const VIDEOS_DIR = path.join(__dirname, 'Videos');
 const THUMBNAILS_DIR = path.join(__dirname, 'public', 'thumbnails');
+const PREVIEWS_DIR = path.join(__dirname, 'public', 'previews');
 
 // Middleware
 app.use(cors());
@@ -20,11 +21,14 @@ app.use(express.json());
 app.use(express.static('public'));
 app.use('/videos', express.static(VIDEOS_DIR));
 app.use('/thumbnails', express.static(THUMBNAILS_DIR));
+app.use('/previews', express.static(PREVIEWS_DIR));
 
-// Ensure thumbnails directory exists
-if (!fs.existsSync(THUMBNAILS_DIR)) {
-    fs.mkdirSync(THUMBNAILS_DIR, { recursive: true });
-}
+// Ensure directories exist
+[THUMBNAILS_DIR, PREVIEWS_DIR].forEach(dir => {
+    if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+    }
+});
 
 const VIDEO_EXTENSIONS = ['.mp4', '.avi', '.mov', '.mkv', '.webm', '.m4v'];
 
@@ -121,13 +125,6 @@ const getCelebrityFolders = () => {
     }
 };
 
-// Get random celebrity folders
-const getRandomCelebrities = (count = 10) => {
-    const allFolders = getCelebrityFolders();
-    const shuffled = allFolders.sort(() => 0.5 - Math.random());
-    return shuffled.slice(0, count);
-};
-
 // Quick file count (no metadata stored)
 const countVideos = (celebrityFilter = '') => {
     let count = 0;
@@ -220,6 +217,10 @@ const generateRandomVideos = function* (startIndex, limit, searchTerm = '', cele
                 `${path.parse(pathData.name).name}.jpg` : 
                 `${pathData.folder}_${path.parse(pathData.name).name}.jpg`;
             
+            const previewName = pathData.isRoot ? 
+                `${path.parse(pathData.name).name}_preview.mp4` : 
+                `${pathData.folder}_${path.parse(pathData.name).name}_preview.mp4`;
+            
             yield {
                 id: `${randomSeed}_${i}`,
                 title: videoInfo.title,
@@ -230,7 +231,9 @@ const generateRandomVideos = function* (startIndex, limit, searchTerm = '', cele
                     `/videos/${pathData.name}` : 
                     `/videos/${pathData.folder}/${pathData.name}`,
                 thumbnailUrl: `/thumbnails/${thumbnailName}`,
-                thumbnailExists: fs.existsSync(path.join(THUMBNAILS_DIR, thumbnailName))
+                previewUrl: `/previews/${previewName}`,
+                thumbnailExists: fs.existsSync(path.join(THUMBNAILS_DIR, thumbnailName)),
+                previewExists: fs.existsSync(path.join(PREVIEWS_DIR, previewName))
             };
         }
     } else {
@@ -243,6 +246,10 @@ const generateRandomVideos = function* (startIndex, limit, searchTerm = '', cele
                 `${path.parse(pathData.name).name}.jpg` : 
                 `${pathData.folder}_${path.parse(pathData.name).name}.jpg`;
             
+            const previewName = pathData.isRoot ? 
+                `${path.parse(pathData.name).name}_preview.mp4` : 
+                `${pathData.folder}_${path.parse(pathData.name).name}_preview.mp4`;
+            
             yield {
                 id: `${pathData.folder || 'root'}_${i}`,
                 title: videoInfo.title,
@@ -253,7 +260,9 @@ const generateRandomVideos = function* (startIndex, limit, searchTerm = '', cele
                     `/videos/${pathData.name}` : 
                     `/videos/${pathData.folder}/${pathData.name}`,
                 thumbnailUrl: `/thumbnails/${thumbnailName}`,
-                thumbnailExists: fs.existsSync(path.join(THUMBNAILS_DIR, thumbnailName))
+                previewUrl: `/previews/${previewName}`,
+                thumbnailExists: fs.existsSync(path.join(THUMBNAILS_DIR, thumbnailName)),
+                previewExists: fs.existsSync(path.join(PREVIEWS_DIR, previewName))
             };
         }
     }
@@ -301,8 +310,10 @@ const setupWatchers = () => {
     }
 };
 
-// Background thumbnail generation (non-blocking queue)
+// Background thumbnail and preview generation (non-blocking queue)
 const thumbnailQueue = new Set();
+const previewQueue = new Set();
+
 const processThumbnailQueue = async () => {
     if (thumbnailQueue.size === 0) return;
     
@@ -331,8 +342,39 @@ const processThumbnailQueue = async () => {
     await Promise.allSettled(promises);
 };
 
-// Process thumbnail queue every 2 seconds
+const processPreviewQueue = async () => {
+    if (previewQueue.size === 0) return;
+    
+    const batch = Array.from(previewQueue).slice(0, 2); // Process 2 at a time
+    batch.forEach(item => previewQueue.delete(item));
+    
+    const promises = batch.map(async ({ videoPath, previewPath }) => {
+        try {
+            await new Promise((resolve, reject) => {
+                ffmpeg(videoPath)
+                    .seekInput(10) // Start from 10 seconds
+                    .duration(10) // 10 second preview
+                    .size('480x270') // Small preview size
+                    .fps(15) // Lower FPS for smaller file
+                    .videoBitrate('500k') // Lower bitrate
+                    .audioCodec('aac')
+                    .videoCodec('libx264')
+                    .output(previewPath)
+                    .on('end', resolve)
+                    .on('error', reject)
+                    .run();
+            });
+        } catch (err) {
+            // Silent fail
+        }
+    });
+    
+    await Promise.allSettled(promises);
+};
+
+// Process queues
 setInterval(processThumbnailQueue, 2000);
+setInterval(processPreviewQueue, 5000);
 
 // ⚡ ULTRA-FAST API ENDPOINTS
 app.get('/api/videos', (req, res) => {
@@ -356,6 +398,17 @@ app.get('/api/videos', (req, res) => {
                     thumbnailQueue.add({ videoPath, thumbnailPath });
                 }
             }
+            
+            // Queue preview generation if missing
+            if (!video.previewExists) {
+                const videoPath = video.videoUrl.startsWith('/videos/') ? 
+                    path.join(VIDEOS_DIR, video.videoUrl.slice(8)) : '';
+                const previewPath = path.join(PREVIEWS_DIR, video.previewUrl.split('/').pop());
+                
+                if (videoPath) {
+                    previewQueue.add({ videoPath, previewPath });
+                }
+            }
         }
         
         const totalCount = countVideos(celebrity);
@@ -373,10 +426,10 @@ app.get('/api/videos', (req, res) => {
     }
 });
 
-// Get random celebrities for sidebar
+// Get ALL celebrities for sidebar (not just random 10)
 app.get('/api/celebrities', (req, res) => {
     try {
-        const celebrities = getRandomCelebrities(10);
+        const celebrities = getCelebrityFolders();
         res.json({ celebrities });
     } catch (err) {
         console.error('Error getting celebrities:', err);
@@ -424,6 +477,7 @@ app.get('/api/stats', (req, res) => {
         totalVideos: videoCount,
         watchedDirectories: watchers.size,
         pendingThumbnails: thumbnailQueue.size,
+        pendingPreviews: previewQueue.size,
         memoryUsage: process.memoryUsage()
     });
 });

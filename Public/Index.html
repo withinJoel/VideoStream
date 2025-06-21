@@ -97,6 +97,12 @@ body::before {
 .sidebar-header {
     padding: 2rem 1.5rem 1rem;
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    position: sticky;
+    top: 0;
+    background: rgba(0, 0, 0, 0.9);
+    backdrop-filter: var(--blur-backdrop);
+    -webkit-backdrop-filter: var(--blur-backdrop);
+    z-index: 10;
 }
 
 .sidebar-logo {
@@ -129,6 +135,13 @@ body::before {
     display: flex;
     align-items: center;
     gap: 0.5rem;
+    position: sticky;
+    top: 120px;
+    background: rgba(0, 0, 0, 0.9);
+    backdrop-filter: var(--blur-backdrop);
+    -webkit-backdrop-filter: var(--blur-backdrop);
+    padding: 0.5rem 0;
+    z-index: 5;
 }
 
 .section-title::before {
@@ -140,6 +153,9 @@ body::before {
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
+    max-height: calc(100vh - 200px);
+    overflow-y: auto;
+    padding-right: 0.5rem;
 }
 
 .celebrity-item {
@@ -250,15 +266,22 @@ body::before {
     -webkit-backdrop-filter: var(--blur-backdrop);
     border-bottom: 1px solid rgba(255, 255, 255, 0.05);
     padding: 1.5rem 4%;
-    position: sticky;
+    position: fixed;
     top: 0;
+    left: var(--sidebar-width);
+    right: 0;
     z-index: 999;
     display: flex;
     align-items: center;
     justify-content: space-between;
     transition: all 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-    width: 100%;
+    width: calc(100% - var(--sidebar-width));
     overflow-x: hidden;
+}
+
+.header.expanded {
+    left: 0;
+    width: 100%;
 }
 
 .header.scrolled {
@@ -449,7 +472,7 @@ body::before {
 
 /* Content Area */
 .content-area {
-    padding: 2rem 4%;
+    padding: 6rem 4% 2rem;
     min-height: calc(100vh - 100px);
     width: 100%;
     overflow-x: hidden;
@@ -567,6 +590,32 @@ body::before {
 .video-card:hover .play-overlay {
     opacity: 1;
     transform: translate(-50%, -50%) scale(1);
+}
+
+/* Video Preview on Hover */
+.video-preview {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    z-index: 2;
+}
+
+.video-preview video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.video-card:hover .video-preview {
+    opacity: 1;
+}
+
+.video-card:hover .play-overlay {
+    opacity: 0;
 }
 
 .video-info {
@@ -912,6 +961,10 @@ body::before {
     border-left: 4px solid var(--accent-color);
 }
 
+.notification.error {
+    border-left: 4px solid #f44336;
+}
+
 /* Scrollbar Styling */
 ::-webkit-scrollbar {
     width: 8px;
@@ -960,10 +1013,17 @@ body::before {
     }
     
     .header {
+        left: 0;
+        width: 100%;
         padding: 1.2rem 3%;
         flex-direction: column;
         gap: 1.5rem;
         background: rgba(0, 0, 0, 0.95);
+    }
+
+    .header.expanded {
+        left: 0;
+        width: 100%;
     }
 
     .header-left {
@@ -984,7 +1044,7 @@ body::before {
     }
 
     .content-area {
-        padding: 2rem 3%;
+        padding: 8rem 3% 2rem;
     }
 
     .videos-grid {
@@ -1012,7 +1072,7 @@ body::before {
 
 @media (max-width: 480px) {
     .content-area {
-        padding: 1.5rem 2%;
+        padding: 8rem 2% 1.5rem;
     }
 
     .videos-grid {
@@ -1106,7 +1166,7 @@ body::before {
             </div>
             
             <div class="celebrities-section">
-                <div class="section-title">Featured Stars</div>
+                <div class="section-title">All Stars</div>
                 <div class="celebrity-list" id="celebrityList">
                     <!-- Celebrity items will be loaded here -->
                 </div>
@@ -1171,14 +1231,17 @@ body::before {
                         <div class="modal-duration" id="modalDuration" style="display: none;"></div>
                     </div>
                     <div class="modal-actions">
-                        <button class="modal-btn primary" id="playRandomBtn">
-                            🎯 Play Random
-                        </button>
                         <button class="modal-btn" id="downloadBtn">
                             📥 Download
                         </button>
                         <button class="modal-btn" id="shareBtn">
                             📤 Share
+                        </button>
+                        <button class="modal-btn" id="favoriteBtn">
+                            ❤️ Favorite
+                        </button>
+                        <button class="modal-btn" id="playlistBtn">
+                            📋 Add to Playlist
                         </button>
                     </div>
                 </div>
@@ -1200,6 +1263,10 @@ class CelebStreamApp {
         this.currentCelebrityName = '';
         this.searchTimeout = null;
         this.allCelebrities = [];
+        this.favorites = JSON.parse(localStorage.getItem('favorites') || '[]');
+        this.playlists = JSON.parse(localStorage.getItem('playlists') || '{}');
+        this.watchHistory = JSON.parse(localStorage.getItem('watchHistory') || '[]');
+        this.previewTimeouts = new Map();
         
         this.initializeElements();
         this.bindEvents();
@@ -1228,9 +1295,10 @@ class CelebStreamApp {
         this.header = document.getElementById('header');
         this.shuffleBtn = document.getElementById('shuffleBtn');
         this.randomBtn = document.getElementById('randomBtn');
-        this.playRandomBtn = document.getElementById('playRandomBtn');
         this.downloadBtn = document.getElementById('downloadBtn');
         this.shareBtn = document.getElementById('shareBtn');
+        this.favoriteBtn = document.getElementById('favoriteBtn');
+        this.playlistBtn = document.getElementById('playlistBtn');
         this.notificationContainer = document.getElementById('notificationContainer');
     }
 
@@ -1273,10 +1341,12 @@ class CelebStreamApp {
         if (this.sidebarToggle) {
             this.sidebarToggle.addEventListener('click', () => {
                 this.sidebar.classList.toggle('visible');
+                this.mainContent.classList.toggle('expanded');
+                this.header.classList.toggle('expanded');
             });
         }
 
-        // Header scroll effect
+        // Header scroll effect - ALWAYS VISIBLE
         let ticking = false;
         window.addEventListener('scroll', () => {
             if (!ticking) {
@@ -1335,19 +1405,20 @@ class CelebStreamApp {
             this.randomBtn.addEventListener('click', () => this.playRandomVideo());
         }
 
-        if (this.playRandomBtn) {
-            this.playRandomBtn.addEventListener('click', () => {
-                this.closeVideoModal();
-                setTimeout(() => this.playRandomVideo(), 300);
-            });
-        }
-
         if (this.downloadBtn) {
             this.downloadBtn.addEventListener('click', () => this.downloadCurrentVideo());
         }
 
         if (this.shareBtn) {
             this.shareBtn.addEventListener('click', () => this.shareCurrentVideo());
+        }
+
+        if (this.favoriteBtn) {
+            this.favoriteBtn.addEventListener('click', () => this.toggleFavorite());
+        }
+
+        if (this.playlistBtn) {
+            this.playlistBtn.addEventListener('click', () => this.showPlaylistModal());
         }
 
         // Modal events
@@ -1389,6 +1460,8 @@ class CelebStreamApp {
             if (window.innerWidth <= 768) {
                 if (!this.sidebar.contains(e.target) && !this.sidebarToggle.contains(e.target)) {
                     this.sidebar.classList.remove('visible');
+                    this.mainContent.classList.remove('expanded');
+                    this.header.classList.remove('expanded');
                 }
             }
         });
@@ -1400,11 +1473,7 @@ class CelebStreamApp {
             const data = await response.json();
             
             this.renderCelebrities(data.celebrities);
-            
-            // Also load all celebrities for search suggestions
-            const allResponse = await fetch('/api/celebrities/all');
-            const allData = await allResponse.json();
-            this.allCelebrities = allData.celebrities;
+            this.allCelebrities = data.celebrities;
         } catch (error) {
             console.error('Error loading celebrities:', error);
             this.showNotification('Failed to load celebrities', 'error');
@@ -1455,6 +1524,8 @@ class CelebStreamApp {
         // Close sidebar on mobile
         if (window.innerWidth <= 768) {
             this.sidebar.classList.remove('visible');
+            this.mainContent.classList.remove('expanded');
+            this.header.classList.remove('expanded');
         }
     }
 
@@ -1641,6 +1712,14 @@ class CelebStreamApp {
             ? `<img src="${video.thumbnailUrl}" alt="${this.escapeHtml(video.title)}" loading="lazy">`
             : `<div class="video-placeholder">🎬</div>`;
 
+        const previewContent = video.previewExists 
+            ? `<div class="video-preview">
+                 <video muted loop preload="none">
+                   <source src="${video.previewUrl}" type="video/mp4">
+                 </video>
+               </div>`
+            : '';
+
         const metaContent = [];
         if (video.quality) {
             metaContent.push(`<div class="video-quality">${video.quality}</div>`);
@@ -1652,6 +1731,7 @@ class CelebStreamApp {
         card.innerHTML = `
             <div class="video-thumbnail">
                 ${thumbnailContent}
+                ${previewContent}
                 <div class="play-overlay">▶</div>
             </div>
             <div class="video-info">
@@ -1660,6 +1740,30 @@ class CelebStreamApp {
                 ${metaContent.length > 0 ? `<div class="video-meta">${metaContent.join('')}</div>` : ''}
             </div>
         `;
+
+        // Add hover preview functionality
+        const previewVideo = card.querySelector('.video-preview video');
+        if (previewVideo) {
+            card.addEventListener('mouseenter', () => {
+                const timeoutId = setTimeout(() => {
+                    previewVideo.play().catch(() => {
+                        // Silent fail if video can't play
+                    });
+                }, 1000); // 1 second delay like xHamster
+                
+                this.previewTimeouts.set(card, timeoutId);
+            });
+
+            card.addEventListener('mouseleave', () => {
+                const timeoutId = this.previewTimeouts.get(card);
+                if (timeoutId) {
+                    clearTimeout(timeoutId);
+                    this.previewTimeouts.delete(card);
+                }
+                previewVideo.pause();
+                previewVideo.currentTime = 0;
+            });
+        }
 
         card.addEventListener('click', () => this.openVideoModal(video));
         card.addEventListener('keydown', (e) => {
@@ -1676,6 +1780,9 @@ class CelebStreamApp {
         if (!this.modal || !this.modalVideo) return;
         
         this.currentVideo = video;
+        
+        // Add to watch history
+        this.addToWatchHistory(video);
         
         this.modalVideo.src = video.videoUrl;
         if (this.modalTitle) this.modalTitle.textContent = video.title;
@@ -1695,6 +1802,9 @@ class CelebStreamApp {
         } else if (this.modalDuration) {
             this.modalDuration.style.display = 'none';
         }
+        
+        // Update favorite button
+        this.updateFavoriteButton();
         
         this.modal.style.display = 'block';
         document.body.style.overflow = 'hidden';
@@ -1748,6 +1858,67 @@ class CelebStreamApp {
                 this.showNotification('Failed to copy link', 'error');
             });
         }
+    }
+
+    toggleFavorite() {
+        if (!this.currentVideo) return;
+        
+        const videoId = this.currentVideo.id;
+        const index = this.favorites.findIndex(fav => fav.id === videoId);
+        
+        if (index === -1) {
+            this.favorites.push(this.currentVideo);
+            this.showNotification('Added to favorites! ❤️', 'success');
+        } else {
+            this.favorites.splice(index, 1);
+            this.showNotification('Removed from favorites', 'info');
+        }
+        
+        localStorage.setItem('favorites', JSON.stringify(this.favorites));
+        this.updateFavoriteButton();
+    }
+
+    updateFavoriteButton() {
+        if (!this.favoriteBtn || !this.currentVideo) return;
+        
+        const isFavorite = this.favorites.some(fav => fav.id === this.currentVideo.id);
+        this.favoriteBtn.innerHTML = isFavorite ? '💖 Favorited' : '❤️ Favorite';
+        this.favoriteBtn.classList.toggle('active', isFavorite);
+    }
+
+    showPlaylistModal() {
+        // Simple implementation - could be expanded
+        const playlistName = prompt('Enter playlist name:');
+        if (playlistName && this.currentVideo) {
+            if (!this.playlists[playlistName]) {
+                this.playlists[playlistName] = [];
+            }
+            
+            const exists = this.playlists[playlistName].some(video => video.id === this.currentVideo.id);
+            if (!exists) {
+                this.playlists[playlistName].push(this.currentVideo);
+                localStorage.setItem('playlists', JSON.stringify(this.playlists));
+                this.showNotification(`Added to playlist "${playlistName}"! 📋`, 'success');
+            } else {
+                this.showNotification('Video already in playlist', 'info');
+            }
+        }
+    }
+
+    addToWatchHistory(video) {
+        // Remove if already exists
+        this.watchHistory = this.watchHistory.filter(item => item.id !== video.id);
+        
+        // Add to beginning
+        this.watchHistory.unshift({
+            ...video,
+            watchedAt: new Date().toISOString()
+        });
+        
+        // Keep only last 100 items
+        this.watchHistory = this.watchHistory.slice(0, 100);
+        
+        localStorage.setItem('watchHistory', JSON.stringify(this.watchHistory));
     }
 
     handleSearch(term) {
@@ -1817,6 +1988,10 @@ class CelebStreamApp {
             this.sentinel.remove();
         }
         clearTimeout(this.searchTimeout);
+        
+        // Clear all preview timeouts
+        this.previewTimeouts.forEach(timeoutId => clearTimeout(timeoutId));
+        this.previewTimeouts.clear();
     }
 }
 
