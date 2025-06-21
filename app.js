@@ -146,6 +146,19 @@ const getVideoDuration = async (videoPath) => {
     });
 };
 
+// Get file creation/modification date
+const getFileDate = (pathData) => {
+    try {
+        const filePath = pathData.isRoot ? 
+            path.join(VIDEOS_DIR, pathData.name) : 
+            path.join(VIDEOS_DIR, pathData.folder, pathData.name);
+        const stats = fs.statSync(filePath);
+        return stats.mtime;
+    } catch (err) {
+        return new Date();
+    }
+};
+
 // Get all celebrity folders (performers) with caching
 const getCelebrityFolders = () => {
     const now = Date.now();
@@ -397,21 +410,8 @@ const generateRandomVideos = function* (startIndex, limit, searchTerm = '', cele
             isFavorite: favorites.has(videoId),
             views: views,
             rating: rating,
-            uploadDate: this.getFileDate(pathData)
+            uploadDate: getFileDate(pathData) // Fixed: Call getFileDate function directly
         };
-    }
-};
-
-// Get file creation/modification date
-const getFileDate = (pathData) => {
-    try {
-        const filePath = pathData.isRoot ? 
-            path.join(VIDEOS_DIR, pathData.name) : 
-            path.join(VIDEOS_DIR, pathData.folder, pathData.name);
-        const stats = fs.statSync(filePath);
-        return stats.mtime;
-    } catch (err) {
-        return new Date();
     }
 };
 
