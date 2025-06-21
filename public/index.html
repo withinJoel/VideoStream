@@ -56,11 +56,6 @@
                             <i class="fas fa-history"></i>
                             Watch History
                         </a>
-                        <div class="dropdown-divider"></div>
-                        <a href="#" class="dropdown-item">
-                            <i class="fas fa-sign-out-alt"></i>
-                            Sign Out
-                        </a>
                     </div>
                 </div>
             </div>
@@ -148,8 +143,11 @@
                 </div>
                 
                 <div class="filter-right">
-                    <button class="view-toggle-btn" id="viewToggleBtn" title="Toggle View">
-                        <i class="fas fa-th-large"></i>
+                    <button class="view-option" data-view="grid" title="Grid View">
+                        <i class="fas fa-th"></i>
+                    </button>
+                    <button class="view-option" data-view="list" title="List View">
+                        <i class="fas fa-list"></i>
                     </button>
                     <button class="shuffle-btn" id="shuffleBtn" title="Shuffle">
                         <i class="fas fa-random"></i>
@@ -168,14 +166,6 @@
             </div>
             <div class="content-stats">
                 <span class="video-count" id="videoCount">Loading...</span>
-                <div class="view-options">
-                    <button class="view-option active" data-view="grid" title="Grid View">
-                        <i class="fas fa-th"></i>
-                    </button>
-                    <button class="view-option" data-view="list" title="List View">
-                        <i class="fas fa-list"></i>
-                    </button>
-                </div>
             </div>
         </div>
 

@@ -687,7 +687,7 @@ app.get('/api/favorites', (req, res) => {
     }
 });
 
-// Watch history management
+// Watch history management - Enhanced to return actual video data
 app.post('/api/watch-history/:id', (req, res) => {
     try {
         const { id } = req.params;
@@ -716,8 +716,25 @@ app.get('/api/watch-history', (req, res) => {
         
         const paginatedHistory = watchHistory.slice(startIndex, endIndex);
         
+        // Get video details for each history item
+        const historyWithVideos = [];
+        
+        for (const historyItem of paginatedHistory) {
+            // Find the video by ID
+            const generator = generateRandomVideos(0, 1000); // Get all videos to find the one
+            for (const video of generator) {
+                if (video.id === historyItem.id) {
+                    historyWithVideos.push({
+                        ...video,
+                        watchedAt: historyItem.timestamp
+                    });
+                    break;
+                }
+            }
+        }
+        
         res.json({ 
-            history: paginatedHistory,
+            videos: historyWithVideos,
             total: watchHistory.length,
             hasMore: endIndex < watchHistory.length
         });

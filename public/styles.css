@@ -469,12 +469,11 @@ body {
 .filter-right {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 5px;
 }
 
-.view-toggle-btn,
-.shuffle-btn,
-.filter-toggle-btn {
+.view-option,
+.shuffle-btn {
     background: #333333;
     border: none;
     color: #cccccc;
@@ -486,19 +485,22 @@ body {
     align-items: center;
     justify-content: center;
     transition: all 0.2s ease;
+    font-size: 12px;
 }
 
-.view-toggle-btn:hover,
-.shuffle-btn:hover,
-.filter-toggle-btn:hover {
+.view-option:hover,
+.shuffle-btn:hover {
     background: #444444;
     color: #ffffff;
 }
 
-.view-toggle-btn.active,
-.filter-toggle-btn.active {
+.view-option.active {
     background: #ff9000;
     color: #000000;
+}
+
+.shuffle-btn:active {
+    transform: scale(0.95);
 }
 
 /* Content Header */
@@ -547,37 +549,6 @@ body {
 .video-count {
     font-size: 14px;
     color: #cccccc;
-}
-
-.view-options {
-    display: flex;
-    gap: 5px;
-}
-
-.view-option {
-    background: none;
-    border: 1px solid #333333;
-    color: #cccccc;
-    width: 32px;
-    height: 32px;
-    border-radius: 4px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 12px;
-    transition: all 0.2s ease;
-}
-
-.view-option:hover {
-    background: #333333;
-    color: #ffffff;
-}
-
-.view-option.active {
-    background: #ff9000;
-    border-color: #ff9000;
-    color: #000000;
 }
 
 /* Categories Grid */
@@ -991,35 +962,6 @@ body {
     border-color: rgba(255, 144, 0, 0.4);
 }
 
-/* Watch History Placeholder */
-.watch-history-placeholder {
-    grid-column: 1 / -1;
-    text-align: center;
-    padding: 80px 20px;
-    background: #1a1a1a;
-    border-radius: 8px;
-    border: 1px solid #333333;
-}
-
-.placeholder-icon {
-    font-size: 64px;
-    color: #333333;
-    margin-bottom: 20px;
-}
-
-.watch-history-placeholder h3 {
-    font-size: 24px;
-    font-weight: 600;
-    color: #ffffff;
-    margin-bottom: 10px;
-}
-
-.watch-history-placeholder p {
-    font-size: 16px;
-    color: #666666;
-    margin-bottom: 10px;
-}
-
 /* No Results */
 .no-results {
     text-align: center;
@@ -1339,6 +1281,8 @@ body {
     display: flex;
     flex-direction: column;
     gap: 15px;
+    max-height: calc(100vh - 200px);
+    overflow-y: auto;
 }
 
 .related-video-card {
