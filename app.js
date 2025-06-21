@@ -32,24 +32,57 @@ app.use('/previews', express.static(PREVIEWS_DIR));
 
 const VIDEO_EXTENSIONS = ['.mp4', '.avi', '.mov', '.mkv', '.webm', '.m4v'];
 
-// 🚀 ULTRA-LIGHTWEIGHT MEMORY MANAGEMENT
+// Memory management
 let videoCount = 0;
 let lastScanTime = 0;
 const watchers = new Map();
 let randomSeed = Math.random();
 
-// Memory-efficient random number generator (no arrays stored)
+// In-memory favorites storage (you can replace with database later)
+let favorites = new Set();
+
+// Memory-efficient random number generator
 const seededRandom = (seed, index) => {
     const x = Math.sin(seed * index) * 10000;
     return x - Math.floor(x);
 };
 
-// Helper function to format names (replace _ and - with space and capitalize)
+// Helper function to format names
 const formatName = (name) => {
     return name.replace(/[_-]/g, ' ')
                .split(' ')
                .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
                .join(' ');
+};
+
+// Extract categories from filename
+const extractCategories = (filename) => {
+    const name = filename.toLowerCase();
+    const categories = [];
+    
+    // Define category keywords
+    const categoryMap = {
+        'anal': ['anal', 'anal-sex'],
+        'gangbang': ['gang-bang', 'gangbang', 'group'],
+        'lesbian': ['lesbian', 'girl-girl'],
+        'milf': ['milf', 'mature'],
+        'teen': ['teen', '18+', 'young'],
+        'hardcore': ['hardcore', 'rough'],
+        'blowjob': ['blowjob', 'oral', 'bj'],
+        'threesome': ['threesome', '3some', 'mmf', 'ffm'],
+        'creampie': ['creampie', 'internal'],
+        'big-tits': ['big-tits', 'busty', 'boobs'],
+        'pov': ['pov', 'point-of-view'],
+        'interracial': ['interracial', 'bbc', 'mixed']
+    };
+    
+    for (const [category, keywords] of Object.entries(categoryMap)) {
+        if (keywords.some(keyword => name.includes(keyword))) {
+            categories.push(category);
+        }
+    }
+    
+    return categories.length > 0 ? categories : ['general'];
 };
 
 // Extract video quality and duration info from filename
@@ -68,7 +101,8 @@ const extractVideoInfo = (filename) => {
     return {
         title: cleanTitle,
         quality: qualities.length > 0 ? qualities[0].toUpperCase() : null,
-        duration: durations.length > 0 ? durations[0] : null
+        duration: durations.length > 0 ? durations[0] : null,
+        categories: extractCategories(filename)
     };
 };
 
@@ -93,7 +127,7 @@ const getVideoDuration = async (videoPath) => {
     });
 };
 
-// Get all celebrity folders
+// Get all celebrity folders (performers)
 const getCelebrityFolders = () => {
     try {
         const items = fs.readdirSync(VIDEOS_DIR, { withFileTypes: true });
@@ -125,14 +159,53 @@ const getCelebrityFolders = () => {
     }
 };
 
-// Quick file count (no metadata stored)
-const countVideos = (celebrityFilter = '') => {
+// Get all categories from videos
+const getAllCategories = () => {
+    const categoryCount = {};
+    const items = fs.readdirSync(VIDEOS_DIR, { withFileTypes: true });
+    
+    for (const item of items) {
+        if (item.isFile() && VIDEO_EXTENSIONS.includes(path.extname(item.name).toLowerCase())) {
+            const categories = extractCategories(item.name);
+            categories.forEach(cat => {
+                categoryCount[cat] = (categoryCount[cat] || 0) + 1;
+            });
+        } else if (item.isDirectory()) {
+            try {
+                const subItems = fs.readdirSync(path.join(VIDEOS_DIR, item.name), { withFileTypes: true });
+                subItems.forEach(sub => {
+                    if (sub.isFile() && VIDEO_EXTENSIONS.includes(path.extname(sub.name).toLowerCase())) {
+                        const categories = extractCategories(sub.name);
+                        categories.forEach(cat => {
+                            categoryCount[cat] = (categoryCount[cat] || 0) + 1;
+                        });
+                    }
+                });
+            } catch (err) {
+                // Skip problematic directories
+            }
+        }
+    }
+    
+    return Object.entries(categoryCount).map(([name, count]) => ({
+        name,
+        displayName: formatName(name),
+        count
+    }));
+};
+
+// Quick file count
+const countVideos = (celebrityFilter = '', categoryFilter = '') => {
     let count = 0;
     const items = fs.readdirSync(VIDEOS_DIR, { withFileTypes: true });
     
     for (const item of items) {
         if (item.isFile() && VIDEO_EXTENSIONS.includes(path.extname(item.name).toLowerCase())) {
-            if (!celebrityFilter) count++;
+            if (!celebrityFilter) {
+                if (!categoryFilter || extractCategories(item.name).includes(categoryFilter)) {
+                    count++;
+                }
+            }
         } else if (item.isDirectory()) {
             // Skip if celebrity filter is specified and doesn't match
             if (celebrityFilter && item.name !== celebrityFilter) {
@@ -141,9 +214,13 @@ const countVideos = (celebrityFilter = '') => {
             
             try {
                 const subItems = fs.readdirSync(path.join(VIDEOS_DIR, item.name), { withFileTypes: true });
-                count += subItems.filter(sub => 
-                    sub.isFile() && VIDEO_EXTENSIONS.includes(path.extname(sub.name).toLowerCase())
-                ).length;
+                subItems.forEach(sub => {
+                    if (sub.isFile() && VIDEO_EXTENSIONS.includes(path.extname(sub.name).toLowerCase())) {
+                        if (!categoryFilter || extractCategories(sub.name).includes(categoryFilter)) {
+                            count++;
+                        }
+                    }
+                });
             } catch (err) {
                 // Skip problematic directories
             }
@@ -152,8 +229,8 @@ const countVideos = (celebrityFilter = '') => {
     return count;
 };
 
-// 🎲 STREAMING RANDOM VIDEO GENERATOR (zero memory storage)
-const generateRandomVideos = function* (startIndex, limit, searchTerm = '', celebrityFilter = '') {
+// Streaming random video generator with proper randomization
+const generateRandomVideos = function* (startIndex, limit, searchTerm = '', celebrityFilter = '', categoryFilter = '', favoritesOnly = false) {
     const items = fs.readdirSync(VIDEOS_DIR, { withFileTypes: true });
     const allPaths = [];
     
@@ -187,9 +264,12 @@ const generateRandomVideos = function* (startIndex, limit, searchTerm = '', cele
         }
     }
     
-    // Apply search filter if needed
-    const filtered = searchTerm ? 
-        allPaths.filter(p => {
+    // Apply filters
+    let filtered = allPaths;
+    
+    // Search filter
+    if (searchTerm) {
+        filtered = filtered.filter(p => {
             const searchLower = searchTerm.toLowerCase();
             const videoInfo = extractVideoInfo(p.name);
             const titleFormatted = videoInfo.title;
@@ -198,77 +278,73 @@ const generateRandomVideos = function* (startIndex, limit, searchTerm = '', cele
             return titleFormatted.toLowerCase().includes(searchLower) ||
                    artistFormatted.toLowerCase().includes(searchLower) ||
                    p.name.toLowerCase().includes(searchLower);
-        }) : allPaths;
+        });
+    }
     
-    // Generate random indexes using seed (only if no celebrity filter and no search)
-    if (!celebrityFilter && !searchTerm) {
-        const randomIndexes = [];
-        for (let i = 0; i < filtered.length; i++) {
-            randomIndexes.push({ index: i, random: seededRandom(randomSeed, i) });
-        }
-        randomIndexes.sort((a, b) => a.random - b.random);
+    // Category filter
+    if (categoryFilter) {
+        filtered = filtered.filter(p => {
+            const categories = extractCategories(p.name);
+            return categories.includes(categoryFilter);
+        });
+    }
+    
+    // Favorites filter
+    if (favoritesOnly) {
+        filtered = filtered.filter(p => {
+            const videoId = p.isRoot ? 
+                `root_${path.parse(p.name).name}` : 
+                `${p.folder}_${path.parse(p.name).name}`;
+            return favorites.has(videoId);
+        });
+    }
+    
+    // Always randomize the order for better variety
+    const randomIndexes = [];
+    for (let i = 0; i < filtered.length; i++) {
+        // Use current time + index for better randomization
+        const randomValue = Math.sin((randomSeed + Date.now() / 1000) * (i + 1)) * 10000;
+        randomIndexes.push({ index: i, random: randomValue - Math.floor(randomValue) });
+    }
+    randomIndexes.sort((a, b) => a.random - b.random);
+    
+    // Yield videos in random order
+    let yielded = 0;
+    for (let i = startIndex; i < randomIndexes.length && yielded < limit; i++, yielded++) {
+        const pathData = filtered[randomIndexes[i].index];
+        const videoInfo = extractVideoInfo(pathData.name);
+        const thumbnailName = pathData.isRoot ? 
+            `${path.parse(pathData.name).name}.jpg` : 
+            `${pathData.folder}_${path.parse(pathData.name).name}.jpg`;
         
-        // Yield videos in random order
-        let yielded = 0;
-        for (let i = startIndex; i < randomIndexes.length && yielded < limit; i++, yielded++) {
-            const pathData = filtered[randomIndexes[i].index];
-            const videoInfo = extractVideoInfo(pathData.name);
-            const thumbnailName = pathData.isRoot ? 
-                `${path.parse(pathData.name).name}.jpg` : 
-                `${pathData.folder}_${path.parse(pathData.name).name}.jpg`;
-            
-            const previewName = pathData.isRoot ? 
-                `${path.parse(pathData.name).name}_preview.mp4` : 
-                `${pathData.folder}_${path.parse(pathData.name).name}_preview.mp4`;
-            
-            yield {
-                id: `${randomSeed}_${i}`,
-                title: videoInfo.title,
-                artist: pathData.artist,
-                quality: videoInfo.quality,
-                duration: videoInfo.duration,
-                videoUrl: pathData.isRoot ? 
-                    `/videos/${pathData.name}` : 
-                    `/videos/${pathData.folder}/${pathData.name}`,
-                thumbnailUrl: `/thumbnails/${thumbnailName}`,
-                previewUrl: `/previews/${previewName}`,
-                thumbnailExists: fs.existsSync(path.join(THUMBNAILS_DIR, thumbnailName)),
-                previewExists: fs.existsSync(path.join(PREVIEWS_DIR, previewName))
-            };
-        }
-    } else {
-        // For celebrity filter or search, show in order
-        let yielded = 0;
-        for (let i = startIndex; i < filtered.length && yielded < limit; i++, yielded++) {
-            const pathData = filtered[i];
-            const videoInfo = extractVideoInfo(pathData.name);
-            const thumbnailName = pathData.isRoot ? 
-                `${path.parse(pathData.name).name}.jpg` : 
-                `${pathData.folder}_${path.parse(pathData.name).name}.jpg`;
-            
-            const previewName = pathData.isRoot ? 
-                `${path.parse(pathData.name).name}_preview.mp4` : 
-                `${pathData.folder}_${path.parse(pathData.name).name}_preview.mp4`;
-            
-            yield {
-                id: `${pathData.folder || 'root'}_${i}`,
-                title: videoInfo.title,
-                artist: pathData.artist,
-                quality: videoInfo.quality,
-                duration: videoInfo.duration,
-                videoUrl: pathData.isRoot ? 
-                    `/videos/${pathData.name}` : 
-                    `/videos/${pathData.folder}/${pathData.name}`,
-                thumbnailUrl: `/thumbnails/${thumbnailName}`,
-                previewUrl: `/previews/${previewName}`,
-                thumbnailExists: fs.existsSync(path.join(THUMBNAILS_DIR, thumbnailName)),
-                previewExists: fs.existsSync(path.join(PREVIEWS_DIR, previewName))
-            };
-        }
+        const previewName = pathData.isRoot ? 
+            `${path.parse(pathData.name).name}_preview.mp4` : 
+            `${pathData.folder}_${path.parse(pathData.name).name}_preview.mp4`;
+        
+        const videoId = pathData.isRoot ? 
+            `root_${path.parse(pathData.name).name}` : 
+            `${pathData.folder}_${path.parse(pathData.name).name}`;
+        
+        yield {
+            id: videoId,
+            title: videoInfo.title,
+            artist: pathData.artist,
+            quality: videoInfo.quality,
+            duration: videoInfo.duration,
+            categories: videoInfo.categories,
+            videoUrl: pathData.isRoot ? 
+                `/videos/${pathData.name}` : 
+                `/videos/${pathData.folder}/${pathData.name}`,
+            thumbnailUrl: `/thumbnails/${thumbnailName}`,
+            previewUrl: `/previews/${previewName}`,
+            thumbnailExists: fs.existsSync(path.join(THUMBNAILS_DIR, thumbnailName)),
+            previewExists: fs.existsSync(path.join(PREVIEWS_DIR, previewName)),
+            isFavorite: favorites.has(videoId)
+        };
     }
 };
 
-// 🔥 REAL-TIME FILE SYSTEM WATCHING
+// File system watching
 const setupWatchers = () => {
     // Clear existing watchers
     watchers.forEach(watcher => watcher.close());
@@ -310,19 +386,18 @@ const setupWatchers = () => {
     }
 };
 
-// Background thumbnail and preview generation (non-blocking queue)
+// Background thumbnail and preview generation
 const thumbnailQueue = new Set();
 const previewQueue = new Set();
 
 const processThumbnailQueue = async () => {
     if (thumbnailQueue.size === 0) return;
     
-    const batch = Array.from(thumbnailQueue).slice(0, 3); // Process 3 at a time
+    const batch = Array.from(thumbnailQueue).slice(0, 3);
     batch.forEach(item => thumbnailQueue.delete(item));
     
     const promises = batch.map(async ({ videoPath, thumbnailPath }) => {
         try {
-            // Check if video file exists and is accessible
             if (!fs.existsSync(videoPath)) {
                 console.log(`Video file not found: ${videoPath}`);
                 return;
@@ -335,7 +410,7 @@ const processThumbnailQueue = async () => {
                         timestamps: [timestamp],
                         filename: path.basename(thumbnailPath),
                         folder: path.dirname(thumbnailPath),
-                        size: '320x180' // Smaller thumbnails = faster generation
+                        size: '320x180'
                     })
                     .on('end', resolve)
                     .on('error', (err) => {
@@ -354,12 +429,11 @@ const processThumbnailQueue = async () => {
 const processPreviewQueue = async () => {
     if (previewQueue.size === 0) return;
     
-    const batch = Array.from(previewQueue).slice(0, 2); // Process 2 at a time
+    const batch = Array.from(previewQueue).slice(0, 2);
     batch.forEach(item => previewQueue.delete(item));
     
     const promises = batch.map(async ({ videoPath, previewPath }) => {
         try {
-            // Check if video file exists and is accessible
             if (!fs.existsSync(videoPath)) {
                 console.log(`Video file not found: ${videoPath}`);
                 return;
@@ -367,11 +441,11 @@ const processPreviewQueue = async () => {
 
             await new Promise((resolve, reject) => {
                 ffmpeg(videoPath)
-                    .seekInput(10) // Start from 10 seconds
-                    .duration(10) // 10 second preview
-                    .size('480x270') // Small preview size
-                    .fps(15) // Lower FPS for smaller file
-                    .videoBitrate('500k') // Lower bitrate
+                    .seekInput(10)
+                    .duration(10)
+                    .size('480x270')
+                    .fps(15)
+                    .videoBitrate('500k')
                     .audioCodec('aac')
                     .videoCodec('libx264')
                     .output(previewPath)
@@ -394,14 +468,17 @@ const processPreviewQueue = async () => {
 setInterval(processThumbnailQueue, 2000);
 setInterval(processPreviewQueue, 5000);
 
-// ⚡ ULTRA-FAST API ENDPOINTS
+// API ENDPOINTS
+
+// Main videos endpoint
 app.get('/api/videos', (req, res) => {
     try {
-        const { page = 1, limit = 20, search = '', celebrity = '' } = req.query;
+        const { page = 1, limit = 20, search = '', celebrity = '', category = '', favorites = 'false' } = req.query;
         const startIndex = (parseInt(page) - 1) * parseInt(limit);
+        const favoritesOnly = favorites === 'true';
         
         const videos = [];
-        const generator = generateRandomVideos(startIndex, parseInt(limit), search, celebrity);
+        const generator = generateRandomVideos(startIndex, parseInt(limit), search, celebrity, category, favoritesOnly);
         
         for (const video of generator) {
             videos.push(video);
@@ -429,13 +506,13 @@ app.get('/api/videos', (req, res) => {
             }
         }
         
-        const totalCount = countVideos(celebrity);
+        const totalCount = favoritesOnly ? favorites.size : countVideos(celebrity, category);
         
         res.json({
             videos,
             hasMore: startIndex + videos.length < totalCount,
             total: totalCount,
-            cached: false // Always fresh data
+            cached: false
         });
         
     } catch (err) {
@@ -444,7 +521,7 @@ app.get('/api/videos', (req, res) => {
     }
 });
 
-// Get ALL celebrities for sidebar (not just random 10)
+// Get all celebrities/performers
 app.get('/api/celebrities', (req, res) => {
     try {
         const celebrities = getCelebrityFolders();
@@ -455,14 +532,44 @@ app.get('/api/celebrities', (req, res) => {
     }
 });
 
-// Get all celebrities (for search suggestions)
-app.get('/api/celebrities/all', (req, res) => {
+// Get all categories
+app.get('/api/categories', (req, res) => {
     try {
-        const celebrities = getCelebrityFolders();
-        res.json({ celebrities });
+        const categories = getAllCategories();
+        res.json({ categories });
     } catch (err) {
-        console.error('Error getting all celebrities:', err);
-        res.status(500).json({ error: 'Failed to fetch all celebrities' });
+        console.error('Error getting categories:', err);
+        res.status(500).json({ error: 'Failed to fetch categories' });
+    }
+});
+
+// Favorites management
+app.post('/api/favorites/:id', (req, res) => {
+    try {
+        const { id } = req.params;
+        favorites.add(id);
+        res.json({ message: 'Added to favorites', id });
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to add to favorites' });
+    }
+});
+
+app.delete('/api/favorites/:id', (req, res) => {
+    try {
+        const { id } = req.params;
+        favorites.delete(id);
+        res.json({ message: 'Removed from favorites', id });
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to remove from favorites' });
+    }
+});
+
+// Get favorites
+app.get('/api/favorites', (req, res) => {
+    try {
+        res.json({ favorites: Array.from(favorites) });
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to get favorites' });
     }
 });
 
@@ -509,28 +616,32 @@ app.get('/api/search/suggestions', (req, res) => {
         }
 
         const celebrities = getCelebrityFolders();
-        const suggestions = celebrities
+        const categories = getAllCategories();
+        
+        const celebritySuggestions = celebrities
             .filter(celebrity => 
                 celebrity.displayName.toLowerCase().includes(q.toLowerCase())
             )
-            .slice(0, 10)
+            .slice(0, 5)
             .map(celebrity => ({
                 type: 'celebrity',
                 text: celebrity.displayName,
                 value: celebrity.name
             }));
 
-        // Add generic suggestions
-        const genericSuggestions = [
-            'HD videos',
-            'New releases',
-            'Popular videos',
-            'Trending now'
-        ].filter(s => s.toLowerCase().includes(q.toLowerCase()))
-         .map(s => ({ type: 'generic', text: s, value: s }));
+        const categorySuggestions = categories
+            .filter(category => 
+                category.displayName.toLowerCase().includes(q.toLowerCase())
+            )
+            .slice(0, 5)
+            .map(category => ({
+                type: 'category',
+                text: category.displayName,
+                value: category.name
+            }));
 
         res.json({ 
-            suggestions: [...suggestions, ...genericSuggestions].slice(0, 10) 
+            suggestions: [...celebritySuggestions, ...categorySuggestions].slice(0, 10) 
         });
     } catch (err) {
         console.error('Error getting search suggestions:', err);
@@ -538,65 +649,7 @@ app.get('/api/search/suggestions', (req, res) => {
     }
 });
 
-// Categories endpoint
-app.get('/api/categories', (req, res) => {
-    try {
-        const categories = [
-            { id: 'all', name: 'All Videos', count: videoCount },
-            { id: 'trending', name: 'Trending', count: Math.floor(videoCount * 0.3) },
-            { id: 'new', name: 'New Releases', count: Math.floor(videoCount * 0.2) },
-            { id: 'popular', name: 'Most Popular', count: Math.floor(videoCount * 0.4) },
-            { id: 'hd', name: 'HD Videos', count: Math.floor(videoCount * 0.7) },
-            { id: 'favorites', name: 'Favorites', count: 0 }
-        ];
-        
-        res.json({ categories });
-    } catch (err) {
-        console.error('Error getting categories:', err);
-        res.status(500).json({ error: 'Failed to fetch categories' });
-    }
-});
-
-// Playlists endpoint
-app.get('/api/playlists', (req, res) => {
-    try {
-        // Mock playlists for now
-        const playlists = [
-            { id: 1, name: 'Favorites', count: 0, created: new Date().toISOString() },
-            { id: 2, name: 'Watch Later', count: 0, created: new Date().toISOString() }
-        ];
-        
-        res.json({ playlists });
-    } catch (err) {
-        console.error('Error getting playlists:', err);
-        res.status(500).json({ error: 'Failed to fetch playlists' });
-    }
-});
-
-// Video details endpoint
-app.get('/api/videos/:id', (req, res) => {
-    try {
-        const { id } = req.params;
-        
-        // This would need to be implemented to get specific video details
-        // For now, return mock data
-        res.json({
-            id,
-            title: 'Video Title',
-            description: 'Video description...',
-            duration: '10:30',
-            quality: '1080p',
-            views: Math.floor(Math.random() * 100000),
-            rating: 4.2,
-            tags: ['tag1', 'tag2', 'tag3'],
-            uploadDate: new Date().toISOString()
-        });
-    } catch (err) {
-        console.error('Error getting video details:', err);
-        res.status(500).json({ error: 'Failed to fetch video details' });
-    }
-});
-
+// Serve main page
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
@@ -606,7 +659,7 @@ console.log('🚀 Initializing ultra-fast celebrity video server...');
 videoCount = countVideos();
 setupWatchers();
 
-// Refresh watchers every 30 seconds (catch new directories)
+// Refresh watchers every 30 seconds
 setInterval(() => {
     setupWatchers();
 }, 30000);
