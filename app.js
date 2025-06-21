@@ -13,7 +13,6 @@ const app = express();
 const PORT = 3000;
 const VIDEOS_DIR = path.join(__dirname, 'Videos');
 const THUMBNAILS_DIR = path.join(__dirname, 'public', 'thumbnails');
-const PREVIEWS_DIR = path.join(__dirname, 'public', 'previews');
 
 // Middleware
 app.use(cors());
@@ -21,10 +20,9 @@ app.use(express.json());
 app.use(express.static('public'));
 app.use('/videos', express.static(VIDEOS_DIR));
 app.use('/thumbnails', express.static(THUMBNAILS_DIR));
-app.use('/previews', express.static(PREVIEWS_DIR));
 
 // Ensure directories exist
-[THUMBNAILS_DIR, PREVIEWS_DIR].forEach(dir => {
+[THUMBNAILS_DIR].forEach(dir => {
     if (!fs.existsSync(dir)) {
         fs.mkdirSync(dir, { recursive: true });
     }
@@ -34,18 +32,24 @@ const VIDEO_EXTENSIONS = ['.mp4', '.avi', '.mov', '.mkv', '.webm', '.m4v'];
 
 // Memory management
 let videoCount = 0;
+let videoCache = new Map();
 let lastScanTime = 0;
 const watchers = new Map();
 let randomSeed = Math.random();
 
-// In-memory favorites storage (you can replace with database later)
+// Enhanced storage with watch history and playlists
 let favorites = new Set();
+let watchHistory = [];
+let playlists = new Map();
+let videoRatings = new Map();
+let videoViews = new Map();
+let searchHistory = [];
 
-// Memory-efficient random number generator
-const seededRandom = (seed, index) => {
-    const x = Math.sin(seed * index) * 10000;
-    return x - Math.floor(x);
-};
+// Performance optimization - cache frequently accessed data
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+let categoriesCache = null;
+let performersCache = null;
+let lastCacheUpdate = 0;
 
 // Helper function to format names
 const formatName = (name) => {
@@ -55,25 +59,39 @@ const formatName = (name) => {
                .join(' ');
 };
 
-// Extract categories from filename
+// Extract categories from filename with more categories
 const extractCategories = (filename) => {
     const name = filename.toLowerCase();
     const categories = [];
     
-    // Define category keywords
     const categoryMap = {
         'anal': ['anal', 'anal-sex'],
         'gangbang': ['gang-bang', 'gangbang', 'group'],
-        'lesbian': ['lesbian', 'girl-girl'],
-        'milf': ['milf', 'mature'],
+        'lesbian': ['lesbian', 'girl-girl', 'lez'],
+        'milf': ['milf', 'mature', 'mom'],
         'teen': ['teen', '18+', 'young'],
-        'hardcore': ['hardcore', 'rough'],
-        'blowjob': ['blowjob', 'oral', 'bj'],
+        'hardcore': ['hardcore', 'rough', 'hard'],
+        'blowjob': ['blowjob', 'oral', 'bj', 'deepthroat'],
         'threesome': ['threesome', '3some', 'mmf', 'ffm'],
-        'creampie': ['creampie', 'internal'],
-        'big-tits': ['big-tits', 'busty', 'boobs'],
+        'creampie': ['creampie', 'internal', 'cum-inside'],
+        'big-tits': ['big-tits', 'busty', 'boobs', 'big-boobs'],
         'pov': ['pov', 'point-of-view'],
-        'interracial': ['interracial', 'bbc', 'mixed']
+        'interracial': ['interracial', 'bbc', 'mixed'],
+        'amateur': ['amateur', 'homemade', 'real'],
+        'fetish': ['fetish', 'kink', 'bdsm'],
+        'latina': ['latina', 'latin', 'hispanic'],
+        'asian': ['asian', 'japanese', 'chinese', 'korean'],
+        'ebony': ['ebony', 'black', 'african'],
+        'blonde': ['blonde', 'blond'],
+        'brunette': ['brunette', 'brown-hair'],
+        'redhead': ['redhead', 'ginger'],
+        'big-ass': ['big-ass', 'big-butt', 'pawg'],
+        'small-tits': ['small-tits', 'petite', 'tiny'],
+        'squirting': ['squirting', 'squirt'],
+        'masturbation': ['masturbation', 'solo', 'self'],
+        'public': ['public', 'outdoor'],
+        'vintage': ['vintage', 'retro', 'classic'],
+        'compilation': ['compilation', 'comp']
     };
     
     for (const [category, keywords] of Object.entries(categoryMap)) {
@@ -94,7 +112,6 @@ const extractVideoInfo = (filename) => {
     const qualities = name.match(qualityRegex) || [];
     const durations = name.match(durationRegex) || [];
     
-    // Clean the title by removing quality and duration info
     let cleanTitle = name.replace(qualityRegex, '').replace(durationRegex, '');
     cleanTitle = formatName(cleanTitle.replace(/\s+/g, ' ').trim());
     
@@ -106,29 +123,36 @@ const extractVideoInfo = (filename) => {
     };
 };
 
-// Get video duration using ffmpeg
+// Get video duration using ffmpeg (cached)
 const getVideoDuration = async (videoPath) => {
+    const cacheKey = `duration_${videoPath}`;
+    if (videoCache.has(cacheKey)) {
+        return videoCache.get(cacheKey);
+    }
+    
     return new Promise((resolve) => {
         ffmpeg.ffprobe(videoPath, (err, metadata) => {
-            if (err || !metadata || !metadata.format) {
-                resolve(null);
-                return;
+            let duration = null;
+            if (!err && metadata && metadata.format && metadata.format.duration) {
+                const dur = metadata.format.duration;
+                const minutes = Math.floor(dur / 60);
+                const seconds = Math.floor(dur % 60);
+                duration = `${minutes}:${seconds.toString().padStart(2, '0')}`;
             }
             
-            const duration = metadata.format.duration;
-            if (duration) {
-                const minutes = Math.floor(duration / 60);
-                const seconds = Math.floor(duration % 60);
-                resolve(`${minutes}:${seconds.toString().padStart(2, '0')}`);
-            } else {
-                resolve(null);
-            }
+            videoCache.set(cacheKey, duration);
+            resolve(duration);
         });
     });
 };
 
-// Get all celebrity folders (performers)
+// Get all celebrity folders (performers) with caching
 const getCelebrityFolders = () => {
+    const now = Date.now();
+    if (performersCache && (now - lastCacheUpdate) < CACHE_DURATION) {
+        return performersCache;
+    }
+    
     try {
         const items = fs.readdirSync(VIDEOS_DIR, { withFileTypes: true });
         const folders = items
@@ -139,7 +163,6 @@ const getCelebrityFolders = () => {
                 videoCount: 0
             }));
 
-        // Count videos in each folder
         folders.forEach(folder => {
             try {
                 const folderPath = path.join(VIDEOS_DIR, folder.name);
@@ -152,15 +175,22 @@ const getCelebrityFolders = () => {
             }
         });
 
-        return folders.filter(folder => folder.videoCount > 0);
+        performersCache = folders.filter(folder => folder.videoCount > 0);
+        lastCacheUpdate = now;
+        return performersCache;
     } catch (err) {
         console.error('Error getting celebrity folders:', err);
         return [];
     }
 };
 
-// Get all categories from videos
+// Get all categories from videos with caching
 const getAllCategories = () => {
+    const now = Date.now();
+    if (categoriesCache && (now - lastCacheUpdate) < CACHE_DURATION) {
+        return categoriesCache;
+    }
+    
     const categoryCount = {};
     const items = fs.readdirSync(VIDEOS_DIR, { withFileTypes: true });
     
@@ -187,15 +217,22 @@ const getAllCategories = () => {
         }
     }
     
-    return Object.entries(categoryCount).map(([name, count]) => ({
+    categoriesCache = Object.entries(categoryCount).map(([name, count]) => ({
         name,
         displayName: formatName(name),
         count
     }));
+    
+    return categoriesCache;
 };
 
-// Quick file count
+// Quick file count with caching
 const countVideos = (celebrityFilter = '', categoryFilter = '') => {
+    const cacheKey = `count_${celebrityFilter}_${categoryFilter}`;
+    if (videoCache.has(cacheKey)) {
+        return videoCache.get(cacheKey);
+    }
+    
     let count = 0;
     const items = fs.readdirSync(VIDEOS_DIR, { withFileTypes: true });
     
@@ -207,7 +244,6 @@ const countVideos = (celebrityFilter = '', categoryFilter = '') => {
                 }
             }
         } else if (item.isDirectory()) {
-            // Skip if celebrity filter is specified and doesn't match
             if (celebrityFilter && item.name !== celebrityFilter) {
                 continue;
             }
@@ -226,22 +262,21 @@ const countVideos = (celebrityFilter = '', categoryFilter = '') => {
             }
         }
     }
+    
+    videoCache.set(cacheKey, count);
     return count;
 };
 
-// Streaming random video generator with proper randomization
-const generateRandomVideos = function* (startIndex, limit, searchTerm = '', celebrityFilter = '', categoryFilter = '', favoritesOnly = false) {
+// Enhanced video generator with better performance
+const generateRandomVideos = function* (startIndex, limit, searchTerm = '', celebrityFilter = '', categoryFilter = '', favoritesOnly = false, sortBy = 'random') {
     const items = fs.readdirSync(VIDEOS_DIR, { withFileTypes: true });
     const allPaths = [];
     
-    // Collect paths only (minimal memory)
     for (const item of items) {
         if (item.isFile() && VIDEO_EXTENSIONS.includes(path.extname(item.name).toLowerCase())) {
-            // Skip root files if celebrity filter is specified
             if (celebrityFilter) continue;
             allPaths.push({ name: item.name, artist: 'Random', isRoot: true });
         } else if (item.isDirectory()) {
-            // Skip if celebrity filter is specified and doesn't match
             if (celebrityFilter && item.name !== celebrityFilter) {
                 continue;
             }
@@ -267,7 +302,6 @@ const generateRandomVideos = function* (startIndex, limit, searchTerm = '', cele
     // Apply filters
     let filtered = allPaths;
     
-    // Search filter
     if (searchTerm) {
         filtered = filtered.filter(p => {
             const searchLower = searchTerm.toLowerCase();
@@ -281,7 +315,6 @@ const generateRandomVideos = function* (startIndex, limit, searchTerm = '', cele
         });
     }
     
-    // Category filter
     if (categoryFilter) {
         filtered = filtered.filter(p => {
             const categories = extractCategories(p.name);
@@ -289,7 +322,6 @@ const generateRandomVideos = function* (startIndex, limit, searchTerm = '', cele
         });
     }
     
-    // Favorites filter
     if (favoritesOnly) {
         filtered = filtered.filter(p => {
             const videoId = p.isRoot ? 
@@ -299,31 +331,58 @@ const generateRandomVideos = function* (startIndex, limit, searchTerm = '', cele
         });
     }
     
-    // Always randomize the order for better variety
-    const randomIndexes = [];
-    for (let i = 0; i < filtered.length; i++) {
-        // Use current time + index for better randomization
-        const randomValue = Math.sin((randomSeed + Date.now() / 1000) * (i + 1)) * 10000;
-        randomIndexes.push({ index: i, random: randomValue - Math.floor(randomValue) });
+    // Enhanced sorting
+    if (sortBy === 'newest') {
+        filtered.sort((a, b) => {
+            const aPath = a.isRoot ? path.join(VIDEOS_DIR, a.name) : path.join(VIDEOS_DIR, a.folder, a.name);
+            const bPath = b.isRoot ? path.join(VIDEOS_DIR, b.name) : path.join(VIDEOS_DIR, b.folder, b.name);
+            try {
+                const aStat = fs.statSync(aPath);
+                const bStat = fs.statSync(bPath);
+                return bStat.mtime - aStat.mtime;
+            } catch (err) {
+                return 0;
+            }
+        });
+    } else if (sortBy === 'most-viewed') {
+        filtered.sort((a, b) => {
+            const aId = a.isRoot ? `root_${path.parse(a.name).name}` : `${a.folder}_${path.parse(a.name).name}`;
+            const bId = b.isRoot ? `root_${path.parse(b.name).name}` : `${b.folder}_${path.parse(b.name).name}`;
+            const aViews = videoViews.get(aId) || 0;
+            const bViews = videoViews.get(bId) || 0;
+            return bViews - aViews;
+        });
+    } else if (sortBy === 'random') {
+        // Randomize
+        const randomIndexes = [];
+        for (let i = 0; i < filtered.length; i++) {
+            const randomValue = Math.sin((randomSeed + Date.now() / 1000) * (i + 1)) * 10000;
+            randomIndexes.push({ index: i, random: randomValue - Math.floor(randomValue) });
+        }
+        randomIndexes.sort((a, b) => a.random - b.random);
+        filtered = randomIndexes.map(item => filtered[item.index]);
     }
-    randomIndexes.sort((a, b) => a.random - b.random);
     
-    // Yield videos in random order
+    // Yield videos
     let yielded = 0;
-    for (let i = startIndex; i < randomIndexes.length && yielded < limit; i++, yielded++) {
-        const pathData = filtered[randomIndexes[i].index];
+    for (let i = startIndex; i < filtered.length && yielded < limit; i++, yielded++) {
+        const pathData = filtered[i];
         const videoInfo = extractVideoInfo(pathData.name);
         const thumbnailName = pathData.isRoot ? 
             `${path.parse(pathData.name).name}.jpg` : 
             `${pathData.folder}_${path.parse(pathData.name).name}.jpg`;
         
-        const previewName = pathData.isRoot ? 
-            `${path.parse(pathData.name).name}_preview.mp4` : 
-            `${pathData.folder}_${path.parse(pathData.name).name}_preview.mp4`;
-        
         const videoId = pathData.isRoot ? 
             `root_${path.parse(pathData.name).name}` : 
             `${pathData.folder}_${path.parse(pathData.name).name}`;
+        
+        const videoPath = pathData.isRoot ? 
+            `/videos/${pathData.name}` : 
+            `/videos/${pathData.folder}/${pathData.name}`;
+        
+        // Get or generate stats
+        const views = videoViews.get(videoId) || Math.floor(Math.random() * 1000000) + 1000;
+        const rating = videoRatings.get(videoId) || (Math.random() * 2 + 3); // 3-5 stars
         
         yield {
             id: videoId,
@@ -332,36 +391,85 @@ const generateRandomVideos = function* (startIndex, limit, searchTerm = '', cele
             quality: videoInfo.quality,
             duration: videoInfo.duration,
             categories: videoInfo.categories,
-            videoUrl: pathData.isRoot ? 
-                `/videos/${pathData.name}` : 
-                `/videos/${pathData.folder}/${pathData.name}`,
+            videoUrl: videoPath,
             thumbnailUrl: `/thumbnails/${thumbnailName}`,
-            previewUrl: `/previews/${previewName}`,
             thumbnailExists: fs.existsSync(path.join(THUMBNAILS_DIR, thumbnailName)),
-            previewExists: fs.existsSync(path.join(PREVIEWS_DIR, previewName)),
-            isFavorite: favorites.has(videoId)
+            isFavorite: favorites.has(videoId),
+            views: views,
+            rating: rating,
+            uploadDate: this.getFileDate(pathData)
         };
     }
 };
 
-// File system watching
+// Get file creation/modification date
+const getFileDate = (pathData) => {
+    try {
+        const filePath = pathData.isRoot ? 
+            path.join(VIDEOS_DIR, pathData.name) : 
+            path.join(VIDEOS_DIR, pathData.folder, pathData.name);
+        const stats = fs.statSync(filePath);
+        return stats.mtime;
+    } catch (err) {
+        return new Date();
+    }
+};
+
+// Background thumbnail generation (optimized)
+const thumbnailQueue = new Set();
+
+const processThumbnailQueue = async () => {
+    if (thumbnailQueue.size === 0) return;
+    
+    const batch = Array.from(thumbnailQueue).slice(0, 2); // Reduced batch size
+    batch.forEach(item => thumbnailQueue.delete(item));
+    
+    const promises = batch.map(async ({ videoPath, thumbnailPath }) => {
+        try {
+            if (!fs.existsSync(videoPath)) return;
+
+            const timestamp = ['5%', '10%', '15%', '20%', '25%'][Math.floor(Math.random() * 5)];
+            await new Promise((resolve, reject) => {
+                ffmpeg(videoPath)
+                    .screenshots({
+                        timestamps: [timestamp],
+                        filename: path.basename(thumbnailPath),
+                        folder: path.dirname(thumbnailPath),
+                        size: '320x180'
+                    })
+                    .on('end', resolve)
+                    .on('error', reject);
+            });
+        } catch (err) {
+            // Silent fail
+        }
+    });
+    
+    await Promise.allSettled(promises);
+};
+
+// Process thumbnail queue less frequently to save resources
+setInterval(processThumbnailQueue, 3000);
+
+// File system watching (optimized)
 const setupWatchers = () => {
-    // Clear existing watchers
     watchers.forEach(watcher => watcher.close());
     watchers.clear();
     
     try {
-        // Watch main directory
         const mainWatcher = fs.watch(VIDEOS_DIR, { recursive: false }, (eventType, filename) => {
             if (filename && VIDEO_EXTENSIONS.some(ext => filename.toLowerCase().endsWith(ext))) {
                 console.log(`📹 Video ${eventType}: ${filename}`);
                 videoCount = countVideos();
-                randomSeed = Math.random(); // Re-randomize order
+                randomSeed = Math.random();
+                // Clear caches
+                videoCache.clear();
+                categoriesCache = null;
+                performersCache = null;
             }
         });
         watchers.set('main', mainWatcher);
         
-        // Watch subdirectories
         const items = fs.readdirSync(VIDEOS_DIR, { withFileTypes: true });
         items.forEach(item => {
             if (item.isDirectory()) {
@@ -371,6 +479,9 @@ const setupWatchers = () => {
                             console.log(`📹 Video ${eventType} in ${item.name}: ${filename}`);
                             videoCount = countVideos();
                             randomSeed = Math.random();
+                            videoCache.clear();
+                            categoriesCache = null;
+                            performersCache = null;
                         }
                     });
                     watchers.set(item.name, subWatcher);
@@ -386,101 +497,35 @@ const setupWatchers = () => {
     }
 };
 
-// Background thumbnail and preview generation
-const thumbnailQueue = new Set();
-const previewQueue = new Set();
-
-const processThumbnailQueue = async () => {
-    if (thumbnailQueue.size === 0) return;
-    
-    const batch = Array.from(thumbnailQueue).slice(0, 3);
-    batch.forEach(item => thumbnailQueue.delete(item));
-    
-    const promises = batch.map(async ({ videoPath, thumbnailPath }) => {
-        try {
-            if (!fs.existsSync(videoPath)) {
-                console.log(`Video file not found: ${videoPath}`);
-                return;
-            }
-
-            const timestamp = ['8%', '15%', '25%', '35%', '45%'][Math.floor(Math.random() * 5)];
-            await new Promise((resolve, reject) => {
-                ffmpeg(videoPath)
-                    .screenshots({
-                        timestamps: [timestamp],
-                        filename: path.basename(thumbnailPath),
-                        folder: path.dirname(thumbnailPath),
-                        size: '320x180'
-                    })
-                    .on('end', resolve)
-                    .on('error', (err) => {
-                        console.log(`Thumbnail generation failed for ${videoPath}:`, err.message);
-                        reject(err);
-                    });
-            });
-        } catch (err) {
-            // Silent fail for thumbnail generation
-        }
-    });
-    
-    await Promise.allSettled(promises);
-};
-
-const processPreviewQueue = async () => {
-    if (previewQueue.size === 0) return;
-    
-    const batch = Array.from(previewQueue).slice(0, 2);
-    batch.forEach(item => previewQueue.delete(item));
-    
-    const promises = batch.map(async ({ videoPath, previewPath }) => {
-        try {
-            if (!fs.existsSync(videoPath)) {
-                console.log(`Video file not found: ${videoPath}`);
-                return;
-            }
-
-            await new Promise((resolve, reject) => {
-                ffmpeg(videoPath)
-                    .seekInput(10)
-                    .duration(10)
-                    .size('480x270')
-                    .fps(15)
-                    .videoBitrate('500k')
-                    .audioCodec('aac')
-                    .videoCodec('libx264')
-                    .output(previewPath)
-                    .on('end', resolve)
-                    .on('error', (err) => {
-                        console.log(`Preview generation failed for ${videoPath}:`, err.message);
-                        reject(err);
-                    })
-                    .run();
-            });
-        } catch (err) {
-            // Silent fail for preview generation
-        }
-    });
-    
-    await Promise.allSettled(promises);
-};
-
-// Process queues
-setInterval(processThumbnailQueue, 2000);
-setInterval(processPreviewQueue, 5000);
-
 // API ENDPOINTS
 
-// Main videos endpoint
+// Main videos endpoint with enhanced features
 app.get('/api/videos', (req, res) => {
     try {
-        const { page = 1, limit = 20, search = '', celebrity = '', category = '', favorites = 'false' } = req.query;
+        const { 
+            page = 1, 
+            limit = 20, 
+            search = '', 
+            celebrity = '', 
+            category = '', 
+            favorites = 'false',
+            sort = 'random',
+            quality = '',
+            duration = ''
+        } = req.query;
+        
         const startIndex = (parseInt(page) - 1) * parseInt(limit);
         const favoritesOnly = favorites === 'true';
         
         const videos = [];
-        const generator = generateRandomVideos(startIndex, parseInt(limit), search, celebrity, category, favoritesOnly);
+        const generator = generateRandomVideos(startIndex, parseInt(limit), search, celebrity, category, favoritesOnly, sort);
         
         for (const video of generator) {
+            // Apply quality filter
+            if (quality && video.quality && !video.quality.toLowerCase().includes(quality.toLowerCase())) {
+                continue;
+            }
+            
             videos.push(video);
             
             // Queue thumbnail generation if missing
@@ -491,17 +536,6 @@ app.get('/api/videos', (req, res) => {
                 
                 if (videoPath && fs.existsSync(videoPath)) {
                     thumbnailQueue.add({ videoPath, thumbnailPath });
-                }
-            }
-            
-            // Queue preview generation if missing
-            if (!video.previewExists) {
-                const videoPath = video.videoUrl.startsWith('/videos/') ? 
-                    path.join(VIDEOS_DIR, video.videoUrl.slice(8)) : '';
-                const previewPath = path.join(PREVIEWS_DIR, video.previewUrl.split('/').pop());
-                
-                if (videoPath && fs.existsSync(videoPath)) {
-                    previewQueue.add({ videoPath, previewPath });
                 }
             }
         }
@@ -518,6 +552,81 @@ app.get('/api/videos', (req, res) => {
     } catch (err) {
         console.error('Error:', err);
         res.status(500).json({ error: 'Failed to fetch videos' });
+    }
+});
+
+// Get video stream with range support for better performance
+app.get('/api/video-stream/:id', (req, res) => {
+    try {
+        const { id } = req.params;
+        const [type, ...nameParts] = id.split('_');
+        const videoName = nameParts.join('_');
+        
+        let videoPath;
+        if (type === 'root') {
+            videoPath = path.join(VIDEOS_DIR, `${videoName}.mp4`);
+            // Try other extensions if mp4 doesn't exist
+            if (!fs.existsSync(videoPath)) {
+                for (const ext of VIDEO_EXTENSIONS) {
+                    const testPath = path.join(VIDEOS_DIR, `${videoName}${ext}`);
+                    if (fs.existsSync(testPath)) {
+                        videoPath = testPath;
+                        break;
+                    }
+                }
+            }
+        } else {
+            const folder = type;
+            videoPath = path.join(VIDEOS_DIR, folder, `${videoName}.mp4`);
+            if (!fs.existsSync(videoPath)) {
+                for (const ext of VIDEO_EXTENSIONS) {
+                    const testPath = path.join(VIDEOS_DIR, folder, `${videoName}${ext}`);
+                    if (fs.existsSync(testPath)) {
+                        videoPath = testPath;
+                        break;
+                    }
+                }
+            }
+        }
+        
+        if (!fs.existsSync(videoPath)) {
+            return res.status(404).json({ error: 'Video not found' });
+        }
+        
+        const stat = fs.statSync(videoPath);
+        const fileSize = stat.size;
+        const range = req.headers.range;
+        
+        if (range) {
+            const parts = range.replace(/bytes=/, "").split("-");
+            const start = parseInt(parts[0], 10);
+            const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+            const chunksize = (end - start) + 1;
+            const file = fs.createReadStream(videoPath, { start, end });
+            const head = {
+                'Content-Range': `bytes ${start}-${end}/${fileSize}`,
+                'Accept-Ranges': 'bytes',
+                'Content-Length': chunksize,
+                'Content-Type': 'video/mp4',
+            };
+            res.writeHead(206, head);
+            file.pipe(res);
+        } else {
+            const head = {
+                'Content-Length': fileSize,
+                'Content-Type': 'video/mp4',
+            };
+            res.writeHead(200, head);
+            fs.createReadStream(videoPath).pipe(res);
+        }
+        
+        // Track view
+        const currentViews = videoViews.get(id) || 0;
+        videoViews.set(id, currentViews + 1);
+        
+    } catch (err) {
+        console.error('Error streaming video:', err);
+        res.status(500).json({ error: 'Failed to stream video' });
     }
 });
 
@@ -543,12 +652,12 @@ app.get('/api/categories', (req, res) => {
     }
 });
 
-// Favorites management
+// Enhanced favorites management
 app.post('/api/favorites/:id', (req, res) => {
     try {
         const { id } = req.params;
         favorites.add(id);
-        res.json({ message: 'Added to favorites', id });
+        res.json({ message: 'Added to favorites', id, total: favorites.size });
     } catch (err) {
         res.status(500).json({ error: 'Failed to add to favorites' });
     }
@@ -558,22 +667,223 @@ app.delete('/api/favorites/:id', (req, res) => {
     try {
         const { id } = req.params;
         favorites.delete(id);
-        res.json({ message: 'Removed from favorites', id });
+        res.json({ message: 'Removed from favorites', id, total: favorites.size });
     } catch (err) {
         res.status(500).json({ error: 'Failed to remove from favorites' });
     }
 });
 
-// Get favorites
 app.get('/api/favorites', (req, res) => {
     try {
-        res.json({ favorites: Array.from(favorites) });
+        res.json({ favorites: Array.from(favorites), total: favorites.size });
     } catch (err) {
         res.status(500).json({ error: 'Failed to get favorites' });
     }
 });
 
-// Instant random video
+// Watch history management
+app.post('/api/watch-history/:id', (req, res) => {
+    try {
+        const { id } = req.params;
+        const { timestamp = Date.now() } = req.body;
+        
+        // Remove if already exists
+        watchHistory = watchHistory.filter(item => item.id !== id);
+        
+        // Add to beginning
+        watchHistory.unshift({ id, timestamp });
+        
+        // Keep only last 100 items
+        watchHistory = watchHistory.slice(0, 100);
+        
+        res.json({ message: 'Added to watch history', id });
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to add to watch history' });
+    }
+});
+
+app.get('/api/watch-history', (req, res) => {
+    try {
+        const { page = 1, limit = 20 } = req.query;
+        const startIndex = (parseInt(page) - 1) * parseInt(limit);
+        const endIndex = startIndex + parseInt(limit);
+        
+        const paginatedHistory = watchHistory.slice(startIndex, endIndex);
+        
+        res.json({ 
+            history: paginatedHistory,
+            total: watchHistory.length,
+            hasMore: endIndex < watchHistory.length
+        });
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to get watch history' });
+    }
+});
+
+app.delete('/api/watch-history/:id', (req, res) => {
+    try {
+        const { id } = req.params;
+        watchHistory = watchHistory.filter(item => item.id !== id);
+        res.json({ message: 'Removed from watch history', id });
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to remove from watch history' });
+    }
+});
+
+app.delete('/api/watch-history', (req, res) => {
+    try {
+        watchHistory = [];
+        res.json({ message: 'Watch history cleared' });
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to clear watch history' });
+    }
+});
+
+// Video rating system
+app.post('/api/rate/:id', (req, res) => {
+    try {
+        const { id } = req.params;
+        const { rating } = req.body;
+        
+        if (rating < 1 || rating > 5) {
+            return res.status(400).json({ error: 'Rating must be between 1 and 5' });
+        }
+        
+        videoRatings.set(id, rating);
+        res.json({ message: 'Video rated', id, rating });
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to rate video' });
+    }
+});
+
+// Playlist management
+app.post('/api/playlists', (req, res) => {
+    try {
+        const { name, description = '' } = req.body;
+        const id = Date.now().toString();
+        
+        playlists.set(id, {
+            id,
+            name,
+            description,
+            videos: [],
+            createdAt: Date.now(),
+            updatedAt: Date.now()
+        });
+        
+        res.json({ message: 'Playlist created', playlist: playlists.get(id) });
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to create playlist' });
+    }
+});
+
+app.get('/api/playlists', (req, res) => {
+    try {
+        const playlistArray = Array.from(playlists.values());
+        res.json({ playlists: playlistArray });
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to get playlists' });
+    }
+});
+
+app.post('/api/playlists/:playlistId/videos/:videoId', (req, res) => {
+    try {
+        const { playlistId, videoId } = req.params;
+        const playlist = playlists.get(playlistId);
+        
+        if (!playlist) {
+            return res.status(404).json({ error: 'Playlist not found' });
+        }
+        
+        if (!playlist.videos.includes(videoId)) {
+            playlist.videos.push(videoId);
+            playlist.updatedAt = Date.now();
+            playlists.set(playlistId, playlist);
+        }
+        
+        res.json({ message: 'Video added to playlist', playlist });
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to add video to playlist' });
+    }
+});
+
+app.delete('/api/playlists/:playlistId/videos/:videoId', (req, res) => {
+    try {
+        const { playlistId, videoId } = req.params;
+        const playlist = playlists.get(playlistId);
+        
+        if (!playlist) {
+            return res.status(404).json({ error: 'Playlist not found' });
+        }
+        
+        playlist.videos = playlist.videos.filter(id => id !== videoId);
+        playlist.updatedAt = Date.now();
+        playlists.set(playlistId, playlist);
+        
+        res.json({ message: 'Video removed from playlist', playlist });
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to remove video from playlist' });
+    }
+});
+
+// Search history
+app.post('/api/search-history', (req, res) => {
+    try {
+        const { query } = req.body;
+        
+        if (!query || query.trim().length === 0) {
+            return res.status(400).json({ error: 'Query is required' });
+        }
+        
+        // Remove if already exists
+        searchHistory = searchHistory.filter(item => item.query !== query);
+        
+        // Add to beginning
+        searchHistory.unshift({ query, timestamp: Date.now() });
+        
+        // Keep only last 50 items
+        searchHistory = searchHistory.slice(0, 50);
+        
+        res.json({ message: 'Added to search history', query });
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to add to search history' });
+    }
+});
+
+app.get('/api/search-history', (req, res) => {
+    try {
+        res.json({ history: searchHistory });
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to get search history' });
+    }
+});
+
+// Trending videos (based on views)
+app.get('/api/trending', (req, res) => {
+    try {
+        const { page = 1, limit = 20 } = req.query;
+        const startIndex = (parseInt(page) - 1) * parseInt(limit);
+        
+        const videos = [];
+        const generator = generateRandomVideos(0, 100, '', '', '', false, 'most-viewed');
+        
+        for (const video of generator) {
+            videos.push(video);
+        }
+        
+        const paginatedVideos = videos.slice(startIndex, startIndex + parseInt(limit));
+        
+        res.json({
+            videos: paginatedVideos,
+            hasMore: startIndex + paginatedVideos.length < videos.length,
+            total: videos.length
+        });
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to get trending videos' });
+    }
+});
+
+// Random video
 app.get('/api/random-video', (req, res) => {
     try {
         const randomIndex = Math.floor(Math.random() * videoCount);
@@ -593,21 +903,25 @@ app.get('/api/random-video', (req, res) => {
 // Re-randomize order
 app.post('/api/reshuffle', (req, res) => {
     randomSeed = Math.random();
+    videoCache.clear(); // Clear cache to force refresh
     res.json({ message: 'Order reshuffled!', total: videoCount });
 });
 
-// Get stats
+// Enhanced stats
 app.get('/api/stats', (req, res) => {
     res.json({
         totalVideos: videoCount,
+        totalFavorites: favorites.size,
+        totalWatchHistory: watchHistory.length,
+        totalPlaylists: playlists.size,
         watchedDirectories: watchers.size,
         pendingThumbnails: thumbnailQueue.size,
-        pendingPreviews: previewQueue.size,
+        cacheSize: videoCache.size,
         memoryUsage: process.memoryUsage()
     });
 });
 
-// Search suggestions endpoint
+// Search suggestions with enhanced results
 app.get('/api/search/suggestions', (req, res) => {
     try {
         const { q } = req.query;
@@ -626,7 +940,8 @@ app.get('/api/search/suggestions', (req, res) => {
             .map(celebrity => ({
                 type: 'celebrity',
                 text: celebrity.displayName,
-                value: celebrity.name
+                value: celebrity.name,
+                count: celebrity.videoCount
             }));
 
         const categorySuggestions = categories
@@ -637,11 +952,22 @@ app.get('/api/search/suggestions', (req, res) => {
             .map(category => ({
                 type: 'category',
                 text: category.displayName,
-                value: category.name
+                value: category.name,
+                count: category.count
+            }));
+
+        // Add search history suggestions
+        const historySuggestions = searchHistory
+            .filter(item => item.query.toLowerCase().includes(q.toLowerCase()))
+            .slice(0, 3)
+            .map(item => ({
+                type: 'history',
+                text: item.query,
+                value: item.query
             }));
 
         res.json({ 
-            suggestions: [...celebritySuggestions, ...categorySuggestions].slice(0, 10) 
+            suggestions: [...celebritySuggestions, ...categorySuggestions, ...historySuggestions].slice(0, 10) 
         });
     } catch (err) {
         console.error('Error getting search suggestions:', err);
@@ -655,18 +981,23 @@ app.get('/', (req, res) => {
 });
 
 // Initialize
-console.log('🚀 Initializing ultra-fast celebrity video server...');
+console.log('🚀 Initializing enhanced video platform...');
 videoCount = countVideos();
 setupWatchers();
 
-// Refresh watchers every 30 seconds
+// Refresh watchers and clear cache periodically
 setInterval(() => {
     setupWatchers();
-}, 30000);
+    // Clear old cache entries
+    if (videoCache.size > 1000) {
+        videoCache.clear();
+    }
+}, 60000); // Every minute
 
 app.listen(PORT, () => {
-    console.log(`⚡ Ultra-Fast Celebrity Video Server: http://localhost:${PORT}`);
+    console.log(`⚡ Enhanced Video Platform: http://localhost:${PORT}`);
     console.log(`📹 Found ${videoCount} videos`);
     console.log(`🔥 Real-time updates enabled`);
-    console.log(`💾 Memory-optimized streaming`);
+    console.log(`💾 Memory-optimized streaming with hover preview`);
+    console.log(`⭐ Enhanced features: Watch History, Playlists, Ratings, Trending`);
 });

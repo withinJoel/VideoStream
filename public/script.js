@@ -16,8 +16,12 @@ class VideoApp {
         this.favorites = new Set();
         this.likes = new Set();
         this.dislikes = new Set();
-        this.viewHistory = [];
+        this.watchHistory = [];
+        this.playlists = [];
+        this.searchHistory = [];
         this.currentVideoId = null;
+        this.hoverTimeout = null;
+        this.hoverVideo = null;
         
         // Statistics
         this.stats = {
@@ -41,10 +45,12 @@ class VideoApp {
                 this.loadFavorites(),
                 this.loadCategories(),
                 this.loadPerformers(),
+                this.loadWatchHistory(),
+                this.loadPlaylists(),
+                this.loadSearchHistory(),
                 this.loadStats()
             ]);
             
-            // Load videos after initial data is loaded
             await this.loadVideos(true);
         } catch (error) {
             console.error('Error loading initial data:', error);
@@ -67,7 +73,7 @@ class VideoApp {
             this.navigateToSection('home');
         });
 
-        // Search functionality
+        // Search functionality with history
         const searchInput = document.getElementById('searchInput');
         const searchBtn = document.getElementById('searchBtn');
         
@@ -89,6 +95,8 @@ class VideoApp {
         searchInput.addEventListener('focus', () => {
             if (searchInput.value.length >= 2) {
                 this.showSearchSuggestions(searchInput.value);
+            } else {
+                this.showSearchHistory();
             }
         });
 
@@ -100,7 +108,6 @@ class VideoApp {
                 const section = navLink.dataset.section;
                 if (section) {
                     this.navigateToSection(section);
-                    // Close mobile nav if open
                     document.getElementById('mobileNav').classList.remove('active');
                 }
             }
@@ -147,13 +154,6 @@ class VideoApp {
         // Favorites button
         document.getElementById('favoritesBtn').addEventListener('click', () => {
             this.navigateToSection('favorites');
-        });
-
-        // Favorites dropdown button
-        document.getElementById('favoritesDropdownBtn').addEventListener('click', (e) => {
-            e.preventDefault();
-            this.navigateToSection('favorites');
-            document.getElementById('userDropdown').classList.remove('active');
         });
 
         // User menu
@@ -218,7 +218,7 @@ class VideoApp {
             }
         });
 
-        // Infinite scroll (optional)
+        // Infinite scroll
         window.addEventListener('scroll', this.debounce(() => {
             if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 1000) {
                 if (this.hasMore && !this.isLoading) {
@@ -246,6 +246,8 @@ class VideoApp {
             const data = await response.json();
             
             this.stats.totalVideos = data.totalVideos || 0;
+            this.stats.totalFavorites = data.totalFavorites || 0;
+            this.stats.totalWatchHistory = data.totalWatchHistory || 0;
         } catch (error) {
             console.error('Error loading stats:', error);
         }
@@ -259,6 +261,36 @@ class VideoApp {
             this.updateFavoritesCount();
         } catch (error) {
             console.error('Error loading favorites:', error);
+        }
+    }
+
+    async loadWatchHistory() {
+        try {
+            const response = await fetch('/api/watch-history');
+            const data = await response.json();
+            this.watchHistory = data.history || [];
+        } catch (error) {
+            console.error('Error loading watch history:', error);
+        }
+    }
+
+    async loadPlaylists() {
+        try {
+            const response = await fetch('/api/playlists');
+            const data = await response.json();
+            this.playlists = data.playlists || [];
+        } catch (error) {
+            console.error('Error loading playlists:', error);
+        }
+    }
+
+    async loadSearchHistory() {
+        try {
+            const response = await fetch('/api/search-history');
+            const data = await response.json();
+            this.searchHistory = data.history || [];
+        } catch (error) {
+            console.error('Error loading search history:', error);
         }
     }
 
@@ -300,7 +332,6 @@ class VideoApp {
             </div>
         `).join('');
 
-        // Add click handlers
         categoriesGrid.querySelectorAll('.category-card').forEach(card => {
             card.addEventListener('click', () => {
                 const categoryName = card.dataset.category;
@@ -323,7 +354,6 @@ class VideoApp {
             </div>
         `).join('');
 
-        // Add click handlers
         performersGrid.querySelectorAll('.performer-card').forEach(card => {
             card.addEventListener('click', () => {
                 const performerName = card.dataset.performer;
@@ -341,7 +371,6 @@ class VideoApp {
             </a>
         `).join('');
 
-        // Add click handlers
         mobileCategories.querySelectorAll('.mobile-category-item').forEach(item => {
             item.addEventListener('click', (e) => {
                 e.preventDefault();
@@ -361,7 +390,6 @@ class VideoApp {
             </a>
         `).join('');
 
-        // Add click handlers
         mobilePerformers.querySelectorAll('.mobile-performer-item').forEach(item => {
             item.addEventListener('click', (e) => {
                 e.preventDefault();
@@ -373,7 +401,6 @@ class VideoApp {
     }
 
     navigateToSection(section) {
-        // Update active nav items
         document.querySelectorAll('.nav-link, .mobile-nav-link').forEach(link => {
             link.classList.remove('active');
         });
@@ -382,7 +409,6 @@ class VideoApp {
             link.classList.add('active');
         });
 
-        // Reset filters and set section
         this.currentFilter = {
             search: '',
             celebrity: '',
@@ -396,13 +422,9 @@ class VideoApp {
         this.currentPage = 1;
         this.hasMore = true;
 
-        // Update UI based on section
         this.updateContentForSection(section);
-        
-        // Clear search input
         document.getElementById('searchInput').value = '';
         
-        // Load content
         if (section === 'categories') {
             this.showCategoriesGrid();
         } else if (section === 'performers') {
@@ -425,14 +447,17 @@ class VideoApp {
             case 'trending':
                 title = 'Trending Videos';
                 breadcrumb = 'Home / Trending';
+                this.currentFilter.sort = 'most-viewed';
                 break;
             case 'new':
                 title = 'New Videos';
                 breadcrumb = 'Home / New';
+                this.currentFilter.sort = 'newest';
                 break;
             case 'top-rated':
                 title = 'Top Rated Videos';
                 breadcrumb = 'Home / Top Rated';
+                this.currentFilter.sort = 'highest-rated';
                 break;
             case 'favorites':
                 title = 'Favorite Videos';
@@ -525,13 +550,20 @@ class VideoApp {
         const searchTerm = document.getElementById('searchInput').value.trim();
         if (searchTerm.length >= 2) {
             this.showSearchSuggestions(searchTerm);
+        } else if (searchTerm.length === 0) {
+            this.showSearchHistory();
         } else {
             document.getElementById('searchSuggestions').style.display = 'none';
         }
     }
 
-    handleSearch() {
+    async handleSearch() {
         const searchTerm = document.getElementById('searchInput').value.trim();
+        
+        if (searchTerm) {
+            // Add to search history
+            await this.addToSearchHistory(searchTerm);
+        }
         
         this.currentFilter = {
             search: searchTerm,
@@ -546,14 +578,12 @@ class VideoApp {
         this.currentPage = 1;
         this.hasMore = true;
         
-        // Update UI
         const title = searchTerm ? `Search: "${searchTerm}"` : 'All Videos';
         const breadcrumb = searchTerm ? `<span>Home</span><span>Search</span><span>"${searchTerm}"</span>` : '<span>Home</span>';
         
         document.getElementById('contentTitle').textContent = title;
         document.getElementById('contentBreadcrumb').innerHTML = breadcrumb;
         
-        // Update active nav
         document.querySelectorAll('.nav-link, .mobile-nav-link').forEach(item => {
             item.classList.remove('active');
         });
@@ -561,8 +591,45 @@ class VideoApp {
         this.showVideoGrid();
         this.loadVideos(true);
         
-        // Hide search suggestions
         document.getElementById('searchSuggestions').style.display = 'none';
+    }
+
+    async addToSearchHistory(query) {
+        try {
+            await fetch('/api/search-history', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ query })
+            });
+            await this.loadSearchHistory();
+        } catch (error) {
+            console.error('Error adding to search history:', error);
+        }
+    }
+
+    showSearchHistory() {
+        if (this.searchHistory.length === 0) return;
+        
+        const suggestionsContainer = document.getElementById('searchSuggestions');
+        suggestionsContainer.innerHTML = `
+            <div class="suggestion-header">Recent Searches</div>
+            ${this.searchHistory.slice(0, 5).map(item => `
+                <div class="suggestion-item" data-type="history" data-value="${item.query}">
+                    <i class="fas fa-history"></i>
+                    <span>${item.query}</span>
+                </div>
+            `).join('')}
+        `;
+        
+        suggestionsContainer.style.display = 'block';
+        
+        suggestionsContainer.querySelectorAll('.suggestion-item').forEach(item => {
+            item.addEventListener('click', () => {
+                document.getElementById('searchInput').value = item.dataset.value;
+                this.handleSearch();
+                suggestionsContainer.style.display = 'none';
+            });
+        });
     }
 
     async showSearchSuggestions(query) {
@@ -577,14 +644,14 @@ class VideoApp {
             if (data.suggestions && data.suggestions.length > 0) {
                 suggestionsContainer.innerHTML = data.suggestions.map(suggestion => `
                     <div class="suggestion-item" data-type="${suggestion.type}" data-value="${suggestion.value}">
-                        <i class="fas fa-${suggestion.type === 'celebrity' ? 'user' : 'tag'}"></i>
+                        <i class="fas fa-${this.getSuggestionIcon(suggestion.type)}"></i>
                         <span>${suggestion.text}</span>
+                        ${suggestion.count ? `<span class="suggestion-count">${suggestion.count}</span>` : ''}
                     </div>
                 `).join('');
                 
                 suggestionsContainer.style.display = 'block';
                 
-                // Add click handlers to suggestions
                 suggestionsContainer.querySelectorAll('.suggestion-item').forEach(item => {
                     item.addEventListener('click', () => {
                         const type = item.dataset.type;
@@ -595,7 +662,7 @@ class VideoApp {
                         } else if (type === 'category') {
                             this.filterByCategory(value);
                         } else {
-                            document.getElementById('searchInput').value = item.textContent.trim();
+                            document.getElementById('searchInput').value = value;
                             this.handleSearch();
                         }
                         
@@ -607,6 +674,15 @@ class VideoApp {
             }
         } catch (error) {
             console.error('Error fetching search suggestions:', error);
+        }
+    }
+
+    getSuggestionIcon(type) {
+        switch (type) {
+            case 'celebrity': return 'user';
+            case 'category': return 'tag';
+            case 'history': return 'history';
+            default: return 'search';
         }
     }
 
@@ -627,7 +703,6 @@ class VideoApp {
             quality: ''
         };
         
-        // Reset UI
         document.getElementById('searchInput').value = '';
         document.getElementById('sortSelect').value = 'random';
         document.getElementById('durationSelect').value = '';
@@ -647,7 +722,6 @@ class VideoApp {
         const viewOptions = document.querySelectorAll('.view-option');
         const viewToggleBtn = document.getElementById('viewToggleBtn');
         
-        // Update grid class
         if (view === 'list') {
             videoGrid.classList.add('list-view');
             viewToggleBtn.innerHTML = '<i class="fas fa-th"></i>';
@@ -656,7 +730,6 @@ class VideoApp {
             viewToggleBtn.innerHTML = '<i class="fas fa-list"></i>';
         }
         
-        // Update view option buttons
         viewOptions.forEach(btn => {
             btn.classList.toggle('active', btn.dataset.view === view);
         });
@@ -670,7 +743,6 @@ class VideoApp {
                 this.hasMore = true;
                 await this.loadVideos(true);
                 
-                // Show feedback
                 const shuffleBtn = document.getElementById('shuffleBtn');
                 const originalHTML = shuffleBtn.innerHTML;
                 shuffleBtn.innerHTML = '<i class="fas fa-check"></i>';
@@ -709,7 +781,6 @@ class VideoApp {
                 limit: 20
             });
             
-            // Add filters
             if (this.currentFilter.search) {
                 params.append('search', this.currentFilter.search);
             }
@@ -726,7 +797,6 @@ class VideoApp {
                 params.append('favorites', 'true');
             }
             
-            // Add sorting and filtering
             if (this.currentFilter.sort && this.currentFilter.sort !== 'random') {
                 params.append('sort', this.currentFilter.sort);
             }
@@ -747,7 +817,6 @@ class VideoApp {
                 this.hasMore = data.hasMore;
                 this.currentPage++;
                 
-                // Update video count
                 document.getElementById('videoCount').textContent = `${this.formatNumber(data.total)} videos`;
                 
                 if (this.hasMore) {
@@ -791,10 +860,6 @@ class VideoApp {
         const isFavorite = this.favorites.has(video.id);
         const thumbnailUrl = video.thumbnailExists ? video.thumbnailUrl : 'https://images.pexels.com/photos/1181467/pexels-photo-1181467.jpeg?auto=compress&cs=tinysrgb&w=400';
         
-        // Generate random stats for demo
-        const views = Math.floor(Math.random() * 1000000) + 1000;
-        const likes = Math.floor(Math.random() * 10000) + 100;
-        
         card.innerHTML = `
             <div class="video-thumbnail">
                 <img src="${thumbnailUrl}" 
@@ -811,6 +876,9 @@ class VideoApp {
                 </button>
                 ${video.duration ? `<div class="video-duration">${video.duration}</div>` : ''}
                 ${video.quality ? `<div class="video-quality">${video.quality}</div>` : ''}
+                <div class="video-rating">
+                    ${this.renderStars(video.rating || 4.2)}
+                </div>
             </div>
             <div class="video-info">
                 <h3 class="video-title">${video.title}</h3>
@@ -818,11 +886,11 @@ class VideoApp {
                 <div class="video-stats">
                     <span class="video-stat">
                         <i class="fas fa-eye"></i>
-                        ${this.formatNumber(views)}
+                        ${this.formatNumber(video.views || 0)}
                     </span>
                     <span class="video-stat">
-                        <i class="fas fa-thumbs-up"></i>
-                        ${this.formatNumber(likes)}
+                        <i class="fas fa-star"></i>
+                        ${(video.rating || 4.2).toFixed(1)}
                     </span>
                     ${video.duration ? `
                         <span class="video-stat">
@@ -839,15 +907,33 @@ class VideoApp {
             </div>
         `;
         
+        // Add hover preview functionality
+        const thumbnail = card.querySelector('.video-thumbnail');
+        const img = thumbnail.querySelector('img');
+        
+        thumbnail.addEventListener('mouseenter', () => {
+            this.hoverTimeout = setTimeout(() => {
+                this.startHoverPreview(video, img);
+            }, 500); // Start preview after 500ms hover
+        });
+        
+        thumbnail.addEventListener('mouseleave', () => {
+            if (this.hoverTimeout) {
+                clearTimeout(this.hoverTimeout);
+                this.hoverTimeout = null;
+            }
+            this.stopHoverPreview(img, thumbnailUrl);
+        });
+        
         // Add event listeners
         const playBtn = card.querySelector('.play-btn');
-        const thumbnail = card.querySelector('.video-thumbnail img');
         const favoriteBtn = card.querySelector('.video-favorite-btn');
         const performerLink = card.querySelector('.video-performer');
         
-        [playBtn, thumbnail].forEach(element => {
+        [playBtn, img].forEach(element => {
             element.addEventListener('click', () => {
-                this.openVideoModal(video, views, likes);
+                this.openVideoModal(video);
+                this.addToWatchHistory(video.id);
             });
         });
         
@@ -862,6 +948,78 @@ class VideoApp {
         });
         
         return card;
+    }
+
+    startHoverPreview(video, imgElement) {
+        // Create video element for hover preview
+        if (this.hoverVideo) {
+            this.hoverVideo.remove();
+        }
+        
+        this.hoverVideo = document.createElement('video');
+        this.hoverVideo.className = 'hover-preview-video';
+        this.hoverVideo.src = `/api/video-stream/${video.id}#t=10`; // Start at 10 seconds
+        this.hoverVideo.muted = true;
+        this.hoverVideo.loop = true;
+        this.hoverVideo.style.cssText = `
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            z-index: 2;
+        `;
+        
+        imgElement.parentElement.appendChild(this.hoverVideo);
+        
+        // Play the video
+        this.hoverVideo.play().catch(() => {
+            // If video fails to play, remove it
+            if (this.hoverVideo) {
+                this.hoverVideo.remove();
+                this.hoverVideo = null;
+            }
+        });
+    }
+
+    stopHoverPreview(imgElement, originalSrc) {
+        if (this.hoverVideo) {
+            this.hoverVideo.pause();
+            this.hoverVideo.remove();
+            this.hoverVideo = null;
+        }
+    }
+
+    renderStars(rating) {
+        const fullStars = Math.floor(rating);
+        const hasHalfStar = rating % 1 >= 0.5;
+        const emptyStars = 5 - fullStars - (hasHalfStar ? 1 : 0);
+        
+        let stars = '';
+        for (let i = 0; i < fullStars; i++) {
+            stars += '<i class="fas fa-star"></i>';
+        }
+        if (hasHalfStar) {
+            stars += '<i class="fas fa-star-half-alt"></i>';
+        }
+        for (let i = 0; i < emptyStars; i++) {
+            stars += '<i class="far fa-star"></i>';
+        }
+        
+        return stars;
+    }
+
+    async addToWatchHistory(videoId) {
+        try {
+            await fetch(`/api/watch-history/${videoId}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ timestamp: Date.now() })
+            });
+        } catch (error) {
+            console.error('Error adding to watch history:', error);
+        }
     }
 
     async toggleFavorite(videoId, button) {
@@ -895,7 +1053,7 @@ class VideoApp {
         document.getElementById('favoritesBtn').querySelector('.favorites-count').textContent = this.favorites.size;
     }
 
-    openVideoModal(video, views = 0, likes = 0) {
+    openVideoModal(video) {
         this.currentVideoId = video.id;
         
         const modal = document.getElementById('videoModal');
@@ -908,16 +1066,16 @@ class VideoApp {
         const modalVideoQuality = document.getElementById('modalVideoQuality');
         const modalVideoCategories = document.getElementById('modalVideoCategories');
         
-        // Set video source
-        modalVideo.src = video.videoUrl;
+        // Set video source with streaming endpoint
+        modalVideo.src = `/api/video-stream/${video.id}`;
         modalVideo.load();
         
         // Set video info
         modalVideoTitle.textContent = video.title;
         modalVideoPerformer.textContent = video.artist;
         modalVideoPerformer.dataset.performer = video.artist;
-        modalVideoViews.textContent = this.formatNumber(views);
-        modalVideoLikes.textContent = this.formatNumber(likes);
+        modalVideoViews.textContent = this.formatNumber(video.views || 0);
+        modalVideoLikes.textContent = this.formatNumber(Math.floor((video.views || 0) * 0.1));
         modalVideoDuration.textContent = video.duration || 'Unknown';
         modalVideoQuality.textContent = video.quality || 'HD';
         
@@ -927,7 +1085,6 @@ class VideoApp {
                 `<span class="category-tag" data-category="${cat}">${this.formatName(cat)}</span>`
             ).join('');
             
-            // Add click handlers to category tags
             modalVideoCategories.querySelectorAll('.category-tag').forEach(tag => {
                 tag.addEventListener('click', () => {
                     this.closeVideoModal();
@@ -938,18 +1095,11 @@ class VideoApp {
             modalVideoCategories.innerHTML = '';
         }
         
-        // Update action buttons
         this.updateModalActionButtons();
-        
-        // Load related videos
         this.loadRelatedVideos(video);
         
-        // Show modal
         modal.classList.add('active');
         document.body.style.overflow = 'hidden';
-        
-        // Add to view history
-        this.addToViewHistory(video.id);
     }
 
     updateModalActionButtons() {
@@ -958,7 +1108,6 @@ class VideoApp {
         const isLiked = this.likes.has(videoId);
         const isDisliked = this.dislikes.has(videoId);
         
-        // Update favorite buttons
         const favoriteButtons = [
             document.getElementById('modalFavoriteBtn'),
             document.getElementById('modalFavBtn')
@@ -974,7 +1123,6 @@ class VideoApp {
             }
         });
         
-        // Update like/dislike buttons
         const likeBtn = document.getElementById('modalLikeBtn');
         const dislikeBtn = document.getElementById('modalDislikeBtn');
         
@@ -984,7 +1132,6 @@ class VideoApp {
 
     async loadRelatedVideos(currentVideo) {
         try {
-            // Load videos from the same category or performer
             const params = new URLSearchParams({
                 page: 1,
                 limit: 12
@@ -1000,7 +1147,6 @@ class VideoApp {
             const data = await response.json();
             
             if (data.videos) {
-                // Filter out current video
                 const relatedVideos = data.videos.filter(v => v.id !== currentVideo.id).slice(0, 10);
                 this.renderRelatedVideos(relatedVideos);
             }
@@ -1019,22 +1165,27 @@ class VideoApp {
                     <div class="related-video-thumbnail">
                         <img src="${thumbnailUrl}" alt="${video.title}" loading="lazy">
                         ${video.duration ? `<div class="video-duration">${video.duration}</div>` : ''}
+                        <div class="video-rating-small">
+                            <i class="fas fa-star"></i>
+                            ${(video.rating || 4.2).toFixed(1)}
+                        </div>
                     </div>
                     <div class="related-video-info">
                         <div class="related-video-title">${video.title}</div>
                         <div class="related-video-performer">${video.artist}</div>
+                        <div class="related-video-views">${this.formatNumber(video.views || 0)} views</div>
                     </div>
                 </div>
             `;
         }).join('');
         
-        // Add click handlers
         relatedVideosGrid.querySelectorAll('.related-video-card').forEach(card => {
             card.addEventListener('click', () => {
                 const videoId = card.dataset.videoId;
                 const video = videos.find(v => v.id === videoId);
                 if (video) {
-                    this.openVideoModal(video, Math.floor(Math.random() * 1000000) + 1000, Math.floor(Math.random() * 10000) + 100);
+                    this.openVideoModal(video);
+                    this.addToWatchHistory(video.id);
                 }
             });
         });
@@ -1074,7 +1225,6 @@ class VideoApp {
             this.updateModalActionButtons();
             this.updateFavoritesCount();
             
-            // Update the corresponding card in the grid
             const videoCard = document.querySelector(`[data-video-id="${this.currentVideoId}"]`);
             if (videoCard) {
                 const cardFavoriteBtn = videoCard.querySelector('.video-favorite-btn');
@@ -1098,7 +1248,6 @@ class VideoApp {
             this.likes.delete(this.currentVideoId);
         } else {
             this.likes.add(this.currentVideoId);
-            // Remove from dislikes if present
             this.dislikes.delete(this.currentVideoId);
         }
         
@@ -1115,7 +1264,6 @@ class VideoApp {
             this.dislikes.delete(this.currentVideoId);
         } else {
             this.dislikes.add(this.currentVideoId);
-            // Remove from likes if present
             this.likes.delete(this.currentVideoId);
         }
         
@@ -1123,23 +1271,10 @@ class VideoApp {
         this.showToast(isDisliked ? 'Dislike removed' : 'Video disliked', 'success');
     }
 
-    addToViewHistory(videoId) {
-        // Remove if already exists
-        this.viewHistory = this.viewHistory.filter(id => id !== videoId);
-        // Add to beginning
-        this.viewHistory.unshift(videoId);
-        // Keep only last 50 items
-        this.viewHistory = this.viewHistory.slice(0, 50);
-    }
-
     updateUI() {
-        // Update any UI elements that need initial state
         this.updateFavoritesCount();
-        
-        // Set initial view
         this.setView(this.currentView);
         
-        // Update filter selects
         document.getElementById('sortSelect').value = this.currentFilter.sort;
         document.getElementById('durationSelect').value = this.currentFilter.duration;
         document.getElementById('qualitySelect').value = this.currentFilter.quality;
@@ -1153,7 +1288,6 @@ class VideoApp {
         
         toastContainer.appendChild(toast);
         
-        // Remove after 3 seconds
         setTimeout(() => {
             toast.remove();
         }, 3000);
