@@ -465,7 +465,7 @@ const generateRandomVideos = function* (startIndex, limit, searchTerm = '', cele
                 path.join(VIDEOS_DIR, pathData.name) : 
                 path.join(VIDEOS_DIR, pathData.folder, pathData.name);
             try {
-                actualDuration = await getVideoDuration(fullVideoPath);
+                actualDuration = getVideoDuration(fullVideoPath);
             } catch (err) {
                 actualDuration = null;
             }

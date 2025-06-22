@@ -713,7 +713,7 @@ body {
 
 .performer-avatar {
     width: 100%;
-    height: 160px;
+    height: 300px;
     background: #333333;
     display: flex;
     align-items: center;
