@@ -29,6 +29,7 @@ app.use('/thumbnails', express.static(THUMBNAILS_DIR));
 });
 
 const VIDEO_EXTENSIONS = ['.mp4', '.avi', '.mov', '.mkv', '.webm', '.m4v'];
+const IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.webp'];
 
 // Memory management
 let videoCount = 0;
@@ -56,6 +57,19 @@ const formatName = (name) => {
                .split(' ')
                .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
                .join(' ');
+};
+
+// Helper function to find performer image
+const findPerformerImage = (folderPath) => {
+    try {
+        const items = fs.readdirSync(folderPath, { withFileTypes: true });
+        const imageFile = items.find(item => 
+            item.isFile() && IMAGE_EXTENSIONS.includes(path.extname(item.name).toLowerCase())
+        );
+        return imageFile ? imageFile.name : null;
+    } catch (err) {
+        return null;
+    }
 };
 
 // Extract categories from filename with more categories
@@ -195,7 +209,7 @@ const getFileDate = (pathData) => {
     }
 };
 
-// Get all celebrity folders (performers) with caching
+// Get all celebrity folders (performers) with caching and images
 const getCelebrityFolders = () => {
     const now = Date.now();
     if (performersCache && (now - lastCacheUpdate) < CACHE_DURATION) {
@@ -206,11 +220,18 @@ const getCelebrityFolders = () => {
         const items = fs.readdirSync(VIDEOS_DIR, { withFileTypes: true });
         const folders = items
             .filter(item => item.isDirectory())
-            .map(item => ({
-                name: item.name,
-                displayName: formatName(item.name),
-                videoCount: 0
-            }));
+            .map(item => {
+                const folderPath = path.join(VIDEOS_DIR, item.name);
+                const imageFile = findPerformerImage(folderPath);
+                
+                return {
+                    name: item.name,
+                    displayName: formatName(item.name),
+                    videoCount: 0,
+                    imageUrl: imageFile ? `/videos/${item.name}/${imageFile}` : null,
+                    hasImage: !!imageFile
+                };
+            });
 
         folders.forEach(folder => {
             try {
@@ -992,4 +1013,5 @@ app.listen(PORT, () => {
     console.log(`🔥 Real-time updates enabled`);
     console.log(`💾 Memory-optimized streaming with hover preview`);
     console.log(`⭐ Enhanced features: Watch History, Favorites, Ratings, Trending`);
+    console.log(`🖼️ Performer images support enabled`);
 });
