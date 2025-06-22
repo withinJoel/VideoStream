@@ -80,18 +80,67 @@ function setupEventListeners() {
     document.getElementById('modalCloseBtn').addEventListener('click', closeVideoModal);
     document.getElementById('modalBackdrop').addEventListener('click', closeVideoModal);
     
-    // Authentication
+    // Authentication event listeners
     document.getElementById('loginBtn').addEventListener('click', () => showAuthModal('login'));
     document.getElementById('registerBtn').addEventListener('click', () => showAuthModal('register'));
     document.getElementById('loginModalClose').addEventListener('click', () => hideAuthModal('login'));
     document.getElementById('registerModalClose').addEventListener('click', () => hideAuthModal('register'));
-    document.getElementById('switchToRegister').addEventListener('click', () => switchAuthModal('register'));
-    document.getElementById('switchToLogin').addEventListener('click', () => switchAuthModal('login'));
+    document.getElementById('switchToRegister').addEventListener('click', (e) => {
+        e.preventDefault();
+        switchAuthModal('register');
+    });
+    document.getElementById('switchToLogin').addEventListener('click', (e) => {
+        e.preventDefault();
+        switchAuthModal('login');
+    });
     
-    // User menu
+    // Authentication form submissions
+    document.getElementById('loginForm').addEventListener('submit', handleLogin);
+    document.getElementById('registerForm').addEventListener('submit', handleRegister);
+    
+    // User menu and profile
     document.getElementById('userAvatarContainer').addEventListener('click', toggleUserDropdown);
-    document.getElementById('favoritesDropdownBtn').addEventListener('click', () => navigateToSection('favorites'));
-    document.getElementById('watchHistoryBtn').addEventListener('click', () => navigateToSection('watch-history'));
+    document.getElementById('profileBtn').addEventListener('click', (e) => {
+        e.preventDefault();
+        showProfileModal();
+        toggleUserDropdown();
+    });
+    document.getElementById('favoritesDropdownBtn').addEventListener('click', (e) => {
+        e.preventDefault();
+        navigateToSection('favorites');
+        toggleUserDropdown();
+    });
+    document.getElementById('watchHistoryBtn').addEventListener('click', (e) => {
+        e.preventDefault();
+        navigateToSection('watch-history');
+        toggleUserDropdown();
+    });
+    document.getElementById('logoutBtn').addEventListener('click', (e) => {
+        e.preventDefault();
+        handleLogout();
+        toggleUserDropdown();
+    });
+    
+    // Profile modal
+    document.getElementById('profileModalClose').addEventListener('click', () => hideProfileModal());
+    document.getElementById('profileForm').addEventListener('submit', handleProfileUpdate);
+    document.getElementById('changeAvatarBtn').addEventListener('click', () => {
+        document.getElementById('avatarUpload').click();
+    });
+    document.getElementById('avatarUpload').addEventListener('change', handleAvatarUpload);
+    
+    // Close modals when clicking backdrop
+    document.querySelectorAll('.modal-backdrop').forEach(backdrop => {
+        backdrop.addEventListener('click', (e) => {
+            if (e.target === backdrop) {
+                const modal = backdrop.closest('.auth-modal, .profile-modal, .playlist-modal');
+                if (modal) {
+                    modal.classList.remove('active');
+                    document.body.style.overflow = '';
+                }
+            }
+        });
+    });
     
     // Infinite scroll
     window.addEventListener('scroll', handleScroll);
@@ -110,12 +159,18 @@ function loadInitialData() {
 }
 
 function checkAuthStatus() {
-    // Simulate authentication check
+    // Check if user is logged in from localStorage
     const savedUser = localStorage.getItem('currentUser');
     if (savedUser) {
-        currentUser = JSON.parse(savedUser);
-        isAuthenticated = true;
-        updateAuthUI();
+        try {
+            currentUser = JSON.parse(savedUser);
+            isAuthenticated = true;
+            updateAuthUI();
+            console.log('User logged in:', currentUser.username);
+        } catch (error) {
+            console.error('Error parsing saved user data:', error);
+            localStorage.removeItem('currentUser');
+        }
     }
 }
 
@@ -128,13 +183,21 @@ function updateAuthUI() {
         userMenu.style.display = 'block';
         
         document.getElementById('userName').textContent = currentUser.username;
-        document.getElementById('userAvatarImg').src = currentUser.avatar || '/api/placeholder/32/32';
+        document.getElementById('userAvatarImg').src = currentUser.avatar || generateAvatarUrl(currentUser.username);
         
         // Show authenticated features
         document.getElementById('createPlaylistBtn').style.display = 'flex';
         document.getElementById('ratingSection').style.display = 'flex';
         document.getElementById('commentForm').style.display = 'block';
         document.getElementById('modalPlaylistBtn').style.display = 'flex';
+        
+        // Update comment form avatar
+        const commentAvatar = document.getElementById('commentUserAvatar');
+        if (commentAvatar) {
+            commentAvatar.src = currentUser.avatar || generateAvatarUrl(currentUser.username);
+        }
+        
+        console.log('Auth UI updated for user:', currentUser.username);
     } else {
         authSection.style.display = 'flex';
         userMenu.style.display = 'none';
@@ -144,7 +207,304 @@ function updateAuthUI() {
         document.getElementById('ratingSection').style.display = 'none';
         document.getElementById('commentForm').style.display = 'none';
         document.getElementById('modalPlaylistBtn').style.display = 'none';
+        
+        console.log('Auth UI updated - user logged out');
     }
+}
+
+// Authentication functions
+function showAuthModal(type) {
+    console.log('Showing auth modal:', type);
+    document.getElementById(`${type}Modal`).classList.add('active');
+    document.body.style.overflow = 'hidden';
+    
+    // Clear form fields
+    const form = document.getElementById(`${type}Form`);
+    if (form) {
+        form.reset();
+    }
+}
+
+function hideAuthModal(type) {
+    console.log('Hiding auth modal:', type);
+    document.getElementById(`${type}Modal`).classList.remove('active');
+    document.body.style.overflow = '';
+}
+
+function switchAuthModal(type) {
+    console.log('Switching to auth modal:', type);
+    hideAuthModal(type === 'login' ? 'register' : 'login');
+    setTimeout(() => showAuthModal(type), 100);
+}
+
+function handleLogin(e) {
+    e.preventDefault();
+    console.log('Handling login...');
+    
+    const email = document.getElementById('loginEmail').value.trim();
+    const password = document.getElementById('loginPassword').value;
+    
+    if (!email || !password) {
+        showToast('Please fill in all fields', 'error');
+        return;
+    }
+    
+    // Simulate login process
+    const users = JSON.parse(localStorage.getItem('registeredUsers') || '[]');
+    const user = users.find(u => u.email === email && u.password === password);
+    
+    if (user) {
+        currentUser = {
+            id: user.id,
+            username: user.username,
+            email: user.email,
+            avatar: user.avatar || generateAvatarUrl(user.username),
+            bio: user.bio || '',
+            joinDate: user.joinDate
+        };
+        
+        isAuthenticated = true;
+        localStorage.setItem('currentUser', JSON.stringify(currentUser));
+        
+        updateAuthUI();
+        hideAuthModal('login');
+        showToast(`Welcome back, ${currentUser.username}!`, 'success');
+        
+        console.log('Login successful:', currentUser.username);
+    } else {
+        showToast('Invalid email or password', 'error');
+        console.log('Login failed: Invalid credentials');
+    }
+}
+
+function handleRegister(e) {
+    e.preventDefault();
+    console.log('Handling registration...');
+    
+    const username = document.getElementById('registerUsername').value.trim();
+    const email = document.getElementById('registerEmail').value.trim();
+    const password = document.getElementById('registerPassword').value;
+    const confirmPassword = document.getElementById('registerConfirmPassword').value;
+    
+    if (!username || !email || !password || !confirmPassword) {
+        showToast('Please fill in all fields', 'error');
+        return;
+    }
+    
+    if (password !== confirmPassword) {
+        showToast('Passwords do not match', 'error');
+        return;
+    }
+    
+    if (password.length < 6) {
+        showToast('Password must be at least 6 characters', 'error');
+        return;
+    }
+    
+    // Check if user already exists
+    const users = JSON.parse(localStorage.getItem('registeredUsers') || '[]');
+    if (users.find(u => u.email === email)) {
+        showToast('Email already registered', 'error');
+        return;
+    }
+    
+    if (users.find(u => u.username === username)) {
+        showToast('Username already taken', 'error');
+        return;
+    }
+    
+    // Create new user
+    const newUser = {
+        id: Date.now().toString(),
+        username: username,
+        email: email,
+        password: password, // In real app, this would be hashed
+        avatar: generateAvatarUrl(username),
+        bio: '',
+        joinDate: new Date().toISOString()
+    };
+    
+    users.push(newUser);
+    localStorage.setItem('registeredUsers', JSON.stringify(users));
+    
+    // Auto-login the new user
+    currentUser = {
+        id: newUser.id,
+        username: newUser.username,
+        email: newUser.email,
+        avatar: newUser.avatar,
+        bio: newUser.bio,
+        joinDate: newUser.joinDate
+    };
+    
+    isAuthenticated = true;
+    localStorage.setItem('currentUser', JSON.stringify(currentUser));
+    
+    updateAuthUI();
+    hideAuthModal('register');
+    showToast(`Welcome to LovePorn, ${currentUser.username}!`, 'success');
+    
+    console.log('Registration successful:', currentUser.username);
+}
+
+function handleLogout() {
+    console.log('Handling logout...');
+    
+    isAuthenticated = false;
+    currentUser = null;
+    localStorage.removeItem('currentUser');
+    
+    updateAuthUI();
+    showToast('You have been logged out', 'success');
+    
+    // Redirect to home if on authenticated-only pages
+    if (currentSection === 'favorites' || currentSection === 'watch-history') {
+        navigateToSection('home');
+    }
+    
+    console.log('Logout successful');
+}
+
+function toggleUserDropdown() {
+    const dropdown = document.getElementById('userDropdown');
+    dropdown.classList.toggle('active');
+    
+    // Close dropdown when clicking outside
+    if (dropdown.classList.contains('active')) {
+        setTimeout(() => {
+            document.addEventListener('click', closeUserDropdownOutside);
+        }, 0);
+    }
+}
+
+function closeUserDropdownOutside(e) {
+    const dropdown = document.getElementById('userDropdown');
+    const container = document.getElementById('userAvatarContainer');
+    
+    if (!dropdown.contains(e.target) && !container.contains(e.target)) {
+        dropdown.classList.remove('active');
+        document.removeEventListener('click', closeUserDropdownOutside);
+    }
+}
+
+// Profile functions
+function showProfileModal() {
+    if (!isAuthenticated) {
+        showToast('Please log in to view your profile', 'error');
+        return;
+    }
+    
+    console.log('Showing profile modal');
+    
+    // Populate form with current user data
+    document.getElementById('profileUsername').value = currentUser.username;
+    document.getElementById('profileEmail').value = currentUser.email;
+    document.getElementById('profileBio').value = currentUser.bio || '';
+    document.getElementById('profileAvatar').src = currentUser.avatar || generateAvatarUrl(currentUser.username);
+    
+    document.getElementById('profileModal').classList.add('active');
+    document.body.style.overflow = 'hidden';
+}
+
+function hideProfileModal() {
+    console.log('Hiding profile modal');
+    document.getElementById('profileModal').classList.remove('active');
+    document.body.style.overflow = '';
+}
+
+function handleProfileUpdate(e) {
+    e.preventDefault();
+    console.log('Handling profile update...');
+    
+    const username = document.getElementById('profileUsername').value.trim();
+    const email = document.getElementById('profileEmail').value.trim();
+    const bio = document.getElementById('profileBio').value.trim();
+    
+    if (!username || !email) {
+        showToast('Username and email are required', 'error');
+        return;
+    }
+    
+    // Check if username/email is taken by another user
+    const users = JSON.parse(localStorage.getItem('registeredUsers') || '[]');
+    const existingUser = users.find(u => u.id !== currentUser.id && (u.username === username || u.email === email));
+    
+    if (existingUser) {
+        showToast('Username or email already taken', 'error');
+        return;
+    }
+    
+    // Update current user
+    currentUser.username = username;
+    currentUser.email = email;
+    currentUser.bio = bio;
+    
+    // Update in localStorage
+    localStorage.setItem('currentUser', JSON.stringify(currentUser));
+    
+    // Update in registered users list
+    const userIndex = users.findIndex(u => u.id === currentUser.id);
+    if (userIndex !== -1) {
+        users[userIndex] = { ...users[userIndex], username, email, bio, avatar: currentUser.avatar };
+        localStorage.setItem('registeredUsers', JSON.stringify(users));
+    }
+    
+    updateAuthUI();
+    hideProfileModal();
+    showToast('Profile updated successfully!', 'success');
+    
+    console.log('Profile updated:', currentUser.username);
+}
+
+function handleAvatarUpload(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    if (!file.type.startsWith('image/')) {
+        showToast('Please select an image file', 'error');
+        return;
+    }
+    
+    if (file.size > 5 * 1024 * 1024) { // 5MB limit
+        showToast('Image size must be less than 5MB', 'error');
+        return;
+    }
+    
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const avatarUrl = e.target.result;
+        currentUser.avatar = avatarUrl;
+        
+        // Update UI
+        document.getElementById('profileAvatar').src = avatarUrl;
+        document.getElementById('userAvatarImg').src = avatarUrl;
+        
+        // Update in localStorage
+        localStorage.setItem('currentUser', JSON.stringify(currentUser));
+        
+        // Update in registered users list
+        const users = JSON.parse(localStorage.getItem('registeredUsers') || '[]');
+        const userIndex = users.findIndex(u => u.id === currentUser.id);
+        if (userIndex !== -1) {
+            users[userIndex].avatar = avatarUrl;
+            localStorage.setItem('registeredUsers', JSON.stringify(users));
+        }
+        
+        showToast('Avatar updated successfully!', 'success');
+        console.log('Avatar updated');
+    };
+    
+    reader.readAsDataURL(file);
+}
+
+function generateAvatarUrl(username) {
+    // Generate a placeholder avatar URL based on username
+    const colors = ['FF6B6B', '4ECDC4', '45B7D1', '96CEB4', 'FFEAA7', 'DDA0DD', 'FFB347', '87CEEB'];
+    const colorIndex = username.length % colors.length;
+    const color = colors[colorIndex];
+    const initial = username.charAt(0).toUpperCase();
+    
+    return `https://ui-avatars.com/api/?name=${initial}&background=${color}&color=fff&size=128&bold=true`;
 }
 
 // Navigation functions
@@ -197,11 +557,21 @@ function navigateToSection(section) {
             showPlaylistsGrid();
             break;
         case 'favorites':
+            if (!isAuthenticated) {
+                showToast('Please log in to view your favorites', 'error');
+                showAuthModal('login');
+                return;
+            }
             currentFilters = { ...currentFilters, favorites: true, celebrity: '', category: '' };
             showVideoGrid();
             loadVideos(true);
             break;
         case 'watch-history':
+            if (!isAuthenticated) {
+                showToast('Please log in to view your watch history', 'error');
+                showAuthModal('login');
+                return;
+            }
             showVideoGrid();
             loadWatchHistory();
             break;
@@ -1186,26 +1556,6 @@ function closeMobileNav() {
     document.getElementById('mobileNav').classList.remove('active');
 }
 
-// Authentication functions
-function showAuthModal(type) {
-    document.getElementById(`${type}Modal`).classList.add('active');
-    document.body.style.overflow = 'hidden';
-}
-
-function hideAuthModal(type) {
-    document.getElementById(`${type}Modal`).classList.remove('active');
-    document.body.style.overflow = '';
-}
-
-function switchAuthModal(type) {
-    hideAuthModal(type === 'login' ? 'register' : 'login');
-    showAuthModal(type);
-}
-
-function toggleUserDropdown() {
-    document.getElementById('userDropdown').classList.toggle('active');
-}
-
 // Scroll handling
 function handleScroll() {
     if (currentSection === 'home' || currentSection === 'trending' || currentSection === 'favorites' || currentSection === 'watch-history') {
@@ -1235,6 +1585,8 @@ function handleKeyboardShortcuts(e) {
             hideAuthModal('login');
         } else if (document.getElementById('registerModal').classList.contains('active')) {
             hideAuthModal('register');
+        } else if (document.getElementById('profileModal').classList.contains('active')) {
+            hideProfileModal();
         }
     }
     
