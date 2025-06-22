@@ -12,7 +12,7 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = 3000;
 const VIDEOS_DIR = path.join(__dirname, 'Videos');
-const THUMBNAILS_DIR = path.join(__dirname, 'public', 'thumbnails');
+const THUMBNAILS_DIR = path.join(__dirname, 'Thumbnails');
 
 // Middleware
 app.use(cors());

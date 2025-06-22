@@ -17,6 +17,13 @@ class VideoApp {
         this.currentVideoId = null;
         this.hoverTimeout = null;
         this.hoverVideo = null;
+        this.currentUser = null;
+        this.playlists = [];
+        this.subscriptions = new Set();
+        this.videoLikes = new Map();
+        this.videoDislikes = new Map();
+        this.videoRatings = new Map();
+        this.comments = new Map();
         
         // Statistics
         this.stats = {
@@ -29,9 +36,25 @@ class VideoApp {
     }
 
     async init() {
+        this.loadUserSession();
         this.setupEventListeners();
         await this.loadInitialData();
         this.updateUI();
+    }
+
+    // Helper function to safely add event listeners
+    safeAddEventListener(elementId, event, handler) {
+        const element = document.getElementById(elementId);
+        if (element) {
+            element.addEventListener(event, handler);
+            return true;
+        }
+        return false;
+    }
+
+    // Helper function to safely query elements
+    safeQuerySelector(selector) {
+        return document.querySelector(selector);
     }
 
     async loadInitialData() {
@@ -42,7 +65,8 @@ class VideoApp {
                 this.loadPerformers(),
                 this.loadWatchHistory(),
                 this.loadSearchHistory(),
-                this.loadStats()
+                this.loadStats(),
+                this.loadPlaylists()
             ]);
             
             await this.loadVideos(true);
@@ -54,45 +78,140 @@ class VideoApp {
 
     setupEventListeners() {
         // Mobile menu
-        document.getElementById('mobileMenuBtn').addEventListener('click', () => {
-            document.getElementById('mobileNav').classList.add('active');
+        this.safeAddEventListener('mobileMenuBtn', 'click', () => {
+            const mobileNav = document.getElementById('mobileNav');
+            if (mobileNav) mobileNav.classList.add('active');
         });
 
-        document.getElementById('mobileNavClose').addEventListener('click', () => {
-            document.getElementById('mobileNav').classList.remove('active');
+        this.safeAddEventListener('mobileNavClose', 'click', () => {
+            const mobileNav = document.getElementById('mobileNav');
+            if (mobileNav) mobileNav.classList.remove('active');
         });
 
         // Home button
-        document.getElementById('homeButton').addEventListener('click', () => {
+        this.safeAddEventListener('homeButton', 'click', () => {
             this.navigateToSection('home');
+        });
+
+        // Authentication buttons
+        this.safeAddEventListener('loginBtn', 'click', () => {
+            this.showLoginModal();
+        });
+
+        this.safeAddEventListener('registerBtn', 'click', () => {
+            this.showRegisterModal();
+        });
+
+        this.safeAddEventListener('logoutBtn', 'click', () => {
+            this.logout();
+        });
+
+        // Modal close buttons
+        this.safeAddEventListener('loginModalClose', 'click', () => {
+            this.hideLoginModal();
+        });
+
+        this.safeAddEventListener('registerModalClose', 'click', () => {
+            this.hideRegisterModal();
+        });
+
+        this.safeAddEventListener('profileModalClose', 'click', () => {
+            this.hideProfileModal();
+        });
+
+        this.safeAddEventListener('playlistModalClose', 'click', () => {
+            this.hidePlaylistModal();
+        });
+
+        // Auth form submissions
+        this.safeAddEventListener('loginForm', 'submit', (e) => {
+            e.preventDefault();
+            this.handleLogin();
+        });
+
+        this.safeAddEventListener('registerForm', 'submit', (e) => {
+            e.preventDefault();
+            this.handleRegister();
+        });
+
+        this.safeAddEventListener('profileForm', 'submit', (e) => {
+            e.preventDefault();
+            this.handleProfileUpdate();
+        });
+
+        // Auth modal switches
+        this.safeAddEventListener('switchToRegister', 'click', (e) => {
+            e.preventDefault();
+            this.hideLoginModal();
+            this.showRegisterModal();
+        });
+
+        this.safeAddEventListener('switchToLogin', 'click', (e) => {
+            e.preventDefault();
+            this.hideRegisterModal();
+            this.showLoginModal();
+        });
+
+        // Profile and playlist buttons
+        this.safeAddEventListener('profileBtn', 'click', (e) => {
+            e.preventDefault();
+            this.showProfileModal();
+        });
+
+        this.safeAddEventListener('myPlaylistsBtn', 'click', (e) => {
+            e.preventDefault();
+            this.navigateToSection('playlists');
+            const userDropdown = document.getElementById('userDropdown');
+            if (userDropdown) userDropdown.classList.remove('active');
+        });
+
+        this.safeAddEventListener('createPlaylistBtn', 'click', () => {
+            this.showCreatePlaylistModal();
+        });
+
+        this.safeAddEventListener('createNewPlaylistBtn', 'click', () => {
+            this.createNewPlaylist();
+        });
+
+        // Avatar upload
+        this.safeAddEventListener('changeAvatarBtn', 'click', () => {
+            const avatarUpload = document.getElementById('avatarUpload');
+            if (avatarUpload) avatarUpload.click();
+        });
+
+        this.safeAddEventListener('avatarUpload', 'change', (e) => {
+            this.handleAvatarUpload(e);
         });
 
         // Search functionality with history
         const searchInput = document.getElementById('searchInput');
         const searchBtn = document.getElementById('searchBtn');
         
-        searchInput.addEventListener('input', this.debounce(() => {
-            this.handleSearchInput();
-        }, 300));
+        if (searchInput) {
+            searchInput.addEventListener('input', this.debounce(() => {
+                this.handleSearchInput();
+            }, 300));
+            
+            searchInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    this.handleSearch();
+                }
+            });
+            
+            searchInput.addEventListener('focus', () => {
+                if (searchInput.value.length >= 2) {
+                    this.showSearchSuggestions(searchInput.value);
+                } else {
+                    this.showSearchHistory();
+                }
+            });
+        }
         
-        searchInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
+        if (searchBtn) {
+            searchBtn.addEventListener('click', () => {
                 this.handleSearch();
-            }
-        });
-        
-        searchBtn.addEventListener('click', () => {
-            this.handleSearch();
-        });
-
-        // Search suggestions
-        searchInput.addEventListener('focus', () => {
-            if (searchInput.value.length >= 2) {
-                this.showSearchSuggestions(searchInput.value);
-            } else {
-                this.showSearchHistory();
-            }
-        });
+            });
+        }
 
         // Navigation
         document.addEventListener('click', (e) => {
@@ -102,13 +221,14 @@ class VideoApp {
                 const section = navLink.dataset.section;
                 if (section) {
                     this.navigateToSection(section);
-                    document.getElementById('mobileNav').classList.remove('active');
+                    const mobileNav = document.getElementById('mobileNav');
+                    if (mobileNav) mobileNav.classList.remove('active');
                 }
             }
         });
 
         // Filter controls
-        document.getElementById('sortSelect').addEventListener('change', (e) => {
+        this.safeAddEventListener('sortSelect', 'change', (e) => {
             this.currentFilter.sort = e.target.value;
             this.applyFilters();
         });
@@ -121,62 +241,131 @@ class VideoApp {
         });
 
         // Shuffle button
-        document.getElementById('shuffleBtn').addEventListener('click', () => {
+        this.safeAddEventListener('shuffleBtn', 'click', () => {
             this.shuffleVideos();
         });
 
         // Favorites dropdown button
-        document.getElementById('favoritesDropdownBtn').addEventListener('click', (e) => {
+        this.safeAddEventListener('favoritesDropdownBtn', 'click', (e) => {
             e.preventDefault();
             this.navigateToSection('favorites');
-            document.getElementById('userDropdown').classList.remove('active');
+            const userDropdown = document.getElementById('userDropdown');
+            if (userDropdown) userDropdown.classList.remove('active');
         });
 
         // Watch history button
-        document.getElementById('watchHistoryBtn').addEventListener('click', (e) => {
+        this.safeAddEventListener('watchHistoryBtn', 'click', (e) => {
             e.preventDefault();
             this.navigateToSection('watch-history');
-            document.getElementById('userDropdown').classList.remove('active');
+            const userDropdown = document.getElementById('userDropdown');
+            if (userDropdown) userDropdown.classList.remove('active');
         });
 
         // User menu
-        document.getElementById('userMenuBtn').addEventListener('click', (e) => {
+        this.safeAddEventListener('userAvatarContainer', 'click', (e) => {
             e.stopPropagation();
             const dropdown = document.getElementById('userDropdown');
-            dropdown.classList.toggle('active');
+            if (dropdown) dropdown.classList.toggle('active');
         });
 
         // Clear filters
-        document.getElementById('clearFiltersBtn').addEventListener('click', () => {
+        this.safeAddEventListener('clearFiltersBtn', 'click', () => {
             this.clearAllFilters();
         });
 
         // Video modal
-        document.getElementById('modalBackdrop').addEventListener('click', () => {
+        this.safeAddEventListener('modalBackdrop', 'click', () => {
             this.closeVideoModal();
         });
         
-        document.getElementById('modalCloseBtn').addEventListener('click', () => {
+        this.safeAddEventListener('modalCloseBtn', 'click', () => {
             this.closeVideoModal();
         });
 
         // Modal actions
-        document.getElementById('modalFavoriteBtn').addEventListener('click', () => {
+        this.safeAddEventListener('modalFavoriteBtn', 'click', () => {
             this.toggleModalFavorite();
         });
 
-        document.getElementById('modalFavBtn').addEventListener('click', () => {
+        this.safeAddEventListener('modalFavBtn', 'click', () => {
             this.toggleModalFavorite();
+        });
+
+        this.safeAddEventListener('modalLikeBtn', 'click', () => {
+            this.toggleVideoLike();
+        });
+
+        this.safeAddEventListener('modalDislikeBtn', 'click', () => {
+            this.toggleVideoDislike();
+        });
+
+        this.safeAddEventListener('modalPlaylistBtn', 'click', () => {
+            this.showAddToPlaylistModal();
+        });
+
+        this.safeAddEventListener('subscribeBtn', 'click', () => {
+            this.toggleSubscription();
+        });
+
+        // Star rating
+        document.addEventListener('click', (e) => {
+            if (e.target.closest('.star-rating i')) {
+                const star = e.target.closest('.star-rating i');
+                const rating = parseInt(star.dataset.rating);
+                this.rateVideo(rating);
+            }
+        });
+
+        // Star rating hover
+        document.addEventListener('mouseover', (e) => {
+            if (e.target.closest('.star-rating i')) {
+                const star = e.target.closest('.star-rating i');
+                const rating = parseInt(star.dataset.rating);
+                this.highlightStars(rating);
+            }
+        });
+
+        document.addEventListener('mouseout', (e) => {
+            if (e.target.closest('.star-rating')) {
+                this.resetStarHighlight();
+            }
+        });
+
+        // Comment functionality
+        this.safeAddEventListener('commentInput', 'focus', () => {
+            this.showCommentActions();
+        });
+
+        this.safeAddEventListener('commentCancelBtn', 'click', () => {
+            this.hideCommentActions();
+        });
+
+        this.safeAddEventListener('commentSubmitBtn', 'click', () => {
+            this.submitComment();
+        });
+
+        this.safeAddEventListener('loadMoreComments', 'click', () => {
+            this.loadMoreComments();
         });
 
         // Close dropdowns when clicking outside
         document.addEventListener('click', (e) => {
             if (!e.target.closest('.search-container')) {
-                document.getElementById('searchSuggestions').style.display = 'none';
+                const searchSuggestions = document.getElementById('searchSuggestions');
+                if (searchSuggestions) searchSuggestions.style.display = 'none';
             }
             
             if (!e.target.closest('.user-menu')) {
-                document.getElementById('userDropdown').classList.remove('active');
+                const userDropdown = document.getElementById('userDropdown');
+                if (userDropdown) userDropdown.classList.remove('active');
+            }
+
+            // Close auth modals when clicking backdrop
+            if (e.target.classList.contains('modal-backdrop')) {
+                this.hideLoginModal();
+                this.hideRegisterModal();
+                this.hideProfileModal();
+                this.hidePlaylistModal();
             }
         });
 
@@ -184,12 +373,18 @@ class VideoApp {
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
                 this.closeVideoModal();
-                document.getElementById('mobileNav').classList.remove('active');
+                this.hideLoginModal();
+                this.hideRegisterModal();
+                this.hideProfileModal();
+                this.hidePlaylistModal();
+                const mobileNav = document.getElementById('mobileNav');
+                if (mobileNav) mobileNav.classList.remove('active');
             }
             
             if (e.key === '/' && !e.target.matches('input, textarea')) {
                 e.preventDefault();
-                document.getElementById('searchInput').focus();
+                const searchInput = document.getElementById('searchInput');
+                if (searchInput) searchInput.focus();
             }
         });
 
@@ -213,6 +408,208 @@ class VideoApp {
             clearTimeout(timeout);
             timeout = setTimeout(later, wait);
         };
+    }
+
+    // User Authentication
+    loadUserSession() {
+        const userData = localStorage.getItem('currentUser');
+        if (userData) {
+            this.currentUser = JSON.parse(userData);
+            this.updateAuthUI();
+        }
+    }
+
+    updateAuthUI() {
+        const authSection = document.getElementById('authSection');
+        const userMenu = document.getElementById('userMenu');
+        const createPlaylistBtn = document.getElementById('createPlaylistBtn');
+        const ratingSection = document.getElementById('ratingSection');
+        const commentForm = document.getElementById('commentForm');
+        const modalPlaylistBtn = document.getElementById('modalPlaylistBtn');
+        const subscribeBtn = document.getElementById('subscribeBtn');
+
+        if (this.currentUser) {
+            // Hide auth buttons, show user menu
+            if (authSection) authSection.style.display = 'none';
+            if (userMenu) userMenu.style.display = 'flex';
+            
+            // Show logged-in features
+            if (createPlaylistBtn) createPlaylistBtn.style.display = 'flex';
+            if (ratingSection) ratingSection.style.display = 'flex';
+            if (commentForm) commentForm.style.display = 'block';
+            if (modalPlaylistBtn) modalPlaylistBtn.style.display = 'flex';
+            if (subscribeBtn) subscribeBtn.style.display = 'flex';
+
+            // Update user info
+            const userName = document.getElementById('userName');
+            const userAvatarImg = document.getElementById('userAvatarImg');
+            const commentUserAvatar = document.getElementById('commentUserAvatar');
+            const profileAvatar = document.getElementById('profileAvatar');
+
+            if (userName) userName.textContent = this.currentUser.username;
+            if (userAvatarImg) userAvatarImg.src = this.currentUser.avatar || 'https://images.pexels.com/photos/771742/pexels-photo-771742.jpeg?auto=compress&cs=tinysrgb&w=100';
+            if (commentUserAvatar) commentUserAvatar.src = this.currentUser.avatar || 'https://images.pexels.com/photos/771742/pexels-photo-771742.jpeg?auto=compress&cs=tinysrgb&w=100';
+            if (profileAvatar) profileAvatar.src = this.currentUser.avatar || 'https://images.pexels.com/photos/771742/pexels-photo-771742.jpeg?auto=compress&cs=tinysrgb&w=100';
+        } else {
+            // Show auth buttons, hide user menu
+            if (authSection) authSection.style.display = 'flex';
+            if (userMenu) userMenu.style.display = 'none';
+            
+            // Hide logged-in features
+            if (createPlaylistBtn) createPlaylistBtn.style.display = 'none';
+            if (ratingSection) ratingSection.style.display = 'none';
+            if (commentForm) commentForm.style.display = 'none';
+            if (modalPlaylistBtn) modalPlaylistBtn.style.display = 'none';
+            if (subscribeBtn) subscribeBtn.style.display = 'none';
+        }
+    }
+
+    showLoginModal() {
+        const loginModal = document.getElementById('loginModal');
+        if (loginModal) loginModal.classList.add('active');
+    }
+
+    hideLoginModal() {
+        const loginModal = document.getElementById('loginModal');
+        if (loginModal) loginModal.classList.remove('active');
+    }
+
+    showRegisterModal() {
+        const registerModal = document.getElementById('registerModal');
+        if (registerModal) registerModal.classList.add('active');
+    }
+
+    hideRegisterModal() {
+        const registerModal = document.getElementById('registerModal');
+        if (registerModal) registerModal.classList.remove('active');
+    }
+
+    showProfileModal() {
+        if (!this.currentUser) {
+            this.showToast('Please login to access your profile', 'warning');
+            return;
+        }
+
+        const profileModal = document.getElementById('profileModal');
+        const profileUsername = document.getElementById('profileUsername');
+        const profileEmail = document.getElementById('profileEmail');
+        const profileBio = document.getElementById('profileBio');
+
+        if (profileUsername) profileUsername.value = this.currentUser.username || '';
+        if (profileEmail) profileEmail.value = this.currentUser.email || '';
+        if (profileBio) profileBio.value = this.currentUser.bio || '';
+
+        if (profileModal) profileModal.classList.add('active');
+    }
+
+    hideProfileModal() {
+        const profileModal = document.getElementById('profileModal');
+        if (profileModal) profileModal.classList.remove('active');
+    }
+
+    async handleLogin() {
+        const email = document.getElementById('loginEmail')?.value;
+        const password = document.getElementById('loginPassword')?.value;
+
+        if (!email || !password) {
+            this.showToast('Please fill in all fields', 'error');
+            return;
+        }
+
+        // Simulate login (in real app, this would be an API call)
+        const userData = {
+            id: Date.now(),
+            username: email.split('@')[0],
+            email: email,
+            avatar: 'https://images.pexels.com/photos/771742/pexels-photo-771742.jpeg?auto=compress&cs=tinysrgb&w=100',
+            bio: ''
+        };
+
+        this.currentUser = userData;
+        localStorage.setItem('currentUser', JSON.stringify(userData));
+        
+        this.updateAuthUI();
+        this.hideLoginModal();
+        this.showToast('Login successful!', 'success');
+    }
+
+    async handleRegister() {
+        const username = document.getElementById('registerUsername')?.value;
+        const email = document.getElementById('registerEmail')?.value;
+        const password = document.getElementById('registerPassword')?.value;
+        const confirmPassword = document.getElementById('registerConfirmPassword')?.value;
+
+        if (!username || !email || !password || !confirmPassword) {
+            this.showToast('Please fill in all fields', 'error');
+            return;
+        }
+
+        if (password !== confirmPassword) {
+            this.showToast('Passwords do not match', 'error');
+            return;
+        }
+
+        // Simulate registration (in real app, this would be an API call)
+        const userData = {
+            id: Date.now(),
+            username: username,
+            email: email,
+            avatar: 'https://images.pexels.com/photos/771742/pexels-photo-771742.jpeg?auto=compress&cs=tinysrgb&w=100',
+            bio: ''
+        };
+
+        this.currentUser = userData;
+        localStorage.setItem('currentUser', JSON.stringify(userData));
+        
+        this.updateAuthUI();
+        this.hideRegisterModal();
+        this.showToast('Registration successful!', 'success');
+    }
+
+    async handleProfileUpdate() {
+        if (!this.currentUser) return;
+
+        const username = document.getElementById('profileUsername')?.value;
+        const email = document.getElementById('profileEmail')?.value;
+        const bio = document.getElementById('profileBio')?.value;
+
+        this.currentUser.username = username;
+        this.currentUser.email = email;
+        this.currentUser.bio = bio;
+
+        localStorage.setItem('currentUser', JSON.stringify(this.currentUser));
+        
+        this.updateAuthUI();
+        this.hideProfileModal();
+        this.showToast('Profile updated successfully!', 'success');
+    }
+
+    async handleAvatarUpload(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        // In a real app, you would upload to a server
+        // For demo, we'll use a placeholder
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            this.currentUser.avatar = e.target.result;
+            localStorage.setItem('currentUser', JSON.stringify(this.currentUser));
+            this.updateAuthUI();
+            this.showToast('Avatar updated!', 'success');
+        };
+        reader.readAsDataURL(file);
+    }
+
+    logout() {
+        this.currentUser = null;
+        localStorage.removeItem('currentUser');
+        this.updateAuthUI();
+        this.showToast('Logged out successfully', 'success');
+        
+        // Redirect to home if on user-specific pages
+        if (['playlists', 'favorites', 'watch-history'].includes(this.currentFilter.section)) {
+            this.navigateToSection('home');
+        }
     }
 
     async loadStats() {
@@ -259,6 +656,14 @@ class VideoApp {
         }
     }
 
+    async loadPlaylists() {
+        if (!this.currentUser) return;
+        
+        // Simulate loading playlists (in real app, this would be an API call)
+        const savedPlaylists = localStorage.getItem(`playlists_${this.currentUser.id}`);
+        this.playlists = savedPlaylists ? JSON.parse(savedPlaylists) : [];
+    }
+
     async loadCategories() {
         try {
             const response = await fetch('/api/categories');
@@ -287,6 +692,8 @@ class VideoApp {
 
     renderCategories(categories) {
         const categoriesGrid = document.getElementById('categoriesGrid');
+        if (!categoriesGrid) return;
+
         categoriesGrid.innerHTML = categories.map(category => `
             <div class="category-card" data-category="${category.name}">
                 <div class="category-icon">
@@ -307,6 +714,8 @@ class VideoApp {
 
     renderPerformers(performers) {
         const performersGrid = document.getElementById('performersGrid');
+        if (!performersGrid) return;
+
         performersGrid.innerHTML = performers.map(performer => `
             <div class="performer-card" data-performer="${performer.name}">
                 <div class="performer-avatar">
@@ -329,6 +738,8 @@ class VideoApp {
 
     renderMobileCategories(categories) {
         const mobileCategories = document.getElementById('mobileCategoriesList');
+        if (!mobileCategories) return;
+
         mobileCategories.innerHTML = categories.slice(0, 10).map(category => `
             <a href="#" class="mobile-category-item" data-category="${category.name}">
                 <span>${category.displayName}</span>
@@ -341,13 +752,16 @@ class VideoApp {
                 e.preventDefault();
                 const categoryName = item.dataset.category;
                 this.filterByCategory(categoryName);
-                document.getElementById('mobileNav').classList.remove('active');
+                const mobileNav = document.getElementById('mobileNav');
+                if (mobileNav) mobileNav.classList.remove('active');
             });
         });
     }
 
     renderMobilePerformers(performers) {
         const mobilePerformers = document.getElementById('mobilePerformersList');
+        if (!mobilePerformers) return;
+
         mobilePerformers.innerHTML = performers.slice(0, 10).map(performer => `
             <a href="#" class="mobile-performer-item" data-performer="${performer.name}">
                 <span>${performer.displayName}</span>
@@ -360,7 +774,8 @@ class VideoApp {
                 e.preventDefault();
                 const performerName = item.dataset.performer;
                 this.filterByPerformer(performerName);
-                document.getElementById('mobileNav').classList.remove('active');
+                const mobileNav = document.getElementById('mobileNav');
+                if (mobileNav) mobileNav.classList.remove('active');
             });
         });
     }
@@ -386,12 +801,15 @@ class VideoApp {
         this.hasMore = true;
 
         this.updateContentForSection(section);
-        document.getElementById('searchInput').value = '';
+        const searchInput = document.getElementById('searchInput');
+        if (searchInput) searchInput.value = '';
         
         if (section === 'categories') {
             this.showCategoriesGrid();
         } else if (section === 'performers') {
             this.showPerformersGrid();
+        } else if (section === 'playlists') {
+            this.showPlaylistsGrid();
         } else {
             this.showVideoGrid();
             this.loadVideos(true);
@@ -438,33 +856,146 @@ class VideoApp {
                 title = 'All Performers';
                 breadcrumb = 'Home / Performers';
                 break;
+            case 'playlists':
+                title = 'My Playlists';
+                breadcrumb = 'Home / Playlists';
+                break;
         }
         
-        document.getElementById('contentTitle').textContent = title;
-        document.getElementById('contentBreadcrumb').innerHTML = breadcrumb.split(' / ').map(crumb => `<span>${crumb}</span>`).join('');
+        const contentTitle = document.getElementById('contentTitle');
+        const contentBreadcrumb = document.getElementById('contentBreadcrumb');
+        
+        if (contentTitle) contentTitle.textContent = title;
+        if (contentBreadcrumb) contentBreadcrumb.innerHTML = breadcrumb.split(' / ').map(crumb => `<span>${crumb}</span>`).join('');
     }
 
     showCategoriesGrid() {
-        document.getElementById('filterBar').style.display = 'none';
-        document.getElementById('videoGrid').style.display = 'none';
-        document.getElementById('performersGrid').style.display = 'none';
-        document.getElementById('categoriesGrid').style.display = 'grid';
-        document.getElementById('noResults').style.display = 'none';
+        const filterBar = document.getElementById('filterBar');
+        const videoGrid = document.getElementById('videoGrid');
+        const performersGrid = document.getElementById('performersGrid');
+        const playlistsGrid = document.getElementById('playlistsGrid');
+        const categoriesGrid = document.getElementById('categoriesGrid');
+        const noResults = document.getElementById('noResults');
+
+        if (filterBar) filterBar.style.display = 'none';
+        if (videoGrid) videoGrid.style.display = 'none';
+        if (performersGrid) performersGrid.style.display = 'none';
+        if (playlistsGrid) playlistsGrid.style.display = 'none';
+        if (categoriesGrid) categoriesGrid.style.display = 'grid';
+        if (noResults) noResults.style.display = 'none';
     }
 
     showPerformersGrid() {
-        document.getElementById('filterBar').style.display = 'none';
-        document.getElementById('videoGrid').style.display = 'none';
-        document.getElementById('categoriesGrid').style.display = 'none';
-        document.getElementById('performersGrid').style.display = 'grid';
-        document.getElementById('noResults').style.display = 'none';
+        const filterBar = document.getElementById('filterBar');
+        const videoGrid = document.getElementById('videoGrid');
+        const categoriesGrid = document.getElementById('categoriesGrid');
+        const playlistsGrid = document.getElementById('playlistsGrid');
+        const performersGrid = document.getElementById('performersGrid');
+        const noResults = document.getElementById('noResults');
+
+        if (filterBar) filterBar.style.display = 'none';
+        if (videoGrid) videoGrid.style.display = 'none';
+        if (categoriesGrid) categoriesGrid.style.display = 'none';
+        if (playlistsGrid) playlistsGrid.style.display = 'none';
+        if (performersGrid) performersGrid.style.display = 'grid';
+        if (noResults) noResults.style.display = 'none';
+    }
+
+    showPlaylistsGrid() {
+        const filterBar = document.getElementById('filterBar');
+        const videoGrid = document.getElementById('videoGrid');
+        const categoriesGrid = document.getElementById('categoriesGrid');
+        const performersGrid = document.getElementById('performersGrid');
+        const playlistsGrid = document.getElementById('playlistsGrid');
+        const noResults = document.getElementById('noResults');
+
+        if (filterBar) filterBar.style.display = 'none';
+        if (videoGrid) videoGrid.style.display = 'none';
+        if (categoriesGrid) categoriesGrid.style.display = 'none';
+        if (performersGrid) performersGrid.style.display = 'none';
+        if (playlistsGrid) playlistsGrid.style.display = 'grid';
+        if (noResults) noResults.style.display = 'none';
+
+        this.renderPlaylists();
     }
 
     showVideoGrid() {
-        document.getElementById('filterBar').style.display = 'block';
-        document.getElementById('categoriesGrid').style.display = 'none';
-        document.getElementById('performersGrid').style.display = 'none';
-        document.getElementById('videoGrid').style.display = 'grid';
+        const filterBar = document.getElementById('filterBar');
+        const categoriesGrid = document.getElementById('categoriesGrid');
+        const performersGrid = document.getElementById('performersGrid');
+        const playlistsGrid = document.getElementById('playlistsGrid');
+        const videoGrid = document.getElementById('videoGrid');
+
+        if (filterBar) filterBar.style.display = 'block';
+        if (categoriesGrid) categoriesGrid.style.display = 'none';
+        if (performersGrid) performersGrid.style.display = 'none';
+        if (playlistsGrid) playlistsGrid.style.display = 'none';
+        if (videoGrid) videoGrid.style.display = 'grid';
+    }
+
+    renderPlaylists() {
+        const playlistsGrid = document.getElementById('playlistsGrid');
+        if (!playlistsGrid) return;
+
+        if (!this.currentUser) {
+            playlistsGrid.innerHTML = `
+                <div class="auth-required">
+                    <i class="fas fa-user-lock"></i>
+                    <h3>Login Required</h3>
+                    <p>Please login to view and manage your playlists</p>
+                    <button class="auth-submit-btn" onclick="app.showLoginModal()">Login Now</button>
+                </div>
+            `;
+            return;
+        }
+
+        if (this.playlists.length === 0) {
+            playlistsGrid.innerHTML = `
+                <div class="no-playlists-message">
+                    <i class="fas fa-list"></i>
+                    <h3>No Playlists Yet</h3>
+                    <p>Create your first playlist to organize your favorite videos</p>
+                    <button class="auth-submit-btn" onclick="app.showCreatePlaylistModal()">Create Playlist</button>
+                </div>
+            `;
+            return;
+        }
+
+        playlistsGrid.innerHTML = this.playlists.map(playlist => `
+            <div class="playlist-card" data-playlist-id="${playlist.id}">
+                <div class="playlist-thumbnail">
+                    <i class="fas fa-list"></i>
+                    <div class="playlist-video-count">${playlist.videos.length} videos</div>
+                </div>
+                <div class="playlist-info">
+                    <div class="playlist-name">${playlist.name}</div>
+                    <div class="playlist-description">${playlist.description || 'No description'}</div>
+                    <div class="playlist-meta">
+                        <div class="playlist-privacy">
+                            <i class="fas fa-${playlist.isPrivate ? 'lock' : 'globe'}"></i>
+                            ${playlist.isPrivate ? 'Private' : 'Public'}
+                        </div>
+                        <div class="playlist-created">
+                            ${new Date(playlist.createdAt).toLocaleDateString()}
+                        </div>
+                    </div>
+                </div>
+                <div class="playlist-actions">
+                    <button class="playlist-action-btn" onclick="app.viewPlaylist('${playlist.id}')">
+                        <i class="fas fa-play"></i>
+                        View
+                    </button>
+                    <button class="playlist-action-btn" onclick="app.editPlaylist('${playlist.id}')">
+                        <i class="fas fa-edit"></i>
+                        Edit
+                    </button>
+                    <button class="playlist-action-btn" onclick="app.deletePlaylist('${playlist.id}')">
+                        <i class="fas fa-trash"></i>
+                        Delete
+                    </button>
+                </div>
+            </div>
+        `).join('');
     }
 
     filterByCategory(category) {
@@ -480,8 +1011,11 @@ class VideoApp {
         this.hasMore = true;
         
         this.updateContentForSection('category');
-        document.getElementById('contentTitle').textContent = `Category: ${this.formatName(category)}`;
-        document.getElementById('contentBreadcrumb').innerHTML = `<span>Home</span><span>Categories</span><span>${this.formatName(category)}</span>`;
+        const contentTitle = document.getElementById('contentTitle');
+        const contentBreadcrumb = document.getElementById('contentBreadcrumb');
+        
+        if (contentTitle) contentTitle.textContent = `Category: ${this.formatName(category)}`;
+        if (contentBreadcrumb) contentBreadcrumb.innerHTML = `<span>Home</span><span>Categories</span><span>${this.formatName(category)}</span>`;
         
         this.showVideoGrid();
         this.loadVideos(true);
@@ -500,26 +1034,36 @@ class VideoApp {
         this.hasMore = true;
         
         this.updateContentForSection('performer');
-        document.getElementById('contentTitle').textContent = `Performer: ${this.formatName(performer)}`;
-        document.getElementById('contentBreadcrumb').innerHTML = `<span>Home</span><span>Performers</span><span>${this.formatName(performer)}</span>`;
+        const contentTitle = document.getElementById('contentTitle');
+        const contentBreadcrumb = document.getElementById('contentBreadcrumb');
+        
+        if (contentTitle) contentTitle.textContent = `Performer: ${this.formatName(performer)}`;
+        if (contentBreadcrumb) contentBreadcrumb.innerHTML = `<span>Home</span><span>Performers</span><span>${this.formatName(performer)}</span>`;
         
         this.showVideoGrid();
         this.loadVideos(true);
     }
 
     handleSearchInput() {
-        const searchTerm = document.getElementById('searchInput').value.trim();
+        const searchInput = document.getElementById('searchInput');
+        if (!searchInput) return;
+
+        const searchTerm = searchInput.value.trim();
         if (searchTerm.length >= 2) {
             this.showSearchSuggestions(searchTerm);
         } else if (searchTerm.length === 0) {
             this.showSearchHistory();
         } else {
-            document.getElementById('searchSuggestions').style.display = 'none';
+            const searchSuggestions = document.getElementById('searchSuggestions');
+            if (searchSuggestions) searchSuggestions.style.display = 'none';
         }
     }
 
     async handleSearch() {
-        const searchTerm = document.getElementById('searchInput').value.trim();
+        const searchInput = document.getElementById('searchInput');
+        if (!searchInput) return;
+
+        const searchTerm = searchInput.value.trim();
         
         if (searchTerm) {
             await this.addToSearchHistory(searchTerm);
@@ -539,8 +1083,11 @@ class VideoApp {
         const title = searchTerm ? `Search: "${searchTerm}"` : 'All Videos';
         const breadcrumb = searchTerm ? `<span>Home</span><span>Search</span><span>"${searchTerm}"</span>` : '<span>Home</span>';
         
-        document.getElementById('contentTitle').textContent = title;
-        document.getElementById('contentBreadcrumb').innerHTML = breadcrumb;
+        const contentTitle = document.getElementById('contentTitle');
+        const contentBreadcrumb = document.getElementById('contentBreadcrumb');
+        
+        if (contentTitle) contentTitle.textContent = title;
+        if (contentBreadcrumb) contentBreadcrumb.innerHTML = breadcrumb;
         
         document.querySelectorAll('.nav-link, .mobile-nav-link').forEach(item => {
             item.classList.remove('active');
@@ -549,7 +1096,8 @@ class VideoApp {
         this.showVideoGrid();
         this.loadVideos(true);
         
-        document.getElementById('searchSuggestions').style.display = 'none';
+        const searchSuggestions = document.getElementById('searchSuggestions');
+        if (searchSuggestions) searchSuggestions.style.display = 'none';
     }
 
     async addToSearchHistory(query) {
@@ -569,6 +1117,8 @@ class VideoApp {
         if (this.searchHistory.length === 0) return;
         
         const suggestionsContainer = document.getElementById('searchSuggestions');
+        if (!suggestionsContainer) return;
+
         suggestionsContainer.innerHTML = `
             <div class="suggestion-header">Recent Searches</div>
             ${this.searchHistory.slice(0, 5).map(item => `
@@ -583,7 +1133,8 @@ class VideoApp {
         
         suggestionsContainer.querySelectorAll('.suggestion-item').forEach(item => {
             item.addEventListener('click', () => {
-                document.getElementById('searchInput').value = item.dataset.value;
+                const searchInput = document.getElementById('searchInput');
+                if (searchInput) searchInput.value = item.dataset.value;
                 this.handleSearch();
                 suggestionsContainer.style.display = 'none';
             });
@@ -598,6 +1149,7 @@ class VideoApp {
             const data = await response.json();
             
             const suggestionsContainer = document.getElementById('searchSuggestions');
+            if (!suggestionsContainer) return;
             
             if (data.suggestions && data.suggestions.length > 0) {
                 suggestionsContainer.innerHTML = data.suggestions.map(suggestion => `
@@ -620,7 +1172,8 @@ class VideoApp {
                         } else if (type === 'category') {
                             this.filterByCategory(value);
                         } else {
-                            document.getElementById('searchInput').value = value;
+                            const searchInput = document.getElementById('searchInput');
+                            if (searchInput) searchInput.value = value;
                             this.handleSearch();
                         }
                         
@@ -659,8 +1212,11 @@ class VideoApp {
             sort: 'random'
         };
         
-        document.getElementById('searchInput').value = '';
-        document.getElementById('sortSelect').value = 'random';
+        const searchInput = document.getElementById('searchInput');
+        const sortSelect = document.getElementById('sortSelect');
+        
+        if (searchInput) searchInput.value = '';
+        if (sortSelect) sortSelect.value = 'random';
         
         this.navigateToSection('home');
     }
@@ -670,10 +1226,12 @@ class VideoApp {
         const videoGrid = document.getElementById('videoGrid');
         const viewOptions = document.querySelectorAll('.view-option');
         
-        if (view === 'list') {
-            videoGrid.classList.add('list-view');
-        } else {
-            videoGrid.classList.remove('list-view');
+        if (videoGrid) {
+            if (view === 'list') {
+                videoGrid.classList.add('list-view');
+            } else {
+                videoGrid.classList.remove('list-view');
+            }
         }
         
         viewOptions.forEach(btn => {
@@ -690,11 +1248,13 @@ class VideoApp {
                 await this.loadVideos(true);
                 
                 const shuffleBtn = document.getElementById('shuffleBtn');
-                const originalHTML = shuffleBtn.innerHTML;
-                shuffleBtn.innerHTML = '<i class="fas fa-check"></i>';
-                setTimeout(() => {
-                    shuffleBtn.innerHTML = originalHTML;
-                }, 1000);
+                if (shuffleBtn) {
+                    const originalHTML = shuffleBtn.innerHTML;
+                    shuffleBtn.innerHTML = '<i class="fas fa-check"></i>';
+                    setTimeout(() => {
+                        shuffleBtn.innerHTML = originalHTML;
+                    }, 1000);
+                }
                 
                 this.showToast('Videos shuffled!', 'success');
             }
@@ -713,11 +1273,12 @@ class VideoApp {
         
         if (reset) {
             this.currentPage = 1;
-            document.getElementById('videoGrid').innerHTML = '';
-            noResults.style.display = 'none';
+            const videoGrid = document.getElementById('videoGrid');
+            if (videoGrid) videoGrid.innerHTML = '';
+            if (noResults) noResults.style.display = 'none';
         }
         
-        loadingContainer.style.display = 'flex';
+        if (loadingContainer) loadingContainer.style.display = 'flex';
         
         try {
             // Handle watch history separately
@@ -759,25 +1320,33 @@ class VideoApp {
                 this.hasMore = data.hasMore;
                 this.currentPage++;
                 
-                document.getElementById('videoCount').textContent = `${this.formatNumber(data.total)} videos`;
+                const videoCount = document.getElementById('videoCount');
+                if (videoCount) videoCount.textContent = `${this.formatNumber(data.total)} videos`;
             } else if (reset) {
-                noResults.style.display = 'block';
-                document.getElementById('videoCount').textContent = '0 videos';
-                document.getElementById('noResultsTitle').textContent = 'No videos found';
-                document.getElementById('noResultsText').textContent = 'Try adjusting your search terms or filters';
+                if (noResults) noResults.style.display = 'block';
+                const videoCount = document.getElementById('videoCount');
+                const noResultsTitle = document.getElementById('noResultsTitle');
+                const noResultsText = document.getElementById('noResultsText');
+                
+                if (videoCount) videoCount.textContent = '0 videos';
+                if (noResultsTitle) noResultsTitle.textContent = 'No videos found';
+                if (noResultsText) noResultsText.textContent = 'Try adjusting your search terms or filters';
             }
             
         } catch (error) {
             console.error('Error loading videos:', error);
             if (reset) {
-                noResults.style.display = 'block';
-                document.getElementById('noResultsTitle').textContent = 'Error loading videos';
-                document.getElementById('noResultsText').textContent = 'Please check your connection and try again';
+                if (noResults) noResults.style.display = 'block';
+                const noResultsTitle = document.getElementById('noResultsTitle');
+                const noResultsText = document.getElementById('noResultsText');
+                
+                if (noResultsTitle) noResultsTitle.textContent = 'Error loading videos';
+                if (noResultsText) noResultsText.textContent = 'Please check your connection and try again';
             }
             this.showToast('Error loading videos', 'error');
         } finally {
             this.isLoading = false;
-            loadingContainer.style.display = 'none';
+            if (loadingContainer) loadingContainer.style.display = 'none';
         }
     }
 
@@ -791,26 +1360,37 @@ class VideoApp {
                 this.hasMore = data.hasMore;
                 this.currentPage++;
                 
-                document.getElementById('videoCount').textContent = `${this.formatNumber(data.total)} videos in history`;
+                const videoCount = document.getElementById('videoCount');
+                if (videoCount) videoCount.textContent = `${this.formatNumber(data.total)} videos in history`;
             } else if (reset) {
-                document.getElementById('noResults').style.display = 'block';
-                document.getElementById('videoCount').textContent = '0 videos in history';
-                document.getElementById('noResultsTitle').textContent = 'No watch history';
-                document.getElementById('noResultsText').textContent = 'Videos you watch will appear here';
+                const noResults = document.getElementById('noResults');
+                const videoCount = document.getElementById('videoCount');
+                const noResultsTitle = document.getElementById('noResultsTitle');
+                const noResultsText = document.getElementById('noResultsText');
+                
+                if (noResults) noResults.style.display = 'block';
+                if (videoCount) videoCount.textContent = '0 videos in history';
+                if (noResultsTitle) noResultsTitle.textContent = 'No watch history';
+                if (noResultsText) noResultsText.textContent = 'Videos you watch will appear here';
             }
             
         } catch (error) {
             console.error('Error loading watch history videos:', error);
             if (reset) {
-                document.getElementById('noResults').style.display = 'block';
-                document.getElementById('noResultsTitle').textContent = 'Error loading watch history';
-                document.getElementById('noResultsText').textContent = 'Please try again later';
+                const noResults = document.getElementById('noResults');
+                const noResultsTitle = document.getElementById('noResultsTitle');
+                const noResultsText = document.getElementById('noResultsText');
+                
+                if (noResults) noResults.style.display = 'block';
+                if (noResultsTitle) noResultsTitle.textContent = 'Error loading watch history';
+                if (noResultsText) noResultsText.textContent = 'Please try again later';
             }
         }
     }
 
     renderVideos(videos, reset = false) {
         const videoGrid = document.getElementById('videoGrid');
+        if (!videoGrid) return;
         
         if (reset) {
             videoGrid.innerHTML = '';
@@ -829,6 +1409,10 @@ class VideoApp {
         
         const isFavorite = this.favorites.has(video.id);
         const thumbnailUrl = video.thumbnailExists ? video.thumbnailUrl : 'https://images.pexels.com/photos/1181467/pexels-photo-1181467.jpeg?auto=compress&cs=tinysrgb&w=400';
+        
+        // Get engagement data
+        const likes = this.videoLikes.get(video.id) || Math.floor(Math.random() * 1000) + 100;
+        const dislikes = this.videoDislikes.get(video.id) || Math.floor(Math.random() * 50) + 10;
         
         card.innerHTML = `
             <div class="video-thumbnail">
@@ -849,6 +1433,12 @@ class VideoApp {
                 <div class="video-rating">
                     ${this.renderStars(video.rating || 4.2)}
                 </div>
+                <div class="video-engagement">
+                    <div class="like-count">
+                        <i class="fas fa-thumbs-up"></i>
+                        ${this.formatNumber(likes)}
+                    </div>
+                </div>
             </div>
             <div class="video-info">
                 <h3 class="video-title">${video.title}</h3>
@@ -868,6 +1458,10 @@ class VideoApp {
                             ${video.duration}
                         </span>
                     ` : ''}
+                    <span class="video-stat">
+                        <i class="fas fa-thumbs-up"></i>
+                        ${this.formatNumber(likes)}
+                    </span>
                 </div>
                 ${video.categories ? `
                     <div class="video-categories">
@@ -1039,25 +1633,31 @@ class VideoApp {
         const modalVideoQuality = document.getElementById('modalVideoQuality');
         const modalVideoCategories = document.getElementById('modalVideoCategories');
         
-        modalVideo.src = `/api/video-stream/${video.id}`;
-        modalVideo.load();
+        if (modalVideo) {
+            modalVideo.src = `/api/video-stream/${video.id}`;
+            modalVideo.load();
+        }
         
-        modalVideoTitle.textContent = video.title;
-        modalVideoPerformer.textContent = video.artist;
-        modalVideoPerformer.dataset.performer = video.artist;
-        modalVideoViews.textContent = this.formatNumber(video.views || 0);
-        modalVideoRating.textContent = (video.rating || 4.2).toFixed(1);
-        modalVideoDuration.textContent = video.duration || 'Unknown';
-        modalVideoQuality.textContent = video.quality || 'HD';
+        if (modalVideoTitle) modalVideoTitle.textContent = video.title;
+        if (modalVideoPerformer) {
+            modalVideoPerformer.textContent = video.artist;
+            modalVideoPerformer.dataset.performer = video.artist;
+        }
+        if (modalVideoViews) modalVideoViews.textContent = this.formatNumber(video.views || 0);
+        if (modalVideoRating) modalVideoRating.textContent = (video.rating || 4.2).toFixed(1);
+        if (modalVideoDuration) modalVideoDuration.textContent = video.duration || 'Unknown';
+        if (modalVideoQuality) modalVideoQuality.textContent = video.quality || 'HD';
         
         // Add click handler for performer link in modal
-        modalVideoPerformer.addEventListener('click', (e) => {
-            e.preventDefault();
-            this.closeVideoModal();
-            this.filterByPerformer(modalVideoPerformer.dataset.performer);
-        });
+        if (modalVideoPerformer) {
+            modalVideoPerformer.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.closeVideoModal();
+                this.filterByPerformer(modalVideoPerformer.dataset.performer);
+            });
+        }
         
-        if (video.categories && video.categories.length > 0) {
+        if (video.categories && video.categories.length > 0 && modalVideoCategories) {
             modalVideoCategories.innerHTML = video.categories.map(cat => 
                 `<span class="category-tag" data-category="${cat}">${this.formatName(cat)}</span>`
             ).join('');
@@ -1068,14 +1668,16 @@ class VideoApp {
                     this.filterByCategory(tag.dataset.category);
                 });
             });
-        } else {
+        } else if (modalVideoCategories) {
             modalVideoCategories.innerHTML = '';
         }
         
         this.updateModalActionButtons();
+        this.updateModalEngagement();
         this.loadRelatedVideos(video);
+        this.loadComments(video.id);
         
-        modal.classList.add('active');
+        if (modal) modal.classList.add('active');
         document.body.style.overflow = 'hidden';
     }
 
@@ -1097,6 +1699,18 @@ class VideoApp {
                 }
             }
         });
+    }
+
+    updateModalEngagement() {
+        const videoId = this.currentVideoId;
+        const likes = this.videoLikes.get(videoId) || Math.floor(Math.random() * 1000) + 100;
+        const dislikes = this.videoDislikes.get(videoId) || Math.floor(Math.random() * 50) + 10;
+        
+        const modalLikeCount = document.getElementById('modalLikeCount');
+        const modalDislikeCount = document.getElementById('modalDislikeCount');
+        
+        if (modalLikeCount) modalLikeCount.textContent = this.formatNumber(likes);
+        if (modalDislikeCount) modalDislikeCount.textContent = this.formatNumber(dislikes);
     }
 
     async loadRelatedVideos(currentVideo) {
@@ -1126,6 +1740,8 @@ class VideoApp {
 
     renderRelatedVideos(videos) {
         const relatedVideosGrid = document.getElementById('relatedVideosGrid');
+        if (!relatedVideosGrid) return;
+
         relatedVideosGrid.innerHTML = videos.map(video => {
             const thumbnailUrl = video.thumbnailExists ? video.thumbnailUrl : 'https://images.pexels.com/photos/1181467/pexels-photo-1181467.jpeg?auto=compress&cs=tinysrgb&w=300';
             
@@ -1164,9 +1780,11 @@ class VideoApp {
         const modal = document.getElementById('videoModal');
         const modalVideo = document.getElementById('modalVideo');
         
-        modal.classList.remove('active');
-        modalVideo.pause();
-        modalVideo.src = '';
+        if (modal) modal.classList.remove('active');
+        if (modalVideo) {
+            modalVideo.pause();
+            modalVideo.src = '';
+        }
         document.body.style.overflow = '';
         this.currentVideoId = null;
     }
@@ -1208,15 +1826,398 @@ class VideoApp {
         }
     }
 
+    toggleVideoLike() {
+        if (!this.currentUser) {
+            this.showToast('Please login to like videos', 'warning');
+            return;
+        }
+
+        const videoId = this.currentVideoId;
+        const currentLikes = this.videoLikes.get(videoId) || Math.floor(Math.random() * 1000) + 100;
+        
+        // Toggle like
+        this.videoLikes.set(videoId, currentLikes + 1);
+        
+        const modalLikeBtn = document.getElementById('modalLikeBtn');
+        if (modalLikeBtn) modalLikeBtn.classList.add('active');
+        
+        this.updateModalEngagement();
+        this.showToast('Video liked!', 'success');
+    }
+
+    toggleVideoDislike() {
+        if (!this.currentUser) {
+            this.showToast('Please login to dislike videos', 'warning');
+            return;
+        }
+
+        const videoId = this.currentVideoId;
+        const currentDislikes = this.videoDislikes.get(videoId) || Math.floor(Math.random() * 50) + 10;
+        
+        // Toggle dislike
+        this.videoDislikes.set(videoId, currentDislikes + 1);
+        
+        const modalDislikeBtn = document.getElementById('modalDislikeBtn');
+        if (modalDislikeBtn) modalDislikeBtn.classList.add('active');
+        
+        this.updateModalEngagement();
+        this.showToast('Video disliked', 'success');
+    }
+
+    toggleSubscription() {
+        if (!this.currentUser) {
+            this.showToast('Please login to subscribe', 'warning');
+            return;
+        }
+
+        const modalVideoPerformer = document.getElementById('modalVideoPerformer');
+        if (!modalVideoPerformer) return;
+
+        const performer = modalVideoPerformer.dataset.performer;
+        const subscribeBtn = document.getElementById('subscribeBtn');
+        
+        if (this.subscriptions.has(performer)) {
+            this.subscriptions.delete(performer);
+            if (subscribeBtn) {
+                subscribeBtn.classList.remove('active');
+                subscribeBtn.querySelector('span').textContent = 'Subscribe';
+            }
+            this.showToast(`Unsubscribed from ${this.formatName(performer)}`, 'success');
+        } else {
+            this.subscriptions.add(performer);
+            if (subscribeBtn) {
+                subscribeBtn.classList.add('active');
+                subscribeBtn.querySelector('span').textContent = 'Subscribed';
+            }
+            this.showToast(`Subscribed to ${this.formatName(performer)}!`, 'success');
+        }
+    }
+
+    highlightStars(rating) {
+        const stars = document.querySelectorAll('.star-rating i');
+        stars.forEach((star, index) => {
+            if (index < rating) {
+                star.classList.add('highlighted');
+            } else {
+                star.classList.remove('highlighted');
+            }
+        });
+    }
+
+    resetStarHighlight() {
+        const stars = document.querySelectorAll('.star-rating i');
+        stars.forEach(star => {
+            star.classList.remove('highlighted');
+        });
+    }
+
+    rateVideo(rating) {
+        if (!this.currentUser) {
+            this.showToast('Please login to rate videos', 'warning');
+            return;
+        }
+
+        const videoId = this.currentVideoId;
+        this.videoRatings.set(videoId, rating);
+        
+        const stars = document.querySelectorAll('.star-rating i');
+        stars.forEach((star, index) => {
+            if (index < rating) {
+                star.classList.add('active');
+            } else {
+                star.classList.remove('active');
+            }
+        });
+        
+        this.showToast(`Rated ${rating} stars!`, 'success');
+    }
+
+    // Comments functionality
+    showCommentActions() {
+        const commentActions = document.querySelector('.comment-actions');
+        if (commentActions) commentActions.style.display = 'flex';
+    }
+
+    hideCommentActions() {
+        const commentActions = document.querySelector('.comment-actions');
+        const commentInput = document.getElementById('commentInput');
+        
+        if (commentActions) commentActions.style.display = 'none';
+        if (commentInput) commentInput.value = '';
+    }
+
+    submitComment() {
+        if (!this.currentUser) {
+            this.showToast('Please login to comment', 'warning');
+            return;
+        }
+
+        const commentInput = document.getElementById('commentInput');
+        if (!commentInput) return;
+
+        const commentText = commentInput.value.trim();
+        if (!commentText) {
+            this.showToast('Please enter a comment', 'warning');
+            return;
+        }
+
+        const videoId = this.currentVideoId;
+        const comment = {
+            id: Date.now(),
+            author: this.currentUser.username,
+            avatar: this.currentUser.avatar,
+            text: commentText,
+            timestamp: Date.now(),
+            likes: 0,
+            dislikes: 0,
+            replies: []
+        };
+
+        if (!this.comments.has(videoId)) {
+            this.comments.set(videoId, []);
+        }
+        
+        this.comments.get(videoId).unshift(comment);
+        this.renderComments(videoId);
+        this.hideCommentActions();
+        this.showToast('Comment added!', 'success');
+    }
+
+    loadComments(videoId) {
+        // Simulate loading comments
+        if (!this.comments.has(videoId)) {
+            this.comments.set(videoId, []);
+        }
+        this.renderComments(videoId);
+    }
+
+    renderComments(videoId) {
+        const commentsList = document.getElementById('commentsList');
+        const commentCount = document.getElementById('commentCount');
+        
+        if (!commentsList || !commentCount) return;
+
+        const comments = this.comments.get(videoId) || [];
+        commentCount.textContent = comments.length;
+
+        if (comments.length === 0) {
+            commentsList.innerHTML = `
+                <div class="no-comments">
+                    <p>No comments yet. Be the first to comment!</p>
+                </div>
+            `;
+            return;
+        }
+
+        commentsList.innerHTML = comments.map(comment => `
+            <div class="comment" data-comment-id="${comment.id}">
+                <img src="${comment.avatar}" alt="${comment.author}" class="comment-avatar">
+                <div class="comment-content">
+                    <div class="comment-header">
+                        <span class="comment-author">${comment.author}</span>
+                        <span class="comment-date">${this.formatDate(comment.timestamp)}</span>
+                    </div>
+                    <div class="comment-text">${comment.text}</div>
+                    <div class="comment-actions">
+                        <button class="comment-like-btn" onclick="app.likeComment('${videoId}', '${comment.id}')">
+                            <i class="fas fa-thumbs-up"></i>
+                            ${comment.likes}
+                        </button>
+                        <button class="comment-dislike-btn" onclick="app.dislikeComment('${videoId}', '${comment.id}')">
+                            <i class="fas fa-thumbs-down"></i>
+                            ${comment.dislikes}
+                        </button>
+                        <button class="comment-reply-btn" onclick="app.replyToComment('${videoId}', '${comment.id}')">
+                            <i class="fas fa-reply"></i>
+                            Reply
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    likeComment(videoId, commentId) {
+        if (!this.currentUser) {
+            this.showToast('Please login to like comments', 'warning');
+            return;
+        }
+
+        const comments = this.comments.get(videoId);
+        const comment = comments.find(c => c.id == commentId);
+        if (comment) {
+            comment.likes++;
+            this.renderComments(videoId);
+        }
+    }
+
+    dislikeComment(videoId, commentId) {
+        if (!this.currentUser) {
+            this.showToast('Please login to dislike comments', 'warning');
+            return;
+        }
+
+        const comments = this.comments.get(videoId);
+        const comment = comments.find(c => c.id == commentId);
+        if (comment) {
+            comment.dislikes++;
+            this.renderComments(videoId);
+        }
+    }
+
+    replyToComment(videoId, commentId) {
+        if (!this.currentUser) {
+            this.showToast('Please login to reply', 'warning');
+            return;
+        }
+
+        this.showToast('Reply functionality coming soon!', 'info');
+    }
+
+    loadMoreComments() {
+        this.showToast('Load more comments functionality coming soon!', 'info');
+    }
+
+    // Playlist functionality
+    showCreatePlaylistModal() {
+        if (!this.currentUser) {
+            this.showToast('Please login to create playlists', 'warning');
+            return;
+        }
+
+        const playlistModal = document.getElementById('playlistModal');
+        const playlistModalTitle = document.getElementById('playlistModalTitle');
+        
+        if (playlistModalTitle) playlistModalTitle.textContent = 'Create New Playlist';
+        if (playlistModal) playlistModal.classList.add('active');
+    }
+
+    showAddToPlaylistModal() {
+        if (!this.currentUser) {
+            this.showToast('Please login to add to playlists', 'warning');
+            return;
+        }
+
+        const playlistModal = document.getElementById('playlistModal');
+        const playlistModalTitle = document.getElementById('playlistModalTitle');
+        
+        if (playlistModalTitle) playlistModalTitle.textContent = 'Add to Playlist';
+        this.renderExistingPlaylists();
+        if (playlistModal) playlistModal.classList.add('active');
+    }
+
+    hidePlaylistModal() {
+        const playlistModal = document.getElementById('playlistModal');
+        if (playlistModal) playlistModal.classList.remove('active');
+    }
+
+    createNewPlaylist() {
+        const newPlaylistName = document.getElementById('newPlaylistName');
+        if (!newPlaylistName) return;
+
+        const name = newPlaylistName.value.trim();
+        if (!name) {
+            this.showToast('Please enter a playlist name', 'warning');
+            return;
+        }
+
+        const playlist = {
+            id: Date.now(),
+            name: name,
+            description: '',
+            videos: [],
+            isPrivate: false,
+            createdAt: Date.now()
+        };
+
+        this.playlists.push(playlist);
+        this.savePlaylists();
+        
+        newPlaylistName.value = '';
+        this.showToast('Playlist created!', 'success');
+        
+        // If we're adding a video to playlist, add it now
+        if (this.currentVideoId) {
+            this.addVideoToPlaylist(playlist.id, this.currentVideoId);
+        }
+        
+        this.hidePlaylistModal();
+    }
+
+    renderExistingPlaylists() {
+        const existingPlaylists = document.getElementById('existingPlaylists');
+        if (!existingPlaylists) return;
+
+        if (this.playlists.length === 0) {
+            existingPlaylists.innerHTML = '<div class="no-playlists">No playlists yet. Create one above!</div>';
+            return;
+        }
+
+        existingPlaylists.innerHTML = this.playlists.map(playlist => `
+            <div class="playlist-item">
+                <div class="playlist-info">
+                    <div class="playlist-name">${playlist.name}</div>
+                    <div class="playlist-count">${playlist.videos.length} videos</div>
+                </div>
+                <button class="add-to-playlist-btn" onclick="app.addVideoToPlaylist('${playlist.id}', '${this.currentVideoId}')">
+                    <i class="fas fa-plus"></i>
+                    Add
+                </button>
+            </div>
+        `).join('');
+    }
+
+    addVideoToPlaylist(playlistId, videoId) {
+        const playlist = this.playlists.find(p => p.id == playlistId);
+        if (!playlist) return;
+
+        if (playlist.videos.includes(videoId)) {
+            this.showToast('Video already in playlist', 'warning');
+            return;
+        }
+
+        playlist.videos.push(videoId);
+        this.savePlaylists();
+        this.showToast(`Added to ${playlist.name}!`, 'success');
+        this.hidePlaylistModal();
+    }
+
+    savePlaylists() {
+        if (this.currentUser) {
+            localStorage.setItem(`playlists_${this.currentUser.id}`, JSON.stringify(this.playlists));
+        }
+    }
+
+    viewPlaylist(playlistId) {
+        this.showToast('View playlist functionality coming soon!', 'info');
+    }
+
+    editPlaylist(playlistId) {
+        this.showToast('Edit playlist functionality coming soon!', 'info');
+    }
+
+    deletePlaylist(playlistId) {
+        if (confirm('Are you sure you want to delete this playlist?')) {
+            this.playlists = this.playlists.filter(p => p.id != playlistId);
+            this.savePlaylists();
+            this.renderPlaylists();
+            this.showToast('Playlist deleted', 'success');
+        }
+    }
+
     updateUI() {
         this.updateFavoritesCount();
         this.setView(this.currentView);
+        this.updateAuthUI();
         
-        document.getElementById('sortSelect').value = this.currentFilter.sort;
+        const sortSelect = document.getElementById('sortSelect');
+        if (sortSelect) sortSelect.value = this.currentFilter.sort;
     }
 
     showToast(message, type = 'info') {
         const toastContainer = document.getElementById('toastContainer');
+        if (!toastContainer) return;
+
         const toast = document.createElement('div');
         toast.className = `toast ${type}`;
         toast.textContent = message;
@@ -1236,16 +2237,43 @@ class VideoApp {
     }
 
     formatNumber(num) {
-        if (num >= 1000000) {
-            return (num / 1000000).toFixed(1) + 'M';
-        } else if (num >= 1000) {
-            return (num / 1000).toFixed(1) + 'K';
+        // Ensure num is a valid number
+        if (num === null || num === undefined || isNaN(num)) {
+            return '0';
         }
-        return num.toString();
+        
+        const number = Number(num);
+        
+        if (number >= 1000000) {
+            return (number / 1000000).toFixed(1) + 'M';
+        } else if (number >= 1000) {
+            return (number / 1000).toFixed(1) + 'K';
+        }
+        return number.toString();
+    }
+
+    formatDate(timestamp) {
+        const date = new Date(timestamp);
+        const now = new Date();
+        const diff = now - date;
+        
+        const minutes = Math.floor(diff / 60000);
+        const hours = Math.floor(diff / 3600000);
+        const days = Math.floor(diff / 86400000);
+        
+        if (minutes < 60) {
+            return `${minutes} minutes ago`;
+        } else if (hours < 24) {
+            return `${hours} hours ago`;
+        } else if (days < 7) {
+            return `${days} days ago`;
+        } else {
+            return date.toLocaleDateString();
+        }
     }
 }
 
 // Initialize the app when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
-    new VideoApp();
+    window.app = new VideoApp();
 });
