@@ -120,9 +120,7 @@ function setupEventListeners() {
     document.getElementById('createNewPlaylistBtn').addEventListener('click', handleCreatePlaylist);
     document.getElementById('createPlaylistBtn').addEventListener('click', () => showCreatePlaylistModal());
     
-    // Video modal actions
-    document.getElementById('modalLikeBtn').addEventListener('click', () => handleVideoLike('like'));
-    document.getElementById('modalDislikeBtn').addEventListener('click', () => handleVideoLike('dislike'));
+    // Video modal actions - Updated for favorites only (no separate likes)
     document.getElementById('modalFavBtn').addEventListener('click', () => toggleVideoFavorite());
     document.getElementById('modalPlaylistBtn').addEventListener('click', () => showPlaylistModal());
     document.getElementById('subscribeBtn').addEventListener('click', handleSubscribe);
@@ -398,7 +396,7 @@ function navigateToSection(section) {
             loadUserPlaylists();
             break;
         case 'subscriptions':
-            showVideoGrid();
+            showPerformersGrid(); // Show performers grid for subscriptions
             loadSubscriptions();
             break;
         case 'favorites':
@@ -458,7 +456,7 @@ function updateContentHeader(section) {
         'categories': 'Categories',
         'performers': 'Performers',
         'playlists': 'My Playlists',
-        'subscriptions': 'Subscriptions',
+        'subscriptions': 'My Subscriptions',
         'favorites': 'Favorite Videos',
         'watch-history': 'Watch History'
     };
@@ -471,7 +469,7 @@ function updateContentHeader(section) {
         'categories': 'Home / Categories',
         'performers': 'Home / Performers',
         'playlists': 'Home / My Playlists',
-        'subscriptions': 'Home / Subscriptions',
+        'subscriptions': 'Home / My Subscriptions',
         'favorites': 'Home / Favorites',
         'watch-history': 'Home / Watch History'
     };
@@ -878,26 +876,10 @@ async function loadSubscriptions() {
         const subscriptionsData = await subscriptionsResponse.json();
         
         if (subscriptionsData.subscriptions && subscriptionsData.subscriptions.length > 0) {
-            // Load videos from subscribed performers
-            const allVideos = [];
-            
-            for (const performer of subscriptionsData.subscriptions) {
-                const videosResponse = await fetch(`/api/videos?celebrity=${performer.name}&limit=10`);
-                const videosData = await videosResponse.json();
-                allVideos.push(...videosData.videos);
-            }
-            
-            // Sort by newest first
-            allVideos.sort((a, b) => new Date(b.uploadDate) - new Date(a.uploadDate));
-            
-            if (allVideos.length > 0) {
-                displayVideos(allVideos, true);
-                updateVideoCount(allVideos.length);
-            } else {
-                showNoResults('No videos from subscriptions', 'Your subscribed performers haven\'t uploaded any videos yet');
-            }
+            // Display only the subscribed performers (not their videos)
+            displaySubscribedPerformers(subscriptionsData.subscriptions);
         } else {
-            showNoResults('No subscriptions', 'Subscribe to performers to see their latest videos here');
+            showNoResults('No subscriptions', 'Subscribe to performers to see them here');
         }
     } catch (error) {
         console.error('Error loading subscriptions:', error);
@@ -1242,58 +1224,13 @@ async function deletePlaylist(playlistId) {
     }
 }
 
-// Video interaction functions
-async function handleVideoLike(action) {
+// Video interaction functions - Updated for favorites only
+function toggleVideoFavorite() {
     if (!isAuthenticated) {
-        showToast('Please login to like videos', 'error');
+        showToast('Please login to favorite videos', 'error');
         return;
     }
     
-    if (!currentVideoId) return;
-    
-    try {
-        const response = await fetch(`/api/videos/${currentVideoId}/like`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                userId: currentUser.id,
-                action: action
-            })
-        });
-        
-        const data = await response.json();
-        
-        if (response.ok) {
-            // Update UI
-            document.getElementById('modalLikeCount').textContent = data.likes;
-            document.getElementById('modalDislikeCount').textContent = data.dislikes;
-            
-            // Update button states
-            const likeBtn = document.getElementById('modalLikeBtn');
-            const dislikeBtn = document.getElementById('modalDislikeBtn');
-            
-            likeBtn.classList.remove('active');
-            dislikeBtn.classList.remove('active');
-            
-            if (data.userAction === 'like') {
-                likeBtn.classList.add('active');
-            } else if (data.userAction === 'dislike') {
-                dislikeBtn.classList.add('active');
-            }
-            
-            showToast(`Video ${action}d!`, 'success');
-        } else {
-            showToast(data.error || 'Failed to update like', 'error');
-        }
-    } catch (error) {
-        console.error('Like error:', error);
-        showToast('Failed to update like', 'error');
-    }
-}
-
-function toggleVideoFavorite() {
     if (!currentVideoId) return;
     
     const btn = document.getElementById('modalFavBtn');
@@ -1301,19 +1238,25 @@ function toggleVideoFavorite() {
     
     const method = isFavorite ? 'DELETE' : 'POST';
     const url = `/api/favorites/${currentVideoId}`;
+    const body = method === 'POST' ? JSON.stringify({ userId: currentUser.id }) : null;
+    const queryParam = method === 'DELETE' ? `?userId=${currentUser.id}` : '';
     
-    fetch(url, { method })
-        .then(response => response.json())
-        .then(data => {
-            btn.classList.toggle('active');
-            const action = isFavorite ? 'removed from' : 'added to';
-            showToast(`Video ${action} favorites`, 'success');
-            updateFavoritesCount();
-        })
-        .catch(error => {
-            console.error('Error toggling favorite:', error);
-            showToast('Failed to update favorites', 'error');
-        });
+    fetch(url + queryParam, { 
+        method,
+        headers: method === 'POST' ? { 'Content-Type': 'application/json' } : {},
+        body
+    })
+    .then(response => response.json())
+    .then(data => {
+        btn.classList.toggle('active');
+        const action = isFavorite ? 'removed from' : 'added to';
+        showToast(`Video ${action} favorites`, 'success');
+        updateFavoritesCount();
+    })
+    .catch(error => {
+        console.error('Error toggling favorite:', error);
+        showToast('Failed to update favorites', 'error');
+    });
 }
 
 function rateVideo(rating) {
@@ -1510,8 +1453,8 @@ function createVideoCard(video) {
                     ${formatNumber(video.views)}
                 </span>
                 <span class="video-stat">
-                    <i class="fas fa-thumbs-up"></i>
-                    ${video.likes || 0}
+                    <i class="fas fa-heart"></i>
+                    ${video.isFavorite ? 'Favorited' : 'Favorite'}
                 </span>
                 <span class="video-stat">
                     <i class="fas fa-star"></i>
@@ -1596,6 +1539,52 @@ function displayPerformers(performers) {
                         <i class="fas fa-bell"></i> Subscribe
                     </button>
                 ` : ''}
+            </div>
+        `;
+        
+        container.appendChild(performerCard);
+    });
+}
+
+// New function to display subscribed performers only
+function displaySubscribedPerformers(subscriptions) {
+    const container = document.getElementById('performersGrid');
+    container.innerHTML = '';
+    
+    if (!subscriptions || subscriptions.length === 0) {
+        container.innerHTML = `
+            <div class="no-performers-message">
+                <i class="fas fa-bell"></i>
+                <h3>No Subscriptions</h3>
+                <p>You haven't subscribed to any performers yet.</p>
+            </div>
+        `;
+        return;
+    }
+    
+    subscriptions.forEach(subscription => {
+        const performerCard = document.createElement('div');
+        performerCard.className = 'performer-card';
+        performerCard.onclick = (e) => {
+            // Don't trigger if clicking on unsubscribe button
+            if (!e.target.closest('.performer-subscribe-btn')) {
+                handlePerformerClick(null, subscription.name);
+            }
+        };
+        
+        performerCard.innerHTML = `
+            <div class="performer-avatar">
+                ${subscription.hasImage ? 
+                    `<img src="${subscription.imageUrl}" alt="${subscription.displayName}" loading="lazy">` :
+                    `<i class="fas fa-user"></i>`
+                }
+            </div>
+            <div class="performer-info">
+                <h3 class="performer-name">${subscription.displayName}</h3>
+                <p class="performer-video-count">Subscribed on ${new Date(subscription.subscribedAt).toLocaleDateString()}</p>
+                <button class="performer-subscribe-btn subscribed" onclick="handlePerformerSubscribe(event, '${subscription.name}')">
+                    <i class="fas fa-bell-slash"></i> Unsubscribe
+                </button>
             </div>
         `;
         
@@ -1766,40 +1755,55 @@ function showNoResults(title = 'No videos found', text = 'Try adjusting your sea
     document.getElementById('noResults').style.display = 'block';
 }
 
-// Favorite functions
+// Favorite functions (merged with likes)
 function toggleFavorite(event, videoId) {
     event.preventDefault();
     event.stopPropagation();
+    
+    if (!isAuthenticated) {
+        showToast('Please login to favorite videos', 'error');
+        return;
+    }
     
     const btn = event.target.closest('.video-favorite-btn');
     const isCurrentlyFavorite = btn.classList.contains('active');
     
     const method = isCurrentlyFavorite ? 'DELETE' : 'POST';
     const url = `/api/favorites/${videoId}`;
+    const body = method === 'POST' ? JSON.stringify({ userId: currentUser.id }) : null;
+    const queryParam = method === 'DELETE' ? `?userId=${currentUser.id}` : '';
     
-    fetch(url, { method })
-        .then(response => response.json())
-        .then(data => {
-            btn.classList.toggle('active');
-            const action = isCurrentlyFavorite ? 'removed from' : 'added to';
-            showToast(`Video ${action} favorites`, 'success');
-            
-            // Update favorites count in dropdown
-            updateFavoritesCount();
-        })
-        .catch(error => {
-            console.error('Error toggling favorite:', error);
-            showToast('Failed to update favorites', 'error');
-        });
+    fetch(url + queryParam, { 
+        method,
+        headers: method === 'POST' ? { 'Content-Type': 'application/json' } : {},
+        body
+    })
+    .then(response => response.json())
+    .then(data => {
+        btn.classList.toggle('active');
+        const action = isCurrentlyFavorite ? 'removed from' : 'added to';
+        showToast(`Video ${action} favorites`, 'success');
+        
+        // Update favorites count in dropdown
+        updateFavoritesCount();
+    })
+    .catch(error => {
+        console.error('Error toggling favorite:', error);
+        showToast('Failed to update favorites', 'error');
+    });
 }
 
 function updateFavoritesCount() {
-    fetch('/api/favorites')
-        .then(response => response.json())
-        .then(data => {
-            document.querySelector('.favorites-count').textContent = data.total;
-        })
-        .catch(console.error);
+    if (isAuthenticated) {
+        fetch(`/api/favorites?userId=${currentUser.id}`)
+            .then(response => response.json())
+            .then(data => {
+                document.querySelector('.favorites-count').textContent = data.total;
+            })
+            .catch(console.error);
+    } else {
+        document.querySelector('.favorites-count').textContent = '0';
+    }
 }
 
 // Video modal functions
@@ -1829,33 +1833,9 @@ async function openVideoModal(video) {
     favoriteBtn.classList.toggle('active', video.isFavorite);
     favoriteBtn.onclick = (e) => toggleFavorite(e, video.id);
     
-    // Update like/dislike counts and user actions
-    if (isAuthenticated) {
-        try {
-            const response = await fetch(`/api/videos/${video.id}/likes?userId=${currentUser.id}`);
-            const likesData = await response.json();
-            
-            document.getElementById('modalLikeCount').textContent = likesData.likes;
-            document.getElementById('modalDislikeCount').textContent = likesData.dislikes;
-            
-            const likeBtn = document.getElementById('modalLikeBtn');
-            const dislikeBtn = document.getElementById('modalDislikeBtn');
-            
-            likeBtn.classList.remove('active');
-            dislikeBtn.classList.remove('active');
-            
-            if (likesData.userAction === 'like') {
-                likeBtn.classList.add('active');
-            } else if (likesData.userAction === 'dislike') {
-                dislikeBtn.classList.add('active');
-            }
-        } catch (error) {
-            console.error('Error loading likes:', error);
-        }
-    } else {
-        document.getElementById('modalLikeCount').textContent = video.likes || 0;
-        document.getElementById('modalDislikeCount').textContent = video.dislikes || 0;
-    }
+    // Update favorite action button
+    const favBtn = document.getElementById('modalFavBtn');
+    favBtn.classList.toggle('active', video.isFavorite);
     
     // Show modal
     document.getElementById('videoModal').classList.add('active');
@@ -1940,7 +1920,6 @@ function displayRelatedVideos(videos) {
                     ${video.rating.toFixed(1)}
                 </div>
             </div>
-            
             <div class="related-video-info">
                 <h4 class="related-video-title">${video.title}</h4>
                 <p class="related-video-performer">${video.artist}</p>
