@@ -17,11 +17,6 @@ let searchTimeout = null;
 let hoverPreviewTimeout = null;
 let currentHoverVideo = null;
 
-// Data storage (simulating backend)
-let userPlaylists = [];
-let userSubscriptions = new Set();
-let videoComments = {};
-
 // Initialize the application
 document.addEventListener('DOMContentLoaded', function() {
     initializeApp();
@@ -31,7 +26,6 @@ function initializeApp() {
     setupEventListeners();
     loadInitialData();
     checkAuthStatus();
-    loadUserData();
 }
 
 function setupEventListeners() {
@@ -67,11 +61,6 @@ function setupEventListeners() {
     searchInput.addEventListener('input', handleSearchInput);
     searchInput.addEventListener('focus', showSearchSuggestions);
     searchInput.addEventListener('blur', hideSearchSuggestions);
-    searchInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-            performSearch();
-        }
-    });
     searchBtn.addEventListener('click', performSearch);
     
     // Filter controls
@@ -90,44 +79,6 @@ function setupEventListeners() {
     // Modal controls
     document.getElementById('modalCloseBtn').addEventListener('click', closeVideoModal);
     document.getElementById('modalBackdrop').addEventListener('click', closeVideoModal);
-    document.getElementById('modalFullscreenBtn').addEventListener('click', toggleFullscreen);
-    document.getElementById('modalShareBtn').addEventListener('click', shareVideo);
-    
-    // Video modal actions
-    document.getElementById('modalFavBtn').addEventListener('click', () => {
-        if (currentVideoId) {
-            const btn = document.getElementById('modalFavBtn');
-            const isActive = btn.classList.contains('active');
-            toggleFavoriteInModal(currentVideoId, !isActive);
-        }
-    });
-    
-    document.getElementById('modalLikeBtn').addEventListener('click', () => {
-        if (currentVideoId) {
-            toggleLike(currentVideoId);
-        }
-    });
-    
-    document.getElementById('modalDislikeBtn').addEventListener('click', () => {
-        if (currentVideoId) {
-            toggleDislike(currentVideoId);
-        }
-    });
-    
-    document.getElementById('modalPlaylistBtn').addEventListener('click', () => {
-        if (currentVideoId) {
-            showPlaylistModal(currentVideoId);
-        }
-    });
-    
-    document.getElementById('subscribeBtn').addEventListener('click', toggleSubscription);
-    
-    // Star rating
-    document.querySelectorAll('#starRating i').forEach((star, index) => {
-        star.addEventListener('click', () => rateVideo(currentVideoId, index + 1));
-        star.addEventListener('mouseenter', () => highlightStars(index + 1));
-        star.addEventListener('mouseleave', () => resetStars());
-    });
     
     // Authentication
     document.getElementById('loginBtn').addEventListener('click', () => showAuthModal('login'));
@@ -149,36 +100,12 @@ function setupEventListeners() {
     
     // User menu
     document.getElementById('userAvatarContainer').addEventListener('click', toggleUserDropdown);
-    document.getElementById('profileBtn').addEventListener('click', (e) => {
-        e.preventDefault();
-        showProfileModal();
-        toggleUserDropdown();
-    });
-    document.getElementById('myPlaylistsBtn').addEventListener('click', (e) => {
-        e.preventDefault();
-        navigateToSection('playlists');
-        toggleUserDropdown();
-    });
-    document.getElementById('subscriptionsBtn').addEventListener('click', (e) => {
-        e.preventDefault();
-        navigateToSection('subscriptions');
-        toggleUserDropdown();
-    });
-    document.getElementById('favoritesDropdownBtn').addEventListener('click', (e) => {
-        e.preventDefault();
-        navigateToSection('favorites');
-        toggleUserDropdown();
-    });
-    document.getElementById('watchHistoryBtn').addEventListener('click', (e) => {
-        e.preventDefault();
-        navigateToSection('watch-history');
-        toggleUserDropdown();
-    });
-    document.getElementById('logoutBtn').addEventListener('click', (e) => {
-        e.preventDefault();
-        handleLogout();
-        toggleUserDropdown();
-    });
+    document.getElementById('profileBtn').addEventListener('click', () => showProfileModal());
+    document.getElementById('myPlaylistsBtn').addEventListener('click', () => navigateToSection('playlists'));
+    document.getElementById('subscriptionsBtn').addEventListener('click', () => navigateToSection('subscriptions'));
+    document.getElementById('favoritesDropdownBtn').addEventListener('click', () => navigateToSection('favorites'));
+    document.getElementById('watchHistoryBtn').addEventListener('click', () => navigateToSection('watch-history'));
+    document.getElementById('logoutBtn').addEventListener('click', handleLogout);
     
     // Profile modal
     document.getElementById('profileModalClose').addEventListener('click', () => hideProfileModal());
@@ -190,23 +117,22 @@ function setupEventListeners() {
     
     // Playlist modal
     document.getElementById('playlistModalClose').addEventListener('click', () => hidePlaylistModal());
-    document.getElementById('createNewPlaylistBtn').addEventListener('click', createNewPlaylist);
+    document.getElementById('createNewPlaylistBtn').addEventListener('click', handleCreatePlaylist);
     document.getElementById('createPlaylistBtn').addEventListener('click', () => showCreatePlaylistModal());
     
-    // Comment functionality
-    document.getElementById('commentInput').addEventListener('focus', () => {
-        if (!isAuthenticated) {
-            showAuthModal('login');
-            return;
-        }
-        document.getElementById('commentInput').style.minHeight = '100px';
-        document.querySelector('.comment-actions').style.display = 'flex';
-    });
+    // Video modal actions
+    document.getElementById('modalLikeBtn').addEventListener('click', () => handleVideoLike('like'));
+    document.getElementById('modalDislikeBtn').addEventListener('click', () => handleVideoLike('dislike'));
+    document.getElementById('modalFavBtn').addEventListener('click', () => toggleVideoFavorite());
+    document.getElementById('modalPlaylistBtn').addEventListener('click', () => showPlaylistModal());
+    document.getElementById('subscribeBtn').addEventListener('click', handleSubscribe);
     
-    document.getElementById('commentCancelBtn').addEventListener('click', cancelComment);
-    document.getElementById('commentSubmitBtn').addEventListener('click', submitComment);
-    document.getElementById('commentSort').addEventListener('change', loadComments);
-    document.getElementById('loadMoreComments').addEventListener('click', loadMoreComments);
+    // Star rating
+    document.querySelectorAll('#starRating i').forEach((star, index) => {
+        star.addEventListener('click', () => rateVideo(index + 1));
+        star.addEventListener('mouseenter', () => highlightStars(index + 1));
+        star.addEventListener('mouseleave', () => resetStars());
+    });
     
     // Infinite scroll
     window.addEventListener('scroll', handleScroll);
@@ -222,22 +148,6 @@ function setupEventListeners() {
         if (!e.target.closest('.user-menu')) {
             document.getElementById('userDropdown').classList.remove('active');
         }
-        if (!e.target.closest('.search-container')) {
-            hideSearchSuggestions();
-        }
-    });
-    
-    // Modal backdrop clicks
-    document.querySelectorAll('.modal-backdrop').forEach(backdrop => {
-        backdrop.addEventListener('click', (e) => {
-            if (e.target === backdrop) {
-                const modal = backdrop.closest('.auth-modal, .playlist-modal, .profile-modal');
-                if (modal) {
-                    modal.classList.remove('active');
-                    document.body.style.overflow = '';
-                }
-            }
-        });
     });
 }
 
@@ -250,46 +160,10 @@ function loadInitialData() {
 function checkAuthStatus() {
     const savedUser = localStorage.getItem('currentUser');
     if (savedUser) {
-        try {
-            currentUser = JSON.parse(savedUser);
-            isAuthenticated = true;
-            updateAuthUI();
-        } catch (error) {
-            console.error('Error parsing saved user:', error);
-            localStorage.removeItem('currentUser');
-        }
-    }
-}
-
-function loadUserData() {
-    if (isAuthenticated) {
-        const savedPlaylists = localStorage.getItem(`playlists_${currentUser.id}`);
-        const savedSubscriptions = localStorage.getItem(`subscriptions_${currentUser.id}`);
-        
-        if (savedPlaylists) {
-            try {
-                userPlaylists = JSON.parse(savedPlaylists);
-            } catch (error) {
-                console.error('Error loading playlists:', error);
-                userPlaylists = [];
-            }
-        }
-        
-        if (savedSubscriptions) {
-            try {
-                userSubscriptions = new Set(JSON.parse(savedSubscriptions));
-            } catch (error) {
-                console.error('Error loading subscriptions:', error);
-                userSubscriptions = new Set();
-            }
-        }
-    }
-}
-
-function saveUserData() {
-    if (isAuthenticated && currentUser) {
-        localStorage.setItem(`playlists_${currentUser.id}`, JSON.stringify(userPlaylists));
-        localStorage.setItem(`subscriptions_${currentUser.id}`, JSON.stringify([...userSubscriptions]));
+        currentUser = JSON.parse(savedUser);
+        isAuthenticated = true;
+        updateAuthUI();
+        updateFavoritesCount();
     }
 }
 
@@ -302,7 +176,7 @@ function updateAuthUI() {
         userMenu.style.display = 'block';
         
         document.getElementById('userName').textContent = currentUser.username;
-        document.getElementById('userAvatarImg').src = currentUser.avatar || generateAvatar(currentUser.username);
+        document.getElementById('userAvatarImg').src = currentUser.avatar || '/api/placeholder/32/32';
         
         // Show authenticated features
         document.getElementById('createPlaylistBtn').style.display = 'flex';
@@ -310,12 +184,6 @@ function updateAuthUI() {
         document.getElementById('commentForm').style.display = 'block';
         document.getElementById('modalPlaylistBtn').style.display = 'flex';
         document.getElementById('subscribeBtn').style.display = 'flex';
-        
-        // Update comment avatar
-        const commentAvatar = document.getElementById('commentUserAvatar');
-        if (commentAvatar) {
-            commentAvatar.src = currentUser.avatar || generateAvatar(currentUser.username);
-        }
     } else {
         authSection.style.display = 'flex';
         userMenu.style.display = 'none';
@@ -327,19 +195,160 @@ function updateAuthUI() {
         document.getElementById('modalPlaylistBtn').style.display = 'none';
         document.getElementById('subscribeBtn').style.display = 'none';
     }
+}
+
+// Authentication functions
+async function handleLogin(e) {
+    e.preventDefault();
     
-    updateFavoritesCount();
+    const email = document.getElementById('loginEmail').value;
+    const password = document.getElementById('loginPassword').value;
+    
+    try {
+        const response = await fetch('/api/auth/login', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ email, password })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            currentUser = data.user;
+            isAuthenticated = true;
+            localStorage.setItem('currentUser', JSON.stringify(currentUser));
+            updateAuthUI();
+            hideAuthModal('login');
+            showToast('Login successful!', 'success');
+        } else {
+            showToast(data.error || 'Login failed', 'error');
+        }
+    } catch (error) {
+        console.error('Login error:', error);
+        showToast('Login failed', 'error');
+    }
+}
+
+async function handleRegister(e) {
+    e.preventDefault();
+    
+    const username = document.getElementById('registerUsername').value;
+    const email = document.getElementById('registerEmail').value;
+    const password = document.getElementById('registerPassword').value;
+    const confirmPassword = document.getElementById('registerConfirmPassword').value;
+    
+    if (password !== confirmPassword) {
+        showToast('Passwords do not match', 'error');
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/auth/register', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ username, email, password })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            currentUser = data.user;
+            isAuthenticated = true;
+            localStorage.setItem('currentUser', JSON.stringify(currentUser));
+            updateAuthUI();
+            hideAuthModal('register');
+            showToast('Registration successful!', 'success');
+        } else {
+            showToast(data.error || 'Registration failed', 'error');
+        }
+    } catch (error) {
+        console.error('Registration error:', error);
+        showToast('Registration failed', 'error');
+    }
+}
+
+function handleLogout() {
+    currentUser = null;
+    isAuthenticated = false;
+    localStorage.removeItem('currentUser');
+    updateAuthUI();
+    navigateToSection('home');
+    showToast('Logged out successfully', 'success');
+}
+
+// Profile functions
+function showProfileModal() {
+    if (!isAuthenticated) {
+        showToast('Please login first', 'error');
+        return;
+    }
+    
+    // Populate form with current user data
+    document.getElementById('profileUsername').value = currentUser.username;
+    document.getElementById('profileEmail').value = currentUser.email;
+    document.getElementById('profileBio').value = currentUser.bio || '';
+    document.getElementById('profileAvatar').src = currentUser.avatar;
+    
+    document.getElementById('profileModal').classList.add('active');
+    document.body.style.overflow = 'hidden';
+}
+
+function hideProfileModal() {
+    document.getElementById('profileModal').classList.remove('active');
+    document.body.style.overflow = '';
+}
+
+async function handleProfileUpdate(e) {
+    e.preventDefault();
+    
+    const username = document.getElementById('profileUsername').value;
+    const email = document.getElementById('profileEmail').value;
+    const bio = document.getElementById('profileBio').value;
+    
+    try {
+        const response = await fetch(`/api/user/profile/${currentUser.id}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ username, email, bio, avatar: currentUser.avatar })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            currentUser = data.user;
+            localStorage.setItem('currentUser', JSON.stringify(currentUser));
+            updateAuthUI();
+            hideProfileModal();
+            showToast('Profile updated successfully!', 'success');
+        } else {
+            showToast(data.error || 'Profile update failed', 'error');
+        }
+    } catch (error) {
+        console.error('Profile update error:', error);
+        showToast('Profile update failed', 'error');
+    }
+}
+
+function handleAvatarUpload(e) {
+    const file = e.target.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            currentUser.avatar = e.target.result;
+            document.getElementById('profileAvatar').src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    }
 }
 
 // Navigation functions
 function navigateToSection(section) {
-    // Check authentication for protected sections
-    if ((section === 'favorites' || section === 'watch-history' || section === 'playlists' || section === 'subscriptions') && !isAuthenticated) {
-        showToast('Please login to access this feature', 'warning');
-        showAuthModal('login');
-        return;
-    }
-    
     currentSection = section;
     currentPage = 1;
     hasMore = true;
@@ -386,11 +395,11 @@ function navigateToSection(section) {
             break;
         case 'playlists':
             showPlaylistsGrid();
-            loadAndDisplayPlaylists();
+            loadUserPlaylists();
             break;
         case 'subscriptions':
             showVideoGrid();
-            loadSubscriptionVideos();
+            loadSubscriptions();
             break;
         case 'favorites':
             currentFilters = { ...currentFilters, favorites: true, celebrity: '', category: '' };
@@ -500,12 +509,12 @@ function performSearch() {
     const query = document.getElementById('searchInput').value.trim();
     if (query) {
         currentFilters.search = query;
-        currentFilters.celebrity = '';
-        currentFilters.category = '';
         currentPage = 1;
         hasMore = true;
         
+        // Add to search history
         addToSearchHistory(query);
+        
         navigateToSection('home');
         hideSearchSuggestions();
     }
@@ -585,25 +594,16 @@ function getSuggestionIcon(type) {
 
 function applySuggestion(type, value, text) {
     if (type === 'celebrity') {
-        currentFilters.celebrity = value;
-        currentFilters.search = '';
-        currentFilters.category = '';
-        document.getElementById('searchInput').value = text;
+        handlePerformerClick(null, value);
     } else if (type === 'category') {
-        currentFilters.category = value;
-        currentFilters.search = '';
-        currentFilters.celebrity = '';
-        document.getElementById('searchInput').value = text;
+        handleCategoryClick(null, value);
     } else {
         currentFilters.search = text;
-        currentFilters.celebrity = '';
-        currentFilters.category = '';
         document.getElementById('searchInput').value = text;
+        currentPage = 1;
+        hasMore = true;
+        navigateToSection('home');
     }
-    
-    currentPage = 1;
-    hasMore = true;
-    navigateToSection('home');
     hideSearchSuggestions();
 }
 
@@ -666,6 +666,7 @@ function handleCategoryClick(event, category) {
     
     console.log('Filtering by category:', category);
     
+    // Clear other filters and set category
     currentFilters = {
         search: '',
         celebrity: '',
@@ -674,16 +675,22 @@ function handleCategoryClick(event, category) {
         favorites: false
     };
     
+    // Clear search input and update UI
     document.getElementById('searchInput').value = '';
+    
+    // Update content header to show filtered content
     document.getElementById('contentTitle').textContent = `Category: ${formatCategoryName(category)}`;
     document.getElementById('contentBreadcrumb').innerHTML = `Home / Categories / ${formatCategoryName(category)}`;
     
+    // Reset pagination and load filtered videos
     currentPage = 1;
     hasMore = true;
     
+    // Show video grid and load filtered videos
     showVideoGrid();
     loadVideos(true);
     
+    // Show success message
     showToast(`Showing videos in category: ${formatCategoryName(category)}`, 'success');
 }
 
@@ -695,6 +702,7 @@ function handlePerformerClick(event, performer) {
     
     console.log('Filtering by performer:', performer);
     
+    // Clear other filters and set performer
     currentFilters = {
         search: '',
         celebrity: performer,
@@ -703,16 +711,22 @@ function handlePerformerClick(event, performer) {
         favorites: false
     };
     
+    // Clear search input and update UI
     document.getElementById('searchInput').value = '';
+    
+    // Update content header to show filtered content
     document.getElementById('contentTitle').textContent = `Performer: ${formatPerformerName(performer)}`;
     document.getElementById('contentBreadcrumb').innerHTML = `Home / Performers / ${formatPerformerName(performer)}`;
     
+    // Reset pagination and load filtered videos
     currentPage = 1;
     hasMore = true;
     
+    // Show video grid and load filtered videos
     showVideoGrid();
     loadVideos(true);
     
+    // Show success message
     showToast(`Showing videos by: ${formatPerformerName(performer)}`, 'success');
 }
 
@@ -729,15 +743,6 @@ function formatPerformerName(performer) {
                    .split(' ')
                    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
                    .join(' ');
-}
-
-// Legacy filter functions for backward compatibility
-function filterByCategory(event, category) {
-    handleCategoryClick(event, category);
-}
-
-function filterByPerformer(event, performer) {
-    handlePerformerClick(event, performer);
 }
 
 // Data loading functions
@@ -856,58 +861,47 @@ async function loadWatchHistory() {
     }
 }
 
-async function loadSubscriptionVideos() {
+async function loadSubscriptions() {
+    if (!isAuthenticated) {
+        showNoResults('Login Required', 'Please login to view your subscriptions');
+        return;
+    }
+    
     if (isLoading) return;
     
     isLoading = true;
     showLoadingIndicator();
     
     try {
-        if (userSubscriptions.size === 0) {
-            showNoResults('No subscriptions found', 'Subscribe to performers to see their latest videos here');
-            return;
-        }
+        // Get user's subscriptions
+        const subscriptionsResponse = await fetch(`/api/subscriptions/${currentUser.id}`);
+        const subscriptionsData = await subscriptionsResponse.json();
         
-        // Get videos from subscribed performers
-        const subscribedPerformers = [...userSubscriptions];
-        const allVideos = [];
-        
-        for (const performer of subscribedPerformers) {
-            const params = new URLSearchParams({
-                page: 1,
-                limit: 50,
-                celebrity: performer,
-                sort: 'newest'
-            });
+        if (subscriptionsData.subscriptions && subscriptionsData.subscriptions.length > 0) {
+            // Load videos from subscribed performers
+            const allVideos = [];
             
-            const response = await fetch(`/api/videos?${params}`);
-            const data = await response.json();
-            
-            if (data.videos) {
-                allVideos.push(...data.videos);
+            for (const performer of subscriptionsData.subscriptions) {
+                const videosResponse = await fetch(`/api/videos?celebrity=${performer.name}&limit=10`);
+                const videosData = await videosResponse.json();
+                allVideos.push(...videosData.videos);
             }
+            
+            // Sort by newest first
+            allVideos.sort((a, b) => new Date(b.uploadDate) - new Date(a.uploadDate));
+            
+            if (allVideos.length > 0) {
+                displayVideos(allVideos, true);
+                updateVideoCount(allVideos.length);
+            } else {
+                showNoResults('No videos from subscriptions', 'Your subscribed performers haven\'t uploaded any videos yet');
+            }
+        } else {
+            showNoResults('No subscriptions', 'Subscribe to performers to see their latest videos here');
         }
-        
-        // Sort by newest
-        allVideos.sort((a, b) => new Date(b.uploadDate) - new Date(a.uploadDate));
-        
-        // Paginate
-        const startIndex = (currentPage - 1) * 20;
-        const endIndex = startIndex + 20;
-        const paginatedVideos = allVideos.slice(startIndex, endIndex);
-        
-        if (paginatedVideos.length > 0) {
-            displayVideos(paginatedVideos, currentPage === 1);
-            hasMore = endIndex < allVideos.length;
-            updateVideoCount(allVideos.length);
-        } else if (currentPage === 1) {
-            showNoResults('No videos from subscriptions', 'Your subscribed performers haven\'t uploaded any videos yet');
-        }
-        
-        currentPage++;
     } catch (error) {
-        console.error('Error loading subscription videos:', error);
-        showToast('Failed to load subscription videos', 'error');
+        console.error('Error loading subscriptions:', error);
+        showToast('Failed to load subscriptions', 'error');
     } finally {
         isLoading = false;
         hideLoadingIndicator();
@@ -951,16 +945,425 @@ async function loadAndDisplayPerformers() {
     }
 }
 
-async function loadAndDisplayPlaylists() {
+// Subscription functions
+async function handleSubscribe(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (!isAuthenticated) {
+        showToast('Please login to subscribe', 'error');
+        return;
+    }
+    
+    const performerName = document.getElementById('modalVideoPerformer').textContent;
+    const btn = document.getElementById('subscribeBtn');
+    const isSubscribed = btn.classList.contains('active');
+    
+    try {
+        if (isSubscribed) {
+            // Unsubscribe
+            const response = await fetch(`/api/subscriptions/${performerName}?userId=${currentUser.id}`, {
+                method: 'DELETE'
+            });
+            
+            if (response.ok) {
+                btn.classList.remove('active');
+                btn.innerHTML = '<i class="fas fa-bell"></i><span>Subscribe</span>';
+                showToast('Unsubscribed successfully', 'success');
+            }
+        } else {
+            // Subscribe
+            const response = await fetch(`/api/subscriptions/${performerName}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ userId: currentUser.id })
+            });
+            
+            if (response.ok) {
+                btn.classList.add('active');
+                btn.innerHTML = '<i class="fas fa-bell-slash"></i><span>Unsubscribe</span>';
+                showToast('Subscribed successfully', 'success');
+            }
+        }
+    } catch (error) {
+        console.error('Subscription error:', error);
+        showToast('Failed to update subscription', 'error');
+    }
+}
+
+async function handlePerformerSubscribe(e, performerName) {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (!isAuthenticated) {
+        showToast('Please login to subscribe', 'error');
+        return;
+    }
+    
+    const btn = e.target;
+    const isSubscribed = btn.classList.contains('subscribed');
+    
+    try {
+        if (isSubscribed) {
+            // Unsubscribe
+            const response = await fetch(`/api/subscriptions/${performerName}?userId=${currentUser.id}`, {
+                method: 'DELETE'
+            });
+            
+            if (response.ok) {
+                btn.classList.remove('subscribed');
+                btn.innerHTML = '<i class="fas fa-bell"></i> Subscribe';
+                showToast('Unsubscribed successfully', 'success');
+            }
+        } else {
+            // Subscribe
+            const response = await fetch(`/api/subscriptions/${performerName}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ userId: currentUser.id })
+            });
+            
+            if (response.ok) {
+                btn.classList.add('subscribed');
+                btn.innerHTML = '<i class="fas fa-bell-slash"></i> Unsubscribe';
+                showToast('Subscribed successfully', 'success');
+            }
+        }
+    } catch (error) {
+        console.error('Subscription error:', error);
+        showToast('Failed to update subscription', 'error');
+    }
+}
+
+// Playlist functions
+async function loadUserPlaylists() {
+    if (!isAuthenticated) {
+        showPlaylistsAuthRequired();
+        return;
+    }
+    
     try {
         showLoadingIndicator();
-        displayPlaylists(userPlaylists);
+        const response = await fetch(`/api/playlists/${currentUser.id}`);
+        const data = await response.json();
+        displayPlaylists(data.playlists);
     } catch (error) {
         console.error('Error loading playlists:', error);
         showToast('Failed to load playlists', 'error');
     } finally {
         hideLoadingIndicator();
     }
+}
+
+function showCreatePlaylistModal() {
+    if (!isAuthenticated) {
+        showToast('Please login to create playlists', 'error');
+        return;
+    }
+    
+    document.getElementById('playlistModalTitle').textContent = 'Create New Playlist';
+    document.getElementById('newPlaylistName').value = '';
+    document.getElementById('playlistModal').classList.add('active');
+    document.body.style.overflow = 'hidden';
+}
+
+function showPlaylistModal() {
+    if (!isAuthenticated) {
+        showToast('Please login to add to playlists', 'error');
+        return;
+    }
+    
+    document.getElementById('playlistModalTitle').textContent = 'Add to Playlist';
+    loadExistingPlaylists();
+    document.getElementById('playlistModal').classList.add('active');
+    document.body.style.overflow = 'hidden';
+}
+
+function hidePlaylistModal() {
+    document.getElementById('playlistModal').classList.remove('active');
+    document.body.style.overflow = '';
+}
+
+async function handleCreatePlaylist() {
+    const name = document.getElementById('newPlaylistName').value.trim();
+    
+    if (!name) {
+        showToast('Please enter a playlist name', 'error');
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/playlists', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                name,
+                userId: currentUser.id,
+                description: '',
+                isPrivate: false
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            document.getElementById('newPlaylistName').value = '';
+            showToast('Playlist created successfully!', 'success');
+            
+            // If we're adding a video to playlist, add it to the new playlist
+            if (currentVideoId) {
+                await addVideoToPlaylist(data.playlist.id);
+            }
+            
+            // Refresh playlists if we're on the playlists page
+            if (currentSection === 'playlists') {
+                loadUserPlaylists();
+            }
+        } else {
+            showToast(data.error || 'Failed to create playlist', 'error');
+        }
+    } catch (error) {
+        console.error('Create playlist error:', error);
+        showToast('Failed to create playlist', 'error');
+    }
+}
+
+async function loadExistingPlaylists() {
+    try {
+        const response = await fetch(`/api/playlists/${currentUser.id}`);
+        const data = await response.json();
+        
+        const container = document.getElementById('existingPlaylists');
+        
+        if (data.playlists && data.playlists.length > 0) {
+            container.innerHTML = data.playlists.map(playlist => `
+                <div class="playlist-item">
+                    <div class="playlist-info">
+                        <div class="playlist-name">${playlist.name}</div>
+                        <div class="playlist-count">${playlist.videos.length} videos</div>
+                    </div>
+                    <button class="add-to-playlist-btn" onclick="addVideoToPlaylist('${playlist.id}')">
+                        <i class="fas fa-plus"></i>
+                        Add
+                    </button>
+                </div>
+            `).join('');
+        } else {
+            container.innerHTML = '<div class="no-playlists">No playlists found. Create one above!</div>';
+        }
+    } catch (error) {
+        console.error('Error loading playlists:', error);
+    }
+}
+
+async function addVideoToPlaylist(playlistId) {
+    if (!currentVideoId) {
+        showToast('No video selected', 'error');
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/playlists/${playlistId}/videos`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                videoId: currentVideoId,
+                userId: currentUser.id
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            showToast('Video added to playlist!', 'success');
+            hidePlaylistModal();
+        } else {
+            showToast(data.error || 'Failed to add video to playlist', 'error');
+        }
+    } catch (error) {
+        console.error('Add to playlist error:', error);
+        showToast('Failed to add video to playlist', 'error');
+    }
+}
+
+async function loadPlaylistVideos(playlistId) {
+    try {
+        showLoadingIndicator();
+        const response = await fetch(`/api/playlists/${playlistId}/videos`);
+        const data = await response.json();
+        
+        if (data.videos && data.videos.length > 0) {
+            // Update content header
+            document.getElementById('contentTitle').textContent = `Playlist: ${data.playlist.name}`;
+            document.getElementById('contentBreadcrumb').innerHTML = `Home / Playlists / ${data.playlist.name}`;
+            
+            // Show videos
+            showVideoGrid();
+            displayVideos(data.videos, true);
+            updateVideoCount(data.total);
+        } else {
+            showNoResults('Empty Playlist', 'This playlist doesn\'t have any videos yet');
+        }
+    } catch (error) {
+        console.error('Error loading playlist videos:', error);
+        showToast('Failed to load playlist videos', 'error');
+    } finally {
+        hideLoadingIndicator();
+    }
+}
+
+async function deletePlaylist(playlistId) {
+    if (!confirm('Are you sure you want to delete this playlist?')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/playlists/${playlistId}?userId=${currentUser.id}`, {
+            method: 'DELETE'
+        });
+        
+        if (response.ok) {
+            showToast('Playlist deleted successfully', 'success');
+            loadUserPlaylists();
+        } else {
+            showToast('Failed to delete playlist', 'error');
+        }
+    } catch (error) {
+        console.error('Delete playlist error:', error);
+        showToast('Failed to delete playlist', 'error');
+    }
+}
+
+// Video interaction functions
+async function handleVideoLike(action) {
+    if (!isAuthenticated) {
+        showToast('Please login to like videos', 'error');
+        return;
+    }
+    
+    if (!currentVideoId) return;
+    
+    try {
+        const response = await fetch(`/api/videos/${currentVideoId}/like`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                userId: currentUser.id,
+                action: action
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            // Update UI
+            document.getElementById('modalLikeCount').textContent = data.likes;
+            document.getElementById('modalDislikeCount').textContent = data.dislikes;
+            
+            // Update button states
+            const likeBtn = document.getElementById('modalLikeBtn');
+            const dislikeBtn = document.getElementById('modalDislikeBtn');
+            
+            likeBtn.classList.remove('active');
+            dislikeBtn.classList.remove('active');
+            
+            if (data.userAction === 'like') {
+                likeBtn.classList.add('active');
+            } else if (data.userAction === 'dislike') {
+                dislikeBtn.classList.add('active');
+            }
+            
+            showToast(`Video ${action}d!`, 'success');
+        } else {
+            showToast(data.error || 'Failed to update like', 'error');
+        }
+    } catch (error) {
+        console.error('Like error:', error);
+        showToast('Failed to update like', 'error');
+    }
+}
+
+function toggleVideoFavorite() {
+    if (!currentVideoId) return;
+    
+    const btn = document.getElementById('modalFavBtn');
+    const isFavorite = btn.classList.contains('active');
+    
+    const method = isFavorite ? 'DELETE' : 'POST';
+    const url = `/api/favorites/${currentVideoId}`;
+    
+    fetch(url, { method })
+        .then(response => response.json())
+        .then(data => {
+            btn.classList.toggle('active');
+            const action = isFavorite ? 'removed from' : 'added to';
+            showToast(`Video ${action} favorites`, 'success');
+            updateFavoritesCount();
+        })
+        .catch(error => {
+            console.error('Error toggling favorite:', error);
+            showToast('Failed to update favorites', 'error');
+        });
+}
+
+function rateVideo(rating) {
+    if (!isAuthenticated) {
+        showToast('Please login to rate videos', 'error');
+        return;
+    }
+    
+    if (!currentVideoId) return;
+    
+    fetch(`/api/rate/${currentVideoId}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ rating })
+    })
+    .then(response => response.json())
+    .then(data => {
+        // Update star display
+        document.querySelectorAll('#starRating i').forEach((star, index) => {
+            if (index < rating) {
+                star.classList.add('active');
+            } else {
+                star.classList.remove('active');
+            }
+        });
+        
+        showToast(`Rated ${rating} stars!`, 'success');
+    })
+    .catch(error => {
+        console.error('Rating error:', error);
+        showToast('Failed to rate video', 'error');
+    });
+}
+
+function highlightStars(rating) {
+    document.querySelectorAll('#starRating i').forEach((star, index) => {
+        if (index < rating) {
+            star.classList.add('highlighted');
+        } else {
+            star.classList.remove('highlighted');
+        }
+    });
+}
+
+function resetStars() {
+    document.querySelectorAll('#starRating i').forEach(star => {
+        star.classList.remove('highlighted');
+    });
 }
 
 // Video hover preview functionality
@@ -974,6 +1377,7 @@ function setupVideoHoverPreview(card, video) {
     const startPreview = () => {
         if (previewVideo || !isHovering) return;
         
+        // Create video element for preview
         previewVideo = document.createElement('video');
         previewVideo.className = 'hover-preview-video';
         previewVideo.muted = true;
@@ -981,19 +1385,23 @@ function setupVideoHoverPreview(card, video) {
         previewVideo.preload = 'metadata';
         previewVideo.style.opacity = '0';
         
+        // Set video source
         previewVideo.src = `/api/video-stream/${video.id}#t=10`;
         
+        // Add to thumbnail
         thumbnail.appendChild(previewVideo);
         
+        // Start playing when loaded
         previewVideo.addEventListener('loadeddata', () => {
             if (isHovering && previewVideo) {
-                previewVideo.currentTime = 10;
+                previewVideo.currentTime = 10; // Start at 10 seconds
                 previewVideo.play().then(() => {
                     if (previewVideo && isHovering) {
                         previewVideo.style.opacity = '1';
                         img.style.opacity = '0';
                     }
                 }).catch(() => {
+                    // Fallback if autoplay fails
                     if (previewVideo) {
                         previewVideo.remove();
                         previewVideo = null;
@@ -1002,6 +1410,7 @@ function setupVideoHoverPreview(card, video) {
             }
         });
         
+        // Handle errors
         previewVideo.addEventListener('error', () => {
             if (previewVideo) {
                 previewVideo.remove();
@@ -1019,18 +1428,23 @@ function setupVideoHoverPreview(card, video) {
         img.style.opacity = '1';
     };
     
+    // Mouse enter event
     card.addEventListener('mouseenter', () => {
         isHovering = true;
         clearTimeout(hoverPreviewTimeout);
+        
+        // Start preview after a short delay
         hoverPreviewTimeout = setTimeout(startPreview, 800);
     });
     
+    // Mouse leave event
     card.addEventListener('mouseleave', () => {
         isHovering = false;
         clearTimeout(hoverPreviewTimeout);
         stopPreview();
     });
     
+    // Cleanup on card removal
     const observer = new MutationObserver((mutations) => {
         mutations.forEach((mutation) => {
             mutation.removedNodes.forEach((node) => {
@@ -1056,6 +1470,8 @@ function displayVideos(videos, reset = false) {
     videos.forEach(video => {
         const videoCard = createVideoCard(video);
         container.appendChild(videoCard);
+        
+        // Setup hover preview for this card
         setupVideoHoverPreview(videoCard, video);
     });
 }
@@ -1092,6 +1508,10 @@ function createVideoCard(video) {
                 <span class="video-stat">
                     <i class="fas fa-eye"></i>
                     ${formatNumber(video.views)}
+                </span>
+                <span class="video-stat">
+                    <i class="fas fa-thumbs-up"></i>
+                    ${video.likes || 0}
                 </span>
                 <span class="video-stat">
                     <i class="fas fa-star"></i>
@@ -1154,9 +1574,12 @@ function displayPerformers(performers) {
     performers.forEach(performer => {
         const performerCard = document.createElement('div');
         performerCard.className = 'performer-card';
-        performerCard.onclick = () => handlePerformerClick(null, performer.name);
-        
-        const isSubscribed = userSubscriptions.has(performer.name);
+        performerCard.onclick = (e) => {
+            // Don't trigger if clicking on subscribe button
+            if (!e.target.closest('.performer-subscribe-btn')) {
+                handlePerformerClick(null, performer.name);
+            }
+        };
         
         performerCard.innerHTML = `
             <div class="performer-avatar">
@@ -1169,10 +1592,8 @@ function displayPerformers(performers) {
                 <h3 class="performer-name">${performer.displayName}</h3>
                 <p class="performer-video-count">${performer.videoCount} videos</p>
                 ${isAuthenticated ? `
-                    <button class="performer-subscribe-btn ${isSubscribed ? 'subscribed' : ''}" 
-                            onclick="togglePerformerSubscription(event, '${performer.name}')">
-                        <i class="fas ${isSubscribed ? 'fa-bell-slash' : 'fa-bell'}"></i>
-                        ${isSubscribed ? 'Unsubscribe' : 'Subscribe'}
+                    <button class="performer-subscribe-btn" onclick="handlePerformerSubscribe(event, '${performer.name}')">
+                        <i class="fas fa-bell"></i> Subscribe
                     </button>
                 ` : ''}
             </div>
@@ -1186,30 +1607,15 @@ function displayPlaylists(playlists) {
     const container = document.getElementById('playlistsGrid');
     container.innerHTML = '';
     
-    if (!isAuthenticated) {
-        container.innerHTML = `
-            <div class="auth-required">
-                <i class="fas fa-lock"></i>
-                <h3>Login Required</h3>
-                <p>Please login to view and manage your playlists.</p>
-                <button class="auth-btn login-btn" onclick="showAuthModal('login')">
-                    <i class="fas fa-sign-in-alt"></i>
-                    Login
-                </button>
-            </div>
-        `;
-        return;
-    }
-    
     if (!playlists || playlists.length === 0) {
         container.innerHTML = `
             <div class="no-playlists-message">
                 <i class="fas fa-list"></i>
                 <h3>No Playlists Found</h3>
-                <p>You haven't created any playlists yet. Create your first playlist to organize your favorite videos.</p>
-                <button class="create-playlist-btn" onclick="showCreatePlaylistModal()">
+                <p>You haven't created any playlists yet.</p>
+                <button class="auth-submit-btn" onclick="showCreatePlaylistModal()">
                     <i class="fas fa-plus"></i>
-                    Create Playlist
+                    Create Your First Playlist
                 </button>
             </div>
         `;
@@ -1219,7 +1625,7 @@ function displayPlaylists(playlists) {
     playlists.forEach(playlist => {
         const playlistCard = document.createElement('div');
         playlistCard.className = 'playlist-card';
-        playlistCard.onclick = () => openPlaylist(playlist.id);
+        playlistCard.onclick = () => loadPlaylistVideos(playlist.id);
         
         playlistCard.innerHTML = `
             <div class="playlist-thumbnail">
@@ -1230,19 +1636,19 @@ function displayPlaylists(playlists) {
                 <h3 class="playlist-name">${playlist.name}</h3>
                 <p class="playlist-description">${playlist.description || 'No description'}</p>
                 <div class="playlist-meta">
-                    <span class="playlist-created">Created ${formatDate(playlist.createdAt)}</span>
-                    <div class="playlist-privacy">
+                    <span class="playlist-privacy">
                         <i class="fas ${playlist.isPrivate ? 'fa-lock' : 'fa-globe'}"></i>
                         ${playlist.isPrivate ? 'Private' : 'Public'}
-                    </div>
+                    </span>
+                    <span>${new Date(playlist.createdAt).toLocaleDateString()}</span>
                 </div>
             </div>
             <div class="playlist-actions">
-                <button class="playlist-action-btn" onclick="editPlaylist(event, '${playlist.id}')">
-                    <i class="fas fa-edit"></i>
-                    Edit
+                <button class="playlist-action-btn" onclick="event.stopPropagation(); loadPlaylistVideos('${playlist.id}')">
+                    <i class="fas fa-play"></i>
+                    Play
                 </button>
-                <button class="playlist-action-btn" onclick="deletePlaylist(event, '${playlist.id}')">
+                <button class="playlist-action-btn" onclick="event.stopPropagation(); deletePlaylist('${playlist.id}')">
                     <i class="fas fa-trash"></i>
                     Delete
                 </button>
@@ -1251,6 +1657,21 @@ function displayPlaylists(playlists) {
         
         container.appendChild(playlistCard);
     });
+}
+
+function showPlaylistsAuthRequired() {
+    const container = document.getElementById('playlistsGrid');
+    container.innerHTML = `
+        <div class="auth-required">
+            <i class="fas fa-lock"></i>
+            <h3>Login Required</h3>
+            <p>Please login to view and manage your playlists.</p>
+            <button class="auth-submit-btn" onclick="showAuthModal('login')">
+                <i class="fas fa-sign-in-alt"></i>
+                Login Now
+            </button>
+        </div>
+    `;
 }
 
 function displayMobileCategories(categories) {
@@ -1327,11 +1748,6 @@ function formatNumber(num) {
     return num.toString();
 }
 
-function formatDate(dateString) {
-    const date = new Date(dateString);
-    return date.toLocaleDateString();
-}
-
 function updateVideoCount(count) {
     document.getElementById('videoCount').textContent = `${formatNumber(count)} videos`;
 }
@@ -1355,12 +1771,6 @@ function toggleFavorite(event, videoId) {
     event.preventDefault();
     event.stopPropagation();
     
-    if (!isAuthenticated) {
-        showToast('Please login to add favorites', 'warning');
-        showAuthModal('login');
-        return;
-    }
-    
     const btn = event.target.closest('.video-favorite-btn');
     const isCurrentlyFavorite = btn.classList.contains('active');
     
@@ -1373,38 +1783,8 @@ function toggleFavorite(event, videoId) {
             btn.classList.toggle('active');
             const action = isCurrentlyFavorite ? 'removed from' : 'added to';
             showToast(`Video ${action} favorites`, 'success');
-            updateFavoritesCount();
-        })
-        .catch(error => {
-            console.error('Error toggling favorite:', error);
-            showToast('Failed to update favorites', 'error');
-        });
-}
-
-function toggleFavoriteInModal(videoId, isFavorite) {
-    if (!isAuthenticated) {
-        showToast('Please login to add favorites', 'warning');
-        showAuthModal('login');
-        return;
-    }
-    
-    const method = isFavorite ? 'POST' : 'DELETE';
-    const url = `/api/favorites/${videoId}`;
-    
-    fetch(url, { method })
-        .then(response => response.json())
-        .then(data => {
-            const btn = document.getElementById('modalFavBtn');
-            btn.classList.toggle('active', isFavorite);
             
-            // Update the heart button in video overlay too
-            const overlayBtn = document.getElementById('modalFavoriteBtn');
-            if (overlayBtn) {
-                overlayBtn.classList.toggle('active', isFavorite);
-            }
-            
-            const action = isFavorite ? 'added to' : 'removed from';
-            showToast(`Video ${action} favorites`, 'success');
+            // Update favorites count in dropdown
             updateFavoritesCount();
         })
         .catch(error => {
@@ -1422,152 +1802,11 @@ function updateFavoritesCount() {
         .catch(console.error);
 }
 
-// Subscription functions
-function toggleSubscription() {
-    if (!isAuthenticated) {
-        showToast('Please login to subscribe', 'warning');
-        showAuthModal('login');
-        return;
-    }
-    
-    const btn = document.getElementById('subscribeBtn');
-    const performer = document.getElementById('modalVideoPerformer').textContent;
-    const isSubscribed = userSubscriptions.has(performer);
-    
-    if (isSubscribed) {
-        userSubscriptions.delete(performer);
-        btn.classList.remove('active');
-        btn.innerHTML = '<i class="fas fa-bell"></i><span>Subscribe</span>';
-        showToast(`Unsubscribed from ${performer}`, 'success');
-    } else {
-        userSubscriptions.add(performer);
-        btn.classList.add('active');
-        btn.innerHTML = '<i class="fas fa-bell-slash"></i><span>Subscribed</span>';
-        showToast(`Subscribed to ${performer}`, 'success');
-    }
-    
-    saveUserData();
-}
-
-function togglePerformerSubscription(event, performer) {
-    event.preventDefault();
-    event.stopPropagation();
-    
-    if (!isAuthenticated) {
-        showToast('Please login to subscribe', 'warning');
-        showAuthModal('login');
-        return;
-    }
-    
-    const btn = event.target.closest('.performer-subscribe-btn');
-    const isSubscribed = userSubscriptions.has(performer);
-    
-    if (isSubscribed) {
-        userSubscriptions.delete(performer);
-        btn.classList.remove('subscribed');
-        btn.innerHTML = '<i class="fas fa-bell"></i>Subscribe';
-        showToast(`Unsubscribed from ${formatPerformerName(performer)}`, 'success');
-    } else {
-        userSubscriptions.add(performer);
-        btn.classList.add('subscribed');
-        btn.innerHTML = '<i class="fas fa-bell-slash"></i>Unsubscribe';
-        showToast(`Subscribed to ${formatPerformerName(performer)}`, 'success');
-    }
-    
-    saveUserData();
-}
-
-// Like/Dislike functions
-function toggleLike(videoId) {
-    if (!isAuthenticated) {
-        showToast('Please login to rate videos', 'warning');
-        showAuthModal('login');
-        return;
-    }
-    
-    const likeBtn = document.getElementById('modalLikeBtn');
-    const dislikeBtn = document.getElementById('modalDislikeBtn');
-    const isLiked = likeBtn.classList.contains('active');
-    
-    if (isLiked) {
-        likeBtn.classList.remove('active');
-        showToast('Like removed', 'success');
-    } else {
-        likeBtn.classList.add('active');
-        dislikeBtn.classList.remove('active');
-        showToast('Video liked!', 'success');
-    }
-}
-
-function toggleDislike(videoId) {
-    if (!isAuthenticated) {
-        showToast('Please login to rate videos', 'warning');
-        showAuthModal('login');
-        return;
-    }
-    
-    const likeBtn = document.getElementById('modalLikeBtn');
-    const dislikeBtn = document.getElementById('modalDislikeBtn');
-    const isDisliked = dislikeBtn.classList.contains('active');
-    
-    if (isDisliked) {
-        dislikeBtn.classList.remove('active');
-        showToast('Dislike removed', 'success');
-    } else {
-        dislikeBtn.classList.add('active');
-        likeBtn.classList.remove('active');
-        showToast('Video disliked', 'success');
-    }
-}
-
-// Rating functions
-function rateVideo(videoId, rating) {
-    if (!isAuthenticated) {
-        showToast('Please login to rate videos', 'warning');
-        showAuthModal('login');
-        return;
-    }
-    
-    fetch(`/api/rate/${videoId}`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ rating })
-    })
-    .then(response => response.json())
-    .then(data => {
-        updateStarRating(rating);
-        showToast(`Rated ${rating} stars`, 'success');
-    })
-    .catch(error => {
-        console.error('Error rating video:', error);
-        showToast('Failed to rate video', 'error');
-    });
-}
-
-function highlightStars(rating) {
-    document.querySelectorAll('#starRating i').forEach((star, index) => {
-        star.classList.toggle('highlighted', index < rating);
-    });
-}
-
-function resetStars() {
-    document.querySelectorAll('#starRating i').forEach(star => {
-        star.classList.remove('highlighted');
-    });
-}
-
-function updateStarRating(rating) {
-    document.querySelectorAll('#starRating i').forEach((star, index) => {
-        star.classList.toggle('active', index < rating);
-    });
-}
-
 // Video modal functions
-function openVideoModal(video) {
+async function openVideoModal(video) {
     currentVideoId = video.id;
     
+    // Update modal content
     document.getElementById('modalVideoTitle').textContent = video.title;
     document.getElementById('modalVideoPerformer').textContent = video.artist;
     document.getElementById('modalVideoViews').textContent = formatNumber(video.views);
@@ -1575,38 +1814,58 @@ function openVideoModal(video) {
     document.getElementById('modalVideoDuration').textContent = video.duration || 'Unknown';
     document.getElementById('modalVideoQuality').textContent = video.quality || 'HD';
     
+    // Update video source
     const videoElement = document.getElementById('modalVideo');
     videoElement.src = `/api/video-stream/${video.id}`;
     
+    // Update categories
     const categoriesContainer = document.getElementById('modalVideoCategories');
     categoriesContainer.innerHTML = video.categories.map(cat => 
         `<span class="category-tag" onclick="handleCategoryClick(event, '${cat}')">${cat}</span>`
     ).join('');
     
-    const favoriteBtn = document.getElementById('modalFavBtn');
+    // Update favorite button
+    const favoriteBtn = document.getElementById('modalFavoriteBtn');
     favoriteBtn.classList.toggle('active', video.isFavorite);
+    favoriteBtn.onclick = (e) => toggleFavorite(e, video.id);
     
-    const overlayFavoriteBtn = document.getElementById('modalFavoriteBtn');
-    if (overlayFavoriteBtn) {
-        overlayFavoriteBtn.classList.toggle('active', video.isFavorite);
-    }
-    
-    // Update subscription button
+    // Update like/dislike counts and user actions
     if (isAuthenticated) {
-        const subscribeBtn = document.getElementById('subscribeBtn');
-        const isSubscribed = userSubscriptions.has(video.artist);
-        subscribeBtn.classList.toggle('active', isSubscribed);
-        subscribeBtn.innerHTML = isSubscribed ? 
-            '<i class="fas fa-bell-slash"></i><span>Subscribed</span>' : 
-            '<i class="fas fa-bell"></i><span>Subscribe</span>';
+        try {
+            const response = await fetch(`/api/videos/${video.id}/likes?userId=${currentUser.id}`);
+            const likesData = await response.json();
+            
+            document.getElementById('modalLikeCount').textContent = likesData.likes;
+            document.getElementById('modalDislikeCount').textContent = likesData.dislikes;
+            
+            const likeBtn = document.getElementById('modalLikeBtn');
+            const dislikeBtn = document.getElementById('modalDislikeBtn');
+            
+            likeBtn.classList.remove('active');
+            dislikeBtn.classList.remove('active');
+            
+            if (likesData.userAction === 'like') {
+                likeBtn.classList.add('active');
+            } else if (likesData.userAction === 'dislike') {
+                dislikeBtn.classList.add('active');
+            }
+        } catch (error) {
+            console.error('Error loading likes:', error);
+        }
+    } else {
+        document.getElementById('modalLikeCount').textContent = video.likes || 0;
+        document.getElementById('modalDislikeCount').textContent = video.dislikes || 0;
     }
     
+    // Show modal
     document.getElementById('videoModal').classList.add('active');
     document.body.style.overflow = 'hidden';
     
+    // Add to watch history
     addToWatchHistory(video.id);
+    
+    // Load related videos
     loadRelatedVideos(video);
-    loadComments();
 }
 
 function closeVideoModal() {
@@ -1616,38 +1875,12 @@ function closeVideoModal() {
     modal.classList.remove('active');
     document.body.style.overflow = '';
     
+    // Pause and reset video
     video.pause();
     video.currentTime = 0;
     video.src = '';
     
     currentVideoId = null;
-}
-
-function toggleFullscreen() {
-    const video = document.getElementById('modalVideo');
-    if (video.requestFullscreen) {
-        video.requestFullscreen();
-    } else if (video.webkitRequestFullscreen) {
-        video.webkitRequestFullscreen();
-    } else if (video.msRequestFullscreen) {
-        video.msRequestFullscreen();
-    }
-}
-
-function shareVideo() {
-    if (navigator.share && currentVideoId) {
-        navigator.share({
-            title: document.getElementById('modalVideoTitle').textContent,
-            url: window.location.href
-        }).catch(console.error);
-    } else {
-        // Fallback: copy to clipboard
-        navigator.clipboard.writeText(window.location.href).then(() => {
-            showToast('Link copied to clipboard', 'success');
-        }).catch(() => {
-            showToast('Failed to copy link', 'error');
-        });
-    }
 }
 
 function addToWatchHistory(videoId) {
@@ -1662,6 +1895,7 @@ function addToWatchHistory(videoId) {
 
 async function loadRelatedVideos(currentVideo) {
     try {
+        // Load videos from same performer or category
         const params = new URLSearchParams({
             page: 1,
             limit: 10,
@@ -1672,7 +1906,9 @@ async function loadRelatedVideos(currentVideo) {
         const response = await fetch(`/api/videos?${params}`);
         const data = await response.json();
         
+        // Filter out current video
         const relatedVideos = data.videos.filter(v => v.id !== currentVideo.id);
+        
         displayRelatedVideos(relatedVideos);
     } catch (error) {
         console.error('Error loading related videos:', error);
@@ -1704,6 +1940,7 @@ function displayRelatedVideos(videos) {
                     ${video.rating.toFixed(1)}
                 </div>
             </div>
+            
             <div class="related-video-info">
                 <h4 class="related-video-title">${video.title}</h4>
                 <p class="related-video-performer">${video.artist}</p>
@@ -1713,260 +1950,6 @@ function displayRelatedVideos(videos) {
         
         container.appendChild(videoCard);
     });
-}
-
-// Comment functions
-function loadComments() {
-    const videoId = currentVideoId;
-    if (!videoId) return;
-    
-    const comments = videoComments[videoId] || [];
-    displayComments(comments);
-    document.getElementById('commentCount').textContent = comments.length;
-}
-
-function displayComments(comments) {
-    const container = document.getElementById('commentsList');
-    container.innerHTML = '';
-    
-    if (comments.length === 0) {
-        container.innerHTML = '<p style="text-align: center; color: #666; padding: 20px;">No comments yet. Be the first to comment!</p>';
-        return;
-    }
-    
-    comments.forEach(comment => {
-        const commentElement = document.createElement('div');
-        commentElement.className = 'comment';
-        commentElement.innerHTML = `
-            <img src="${comment.avatar}" alt="${comment.author}" class="comment-avatar">
-            <div class="comment-content">
-                <div class="comment-header">
-                    <span class="comment-author">${comment.author}</span>
-                    <span class="comment-date">${formatDate(comment.date)}</span>
-                </div>
-                <p class="comment-text">${comment.text}</p>
-                <div class="comment-actions">
-                    <button class="comment-like-btn">
-                        <i class="fas fa-thumbs-up"></i>
-                        ${comment.likes || 0}
-                    </button>
-                    <button class="comment-dislike-btn">
-                        <i class="fas fa-thumbs-down"></i>
-                        ${comment.dislikes || 0}
-                    </button>
-                    <button class="comment-reply-btn">
-                        <i class="fas fa-reply"></i>
-                        Reply
-                    </button>
-                </div>
-            </div>
-        `;
-        container.appendChild(commentElement);
-    });
-}
-
-function submitComment() {
-    if (!isAuthenticated) {
-        showToast('Please login to comment', 'warning');
-        showAuthModal('login');
-        return;
-    }
-    
-    const input = document.getElementById('commentInput');
-    const text = input.value.trim();
-    
-    if (!text) {
-        showToast('Please enter a comment', 'warning');
-        return;
-    }
-    
-    const comment = {
-        id: Date.now().toString(),
-        author: currentUser.username,
-        avatar: currentUser.avatar || generateAvatar(currentUser.username),
-        text: text,
-        date: new Date().toISOString(),
-        likes: 0,
-        dislikes: 0
-    };
-    
-    if (!videoComments[currentVideoId]) {
-        videoComments[currentVideoId] = [];
-    }
-    
-    videoComments[currentVideoId].unshift(comment);
-    
-    input.value = '';
-    cancelComment();
-    loadComments();
-    
-    showToast('Comment added successfully', 'success');
-}
-
-function cancelComment() {
-    const input = document.getElementById('commentInput');
-    input.style.minHeight = '80px';
-    document.querySelector('.comment-actions').style.display = 'none';
-    input.blur();
-}
-
-function loadMoreComments() {
-    // Placeholder for loading more comments
-    showToast('No more comments to load', 'info');
-}
-
-// Playlist functions
-function showPlaylistModal(videoId) {
-    if (!isAuthenticated) {
-        showToast('Please login to create playlists', 'warning');
-        showAuthModal('login');
-        return;
-    }
-    
-    document.getElementById('playlistModal').classList.add('active');
-    document.body.style.overflow = 'hidden';
-    
-    displayExistingPlaylists(videoId);
-}
-
-function hidePlaylistModal() {
-    document.getElementById('playlistModal').classList.remove('active');
-    document.body.style.overflow = '';
-}
-
-function showCreatePlaylistModal() {
-    if (!isAuthenticated) {
-        showToast('Please login to create playlists', 'warning');
-        showAuthModal('login');
-        return;
-    }
-    
-    const name = prompt('Enter playlist name:');
-    if (name && name.trim()) {
-        createPlaylist(name.trim());
-    }
-}
-
-function createNewPlaylist() {
-    const input = document.getElementById('newPlaylistName');
-    const name = input.value.trim();
-    
-    if (!name) {
-        showToast('Please enter a playlist name', 'warning');
-        return;
-    }
-    
-    createPlaylist(name);
-    input.value = '';
-}
-
-function createPlaylist(name, description = '') {
-    const playlist = {
-        id: Date.now().toString(),
-        name: name,
-        description: description,
-        videos: [],
-        createdAt: new Date().toISOString(),
-        isPrivate: false
-    };
-    
-    userPlaylists.push(playlist);
-    saveUserData();
-    
-    showToast(`Playlist "${name}" created successfully`, 'success');
-    
-    if (currentSection === 'playlists') {
-        loadAndDisplayPlaylists();
-    }
-}
-
-function displayExistingPlaylists(videoId) {
-    const container = document.getElementById('existingPlaylists');
-    
-    if (userPlaylists.length === 0) {
-        container.innerHTML = '<p class="no-playlists">No playlists found. Create one above!</p>';
-        return;
-    }
-    
-    container.innerHTML = '';
-    
-    userPlaylists.forEach(playlist => {
-        const playlistItem = document.createElement('div');
-        playlistItem.className = 'playlist-item';
-        
-        const isVideoInPlaylist = playlist.videos.includes(videoId);
-        
-        playlistItem.innerHTML = `
-            <div class="playlist-info">
-                <div class="playlist-name">${playlist.name}</div>
-                <div class="playlist-count">${playlist.videos.length} videos</div>
-            </div>
-            <button class="add-to-playlist-btn ${isVideoInPlaylist ? 'added' : ''}" 
-                    onclick="toggleVideoInPlaylist('${playlist.id}', '${videoId}')">
-                <i class="fas ${isVideoInPlaylist ? 'fa-check' : 'fa-plus'}"></i>
-                ${isVideoInPlaylist ? 'Added' : 'Add'}
-            </button>
-        `;
-        
-        container.appendChild(playlistItem);
-    });
-}
-
-function toggleVideoInPlaylist(playlistId, videoId) {
-    const playlist = userPlaylists.find(p => p.id === playlistId);
-    if (!playlist) return;
-    
-    const videoIndex = playlist.videos.indexOf(videoId);
-    
-    if (videoIndex > -1) {
-        playlist.videos.splice(videoIndex, 1);
-        showToast(`Removed from "${playlist.name}"`, 'success');
-    } else {
-        playlist.videos.push(videoId);
-        showToast(`Added to "${playlist.name}"`, 'success');
-    }
-    
-    saveUserData();
-    displayExistingPlaylists(videoId);
-}
-
-function openPlaylist(playlistId) {
-    const playlist = userPlaylists.find(p => p.id === playlistId);
-    if (!playlist) return;
-    
-    // This would load and display videos from the playlist
-    showToast(`Opening playlist: ${playlist.name}`, 'info');
-}
-
-function editPlaylist(event, playlistId) {
-    event.preventDefault();
-    event.stopPropagation();
-    
-    const playlist = userPlaylists.find(p => p.id === playlistId);
-    if (!playlist) return;
-    
-    const newName = prompt('Enter new playlist name:', playlist.name);
-    if (newName && newName.trim() && newName !== playlist.name) {
-        playlist.name = newName.trim();
-        saveUserData();
-        loadAndDisplayPlaylists();
-        showToast('Playlist updated successfully', 'success');
-    }
-}
-
-function deletePlaylist(event, playlistId) {
-    event.preventDefault();
-    event.stopPropagation();
-    
-    const playlist = userPlaylists.find(p => p.id === playlistId);
-    if (!playlist) return;
-    
-    if (confirm(`Are you sure you want to delete "${playlist.name}"?`)) {
-        userPlaylists = userPlaylists.filter(p => p.id !== playlistId);
-        saveUserData();
-        loadAndDisplayPlaylists();
-        showToast('Playlist deleted successfully', 'success');
-    }
 }
 
 // Mobile navigation
@@ -1994,240 +1977,13 @@ function switchAuthModal(type) {
     showAuthModal(type);
 }
 
-function handleLogin(e) {
-    e.preventDefault();
-    
-    const email = document.getElementById('loginEmail').value.trim();
-    const password = document.getElementById('loginPassword').value;
-    
-    if (!email || !password) {
-        showToast('Please fill in all fields', 'warning');
-        return;
-    }
-    
-    // Simulate login (in real app, this would be an API call)
-    const users = JSON.parse(localStorage.getItem('users') || '[]');
-    const user = users.find(u => u.email === email && u.password === password);
-    
-    if (user) {
-        currentUser = user;
-        isAuthenticated = true;
-        localStorage.setItem('currentUser', JSON.stringify(user));
-        
-        updateAuthUI();
-        loadUserData();
-        hideAuthModal('login');
-        
-        showToast(`Welcome back, ${user.username}!`, 'success');
-    } else {
-        showToast('Invalid email or password', 'error');
-    }
-}
-
-function handleRegister(e) {
-    e.preventDefault();
-    
-    const username = document.getElementById('registerUsername').value.trim();
-    const email = document.getElementById('registerEmail').value.trim();
-    const password = document.getElementById('registerPassword').value;
-    const confirmPassword = document.getElementById('registerConfirmPassword').value;
-    
-    if (!username || !email || !password || !confirmPassword) {
-        showToast('Please fill in all fields', 'warning');
-        return;
-    }
-    
-    if (password !== confirmPassword) {
-        showToast('Passwords do not match', 'error');
-        return;
-    }
-    
-    if (password.length < 6) {
-        showToast('Password must be at least 6 characters', 'error');
-        return;
-    }
-    
-    // Check if user already exists
-    const users = JSON.parse(localStorage.getItem('users') || '[]');
-    if (users.find(u => u.email === email)) {
-        showToast('Email already registered', 'error');
-        return;
-    }
-    
-    if (users.find(u => u.username === username)) {
-        showToast('Username already taken', 'error');
-        return;
-    }
-    
-    // Create new user
-    const newUser = {
-        id: Date.now().toString(),
-        username: username,
-        email: email,
-        password: password,
-        avatar: generateAvatar(username),
-        bio: '',
-        createdAt: new Date().toISOString()
-    };
-    
-    users.push(newUser);
-    localStorage.setItem('users', JSON.stringify(users));
-    
-    // Auto-login
-    currentUser = newUser;
-    isAuthenticated = true;
-    localStorage.setItem('currentUser', JSON.stringify(newUser));
-    
-    updateAuthUI();
-    loadUserData();
-    hideAuthModal('register');
-    
-    showToast(`Welcome, ${username}! Your account has been created.`, 'success');
-}
-
-function handleLogout() {
-    currentUser = null;
-    isAuthenticated = false;
-    userPlaylists = [];
-    userSubscriptions = new Set();
-    
-    localStorage.removeItem('currentUser');
-    
-    updateAuthUI();
-    
-    // Redirect to home if on protected page
-    if (['favorites', 'watch-history', 'playlists', 'subscriptions'].includes(currentSection)) {
-        navigateToSection('home');
-    }
-    
-    showToast('Logged out successfully', 'success');
-}
-
 function toggleUserDropdown() {
     document.getElementById('userDropdown').classList.toggle('active');
 }
 
-// Profile functions
-function showProfileModal() {
-    if (!isAuthenticated) {
-        showToast('Please login to access profile', 'warning');
-        showAuthModal('login');
-        return;
-    }
-    
-    // Populate form with current user data
-    document.getElementById('profileUsername').value = currentUser.username;
-    document.getElementById('profileEmail').value = currentUser.email;
-    document.getElementById('profileBio').value = currentUser.bio || '';
-    document.getElementById('profileAvatar').src = currentUser.avatar || generateAvatar(currentUser.username);
-    
-    document.getElementById('profileModal').classList.add('active');
-    document.body.style.overflow = 'hidden';
-}
-
-function hideProfileModal() {
-    document.getElementById('profileModal').classList.remove('active');
-    document.body.style.overflow = '';
-}
-
-function handleProfileUpdate(e) {
-    e.preventDefault();
-    
-    const username = document.getElementById('profileUsername').value.trim();
-    const email = document.getElementById('profileEmail').value.trim();
-    const bio = document.getElementById('profileBio').value.trim();
-    
-    if (!username || !email) {
-        showToast('Username and email are required', 'warning');
-        return;
-    }
-    
-    // Check if username/email is taken by another user
-    const users = JSON.parse(localStorage.getItem('users') || '[]');
-    const existingUser = users.find(u => u.id !== currentUser.id && (u.username === username || u.email === email));
-    
-    if (existingUser) {
-        showToast('Username or email already taken', 'error');
-        return;
-    }
-    
-    // Update current user
-    currentUser.username = username;
-    currentUser.email = email;
-    currentUser.bio = bio;
-    
-    // Update in users array
-    const userIndex = users.findIndex(u => u.id === currentUser.id);
-    if (userIndex > -1) {
-        users[userIndex] = currentUser;
-        localStorage.setItem('users', JSON.stringify(users));
-    }
-    
-    localStorage.setItem('currentUser', JSON.stringify(currentUser));
-    
-    updateAuthUI();
-    hideProfileModal();
-    
-    showToast('Profile updated successfully', 'success');
-}
-
-function handleAvatarUpload(e) {
-    const file = e.target.files[0];
-    if (!file) return;
-    
-    if (!file.type.startsWith('image/')) {
-        showToast('Please select an image file', 'error');
-        return;
-    }
-    
-    if (file.size > 5 * 1024 * 1024) { // 5MB limit
-        showToast('Image size must be less than 5MB', 'error');
-        return;
-    }
-    
-    const reader = new FileReader();
-    reader.onload = (e) => {
-        const avatarUrl = e.target.result;
-        currentUser.avatar = avatarUrl;
-        
-        document.getElementById('profileAvatar').src = avatarUrl;
-        
-        // Update in storage
-        const users = JSON.parse(localStorage.getItem('users') || '[]');
-        const userIndex = users.findIndex(u => u.id === currentUser.id);
-        if (userIndex > -1) {
-            users[userIndex] = currentUser;
-            localStorage.setItem('users', JSON.stringify(users));
-        }
-        
-        localStorage.setItem('currentUser', JSON.stringify(currentUser));
-        updateAuthUI();
-        
-        showToast('Avatar updated successfully', 'success');
-    };
-    
-    reader.readAsDataURL(file);
-}
-
-function generateAvatar(username) {
-    const colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD', '#98D8C8', '#F7DC6F'];
-    const color = colors[username.length % colors.length];
-    const initial = username.charAt(0).toUpperCase();
-    
-    const svg = `
-        <svg width="100" height="100" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="50" cy="50" r="50" fill="${color}"/>
-            <text x="50" y="50" font-family="Arial, sans-serif" font-size="40" font-weight="bold" 
-                  text-anchor="middle" dominant-baseline="central" fill="white">${initial}</text>
-        </svg>
-    `;
-    
-    return `data:image/svg+xml;base64,${btoa(svg)}`;
-}
-
 // Scroll handling
 function handleScroll() {
-    if (currentSection === 'home' || currentSection === 'trending' || currentSection === 'favorites' || currentSection === 'watch-history' || currentSection === 'subscriptions') {
+    if (currentSection === 'home' || currentSection === 'trending' || currentSection === 'favorites' || currentSection === 'watch-history') {
         const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
         const windowHeight = window.innerHeight;
         const documentHeight = document.documentElement.scrollHeight;
@@ -2237,8 +1993,6 @@ function handleScroll() {
                 loadTrendingVideos();
             } else if (currentSection === 'watch-history') {
                 loadWatchHistory();
-            } else if (currentSection === 'subscriptions') {
-                loadSubscriptionVideos();
             } else {
                 loadVideos();
             }
@@ -2248,6 +2002,7 @@ function handleScroll() {
 
 // Keyboard shortcuts
 function handleKeyboardShortcuts(e) {
+    // Escape key to close modals
     if (e.key === 'Escape') {
         if (document.getElementById('videoModal').classList.contains('active')) {
             closeVideoModal();
@@ -2262,6 +2017,7 @@ function handleKeyboardShortcuts(e) {
         }
     }
     
+    // Search shortcut (Ctrl/Cmd + K)
     if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
         e.preventDefault();
         document.getElementById('searchInput').focus();
@@ -2276,6 +2032,7 @@ function showToast(message, type = 'info') {
     
     document.getElementById('toastContainer').appendChild(toast);
     
+    // Remove toast after 3 seconds
     setTimeout(() => {
         toast.remove();
     }, 3000);
