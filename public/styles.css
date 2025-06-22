@@ -755,6 +755,36 @@ body {
 .performer-video-count {
     font-size: 13px;
     color: #666666;
+    margin-bottom: 10px;
+}
+
+.performer-subscribe-btn {
+    background: #ff9000;
+    border: none;
+    color: #000000;
+    padding: 6px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin: 0 auto;
+    transition: all 0.2s ease;
+}
+
+.performer-subscribe-btn:hover {
+    background: #ffaa33;
+}
+
+.performer-subscribe-btn.subscribed {
+    background: #666666;
+    color: #ffffff;
+}
+
+.performer-subscribe-btn.subscribed:hover {
+    background: #777777;
 }
 
 /* No Performers Message */
@@ -2245,6 +2275,10 @@ body {
 
 .add-to-playlist-btn:hover {
     background: #ffaa33;
+}
+
+.add-to-playlist-btn.added {
+    background: #4CAF50;
 }
 
 .no-playlists {
