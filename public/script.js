@@ -191,6 +191,7 @@ function navigateToSection(section) {
             break;
         case 'performers':
             showPerformersGrid();
+            loadAndDisplayPerformers();
             break;
         case 'playlists':
             showPlaylistsGrid();
@@ -570,10 +571,25 @@ async function loadPerformers() {
     try {
         const response = await fetch('/api/celebrities');
         const data = await response.json();
-        displayPerformers(data.celebrities);
         displayMobilePerformers(data.celebrities);
+        return data.celebrities;
     } catch (error) {
         console.error('Error loading performers:', error);
+        return [];
+    }
+}
+
+async function loadAndDisplayPerformers() {
+    try {
+        showLoadingIndicator();
+        const response = await fetch('/api/celebrities');
+        const data = await response.json();
+        displayPerformers(data.celebrities);
+    } catch (error) {
+        console.error('Error loading performers:', error);
+        showToast('Failed to load performers', 'error');
+    } finally {
+        hideLoadingIndicator();
     }
 }
 
@@ -714,7 +730,7 @@ function createVideoCard(video) {
         </div>
         <div class="video-info">
             <h3 class="video-title">${video.title}</h3>
-            <a href="#" class="video-performer" onclick="filterByPerformer(event, '${video.artist}')">${video.artist}</a>
+            <a href="#" class="video-performer" onclick="handlePerformerClick(event, '${video.artist}')">${video.artist}</a>
             <div class="video-stats">
                 <span class="video-stat">
                     <i class="fas fa-eye"></i>
@@ -733,7 +749,7 @@ function createVideoCard(video) {
             </div>
             <div class="video-categories">
                 ${video.categories.map(cat => 
-                    `<span class="category-tag" onclick="filterByCategory(event, '${cat}')">${cat}</span>`
+                    `<span class="category-tag" onclick="handleCategoryClick(event, '${cat}')">${cat}</span>`
                 ).join('')}
             </div>
         </div>
@@ -749,7 +765,7 @@ function displayCategories(categories) {
     categories.forEach(category => {
         const categoryCard = document.createElement('div');
         categoryCard.className = 'category-card';
-        categoryCard.onclick = () => filterByCategory(null, category.name);
+        categoryCard.onclick = () => handleCategoryClick(null, category.name);
         
         categoryCard.innerHTML = `
             <div class="category-icon">
@@ -767,10 +783,21 @@ function displayPerformers(performers) {
     const container = document.getElementById('performersGrid');
     container.innerHTML = '';
     
+    if (!performers || performers.length === 0) {
+        container.innerHTML = `
+            <div class="no-performers-message">
+                <i class="fas fa-users"></i>
+                <h3>No Performers Found</h3>
+                <p>No performer folders were found in your video directory.</p>
+            </div>
+        `;
+        return;
+    }
+    
     performers.forEach(performer => {
         const performerCard = document.createElement('div');
         performerCard.className = 'performer-card';
-        performerCard.onclick = () => filterByPerformer(null, performer.name);
+        performerCard.onclick = () => handlePerformerClick(null, performer.name);
         
         performerCard.innerHTML = `
             <div class="performer-avatar">
@@ -799,7 +826,7 @@ function displayMobileCategories(categories) {
         categoryItem.className = 'mobile-category-item';
         categoryItem.onclick = (e) => {
             e.preventDefault();
-            filterByCategory(null, category.name);
+            handleCategoryClick(null, category.name);
             closeMobileNav();
         };
         
@@ -822,7 +849,7 @@ function displayMobilePerformers(performers) {
         performerItem.className = 'mobile-performer-item';
         performerItem.onclick = (e) => {
             e.preventDefault();
-            filterByPerformer(null, performer.name);
+            handlePerformerClick(null, performer.name);
             closeMobileNav();
         };
         
@@ -881,8 +908,8 @@ function showNoResults(title = 'No videos found', text = 'Try adjusting your sea
     document.getElementById('noResults').style.display = 'block';
 }
 
-// Filter functions
-function filterByCategory(event, category) {
+// Enhanced filter functions with proper event handling
+function handleCategoryClick(event, category) {
     if (event) {
         event.preventDefault();
         event.stopPropagation();
@@ -901,7 +928,7 @@ function filterByCategory(event, category) {
     navigateToSection('home');
 }
 
-function filterByPerformer(event, performer) {
+function handlePerformerClick(event, performer) {
     if (event) {
         event.preventDefault();
         event.stopPropagation();
@@ -918,6 +945,15 @@ function filterByPerformer(event, performer) {
     hasMore = true;
     
     navigateToSection('home');
+}
+
+// Legacy filter functions for backward compatibility
+function filterByCategory(event, category) {
+    handleCategoryClick(event, category);
+}
+
+function filterByPerformer(event, performer) {
+    handlePerformerClick(event, performer);
 }
 
 // Favorite functions
@@ -975,7 +1011,7 @@ function openVideoModal(video) {
     // Update categories
     const categoriesContainer = document.getElementById('modalVideoCategories');
     categoriesContainer.innerHTML = video.categories.map(cat => 
-        `<span class="category-tag" onclick="filterByCategory(event, '${cat}')">${cat}</span>`
+        `<span class="category-tag" onclick="handleCategoryClick(event, '${cat}')">${cat}</span>`
     ).join('');
     
     // Update favorite button

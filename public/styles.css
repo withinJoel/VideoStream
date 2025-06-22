@@ -757,6 +757,34 @@ body {
     color: #666666;
 }
 
+/* No Performers Message */
+.no-performers-message {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 80px 20px;
+    background: #1a1a1a;
+    border-radius: 8px;
+    border: 1px solid #333333;
+}
+
+.no-performers-message i {
+    font-size: 64px;
+    color: #333333;
+    margin-bottom: 20px;
+}
+
+.no-performers-message h3 {
+    font-size: 24px;
+    font-weight: 600;
+    color: #ffffff;
+    margin-bottom: 10px;
+}
+
+.no-performers-message p {
+    font-size: 16px;
+    color: #666666;
+}
+
 /* Playlists Grid */
 .playlists-grid {
     max-width: 1400px;
@@ -1003,6 +1031,7 @@ body {
     height: 100%;
     object-fit: cover;
     z-index: 2;
+    transition: opacity 0.3s ease;
 }
 
 .video-overlay {
