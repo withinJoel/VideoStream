@@ -455,6 +455,103 @@ function toggleViewMode(view) {
     }
 }
 
+// Enhanced filter functions with proper event handling
+function handleCategoryClick(event, category) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+    
+    console.log('Filtering by category:', category);
+    
+    // Clear other filters and set category
+    currentFilters = {
+        search: '',
+        celebrity: '',
+        category: category,
+        sort: currentFilters.sort,
+        favorites: false
+    };
+    
+    // Clear search input and update UI
+    document.getElementById('searchInput').value = '';
+    
+    // Update content header to show filtered content
+    document.getElementById('contentTitle').textContent = `Category: ${formatCategoryName(category)}`;
+    document.getElementById('contentBreadcrumb').innerHTML = `Home / Categories / ${formatCategoryName(category)}`;
+    
+    // Reset pagination and load filtered videos
+    currentPage = 1;
+    hasMore = true;
+    
+    // Show video grid and load filtered videos
+    showVideoGrid();
+    loadVideos(true);
+    
+    // Show success message
+    showToast(`Showing videos in category: ${formatCategoryName(category)}`, 'success');
+}
+
+function handlePerformerClick(event, performer) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+    
+    console.log('Filtering by performer:', performer);
+    
+    // Clear other filters and set performer
+    currentFilters = {
+        search: '',
+        celebrity: performer,
+        category: '',
+        sort: currentFilters.sort,
+        favorites: false
+    };
+    
+    // Clear search input and update UI
+    document.getElementById('searchInput').value = '';
+    
+    // Update content header to show filtered content
+    document.getElementById('contentTitle').textContent = `Performer: ${formatPerformerName(performer)}`;
+    document.getElementById('contentBreadcrumb').innerHTML = `Home / Performers / ${formatPerformerName(performer)}`;
+    
+    // Reset pagination and load filtered videos
+    currentPage = 1;
+    hasMore = true;
+    
+    // Show video grid and load filtered videos
+    showVideoGrid();
+    loadVideos(true);
+    
+    // Show success message
+    showToast(`Showing videos by: ${formatPerformerName(performer)}`, 'success');
+}
+
+// Helper functions for formatting names
+function formatCategoryName(category) {
+    return category.replace(/[-_]/g, ' ')
+                  .split(' ')
+                  .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+                  .join(' ');
+}
+
+function formatPerformerName(performer) {
+    return performer.replace(/[-_]/g, ' ')
+                   .split(' ')
+                   .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+                   .join(' ');
+}
+
+// Legacy filter functions for backward compatibility
+function filterByCategory(event, category) {
+    handleCategoryClick(event, category);
+}
+
+function filterByPerformer(event, performer) {
+    handlePerformerClick(event, performer);
+}
+
 // Data loading functions
 async function loadVideos(reset = false) {
     if (isLoading) return;
@@ -479,15 +576,30 @@ async function loadVideos(reset = false) {
             favorites: currentFilters.favorites.toString()
         });
         
+        console.log('Loading videos with filters:', currentFilters);
+        
         const response = await fetch(`/api/videos?${params}`);
         const data = await response.json();
+        
+        console.log('Received videos:', data.videos?.length || 0, 'Total:', data.total);
         
         if (data.videos && data.videos.length > 0) {
             displayVideos(data.videos, reset);
             hasMore = data.hasMore;
             updateVideoCount(data.total);
         } else if (reset) {
-            showNoResults();
+            let noResultsTitle = 'No videos found';
+            let noResultsText = 'Try adjusting your search terms or filters';
+            
+            if (currentFilters.celebrity) {
+                noResultsTitle = `No videos found for ${formatPerformerName(currentFilters.celebrity)}`;
+                noResultsText = 'This performer may not have any videos in your collection';
+            } else if (currentFilters.category) {
+                noResultsTitle = `No videos found in ${formatCategoryName(currentFilters.category)} category`;
+                noResultsText = 'Try browsing other categories or clear the filter';
+            }
+            
+            showNoResults(noResultsTitle, noResultsText);
         }
         
         currentPage++;
@@ -906,54 +1018,6 @@ function showNoResults(title = 'No videos found', text = 'Try adjusting your sea
     document.getElementById('noResultsTitle').textContent = title;
     document.getElementById('noResultsText').textContent = text;
     document.getElementById('noResults').style.display = 'block';
-}
-
-// Enhanced filter functions with proper event handling
-function handleCategoryClick(event, category) {
-    if (event) {
-        event.preventDefault();
-        event.stopPropagation();
-    }
-    
-    currentFilters.category = category;
-    currentFilters.celebrity = '';
-    currentFilters.search = '';
-    currentFilters.favorites = false;
-    
-    document.getElementById('searchInput').value = '';
-    
-    currentPage = 1;
-    hasMore = true;
-    
-    navigateToSection('home');
-}
-
-function handlePerformerClick(event, performer) {
-    if (event) {
-        event.preventDefault();
-        event.stopPropagation();
-    }
-    
-    currentFilters.celebrity = performer;
-    currentFilters.category = '';
-    currentFilters.search = '';
-    currentFilters.favorites = false;
-    
-    document.getElementById('searchInput').value = '';
-    
-    currentPage = 1;
-    hasMore = true;
-    
-    navigateToSection('home');
-}
-
-// Legacy filter functions for backward compatibility
-function filterByCategory(event, category) {
-    handleCategoryClick(event, category);
-}
-
-function filterByPerformer(event, performer) {
-    handlePerformerClick(event, performer);
 }
 
 // Favorite functions
