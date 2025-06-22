@@ -132,6 +132,11 @@ function setupEventListeners() {
         star.addEventListener('mouseleave', () => resetStars());
     });
     
+    // Comments
+    document.getElementById('commentInput').addEventListener('focus', showCommentActions);
+    document.getElementById('commentCancelBtn').addEventListener('click', hideCommentActions);
+    document.getElementById('commentSubmitBtn').addEventListener('click', submitComment);
+    
     // Infinite scroll
     window.addEventListener('scroll', handleScroll);
     
@@ -182,6 +187,9 @@ function updateAuthUI() {
         document.getElementById('commentForm').style.display = 'block';
         document.getElementById('modalPlaylistBtn').style.display = 'flex';
         document.getElementById('subscribeBtn').style.display = 'flex';
+        
+        // Update comment form avatar
+        document.getElementById('commentUserAvatar').src = currentUser.avatar || '/api/placeholder/40/40';
     } else {
         authSection.style.display = 'flex';
         userMenu.style.display = 'none';
@@ -336,10 +344,29 @@ async function handleProfileUpdate(e) {
 function handleAvatarUpload(e) {
     const file = e.target.files[0];
     if (file) {
+        // Check file size (max 5MB)
+        if (file.size > 5 * 1024 * 1024) {
+            showToast('Image too large. Please choose a file under 5MB.', 'error');
+            return;
+        }
+        
+        // Check file type
+        if (!file.type.startsWith('image/')) {
+            showToast('Please select an image file.', 'error');
+            return;
+        }
+        
         const reader = new FileReader();
         reader.onload = function(e) {
             currentUser.avatar = e.target.result;
             document.getElementById('profileAvatar').src = e.target.result;
+            document.getElementById('userAvatarImg').src = e.target.result;
+            document.getElementById('commentUserAvatar').src = e.target.result;
+            
+            // Save to localStorage immediately
+            localStorage.setItem('currentUser', JSON.stringify(currentUser));
+            
+            showToast('Profile picture updated!', 'success');
         };
         reader.readAsDataURL(file);
     }
@@ -764,7 +791,8 @@ async function loadVideos(reset = false) {
             celebrity: currentFilters.celebrity,
             category: currentFilters.category,
             sort: currentFilters.sort,
-            favorites: currentFilters.favorites.toString()
+            favorites: currentFilters.favorites.toString(),
+            userId: isAuthenticated ? currentUser.id : ''
         });
         
         console.log('Loading videos with filters:', currentFilters);
@@ -1309,6 +1337,115 @@ function resetStars() {
     });
 }
 
+// Comments functions
+function showCommentActions() {
+    if (!isAuthenticated) {
+        showToast('Please login to comment', 'error');
+        document.getElementById('commentInput').blur();
+        return;
+    }
+    
+    document.getElementById('commentActions').style.display = 'flex';
+}
+
+function hideCommentActions() {
+    document.getElementById('commentActions').style.display = 'none';
+    document.getElementById('commentInput').value = '';
+}
+
+async function submitComment() {
+    if (!isAuthenticated) {
+        showToast('Please login to comment', 'error');
+        return;
+    }
+    
+    const text = document.getElementById('commentInput').value.trim();
+    
+    if (!text) {
+        showToast('Please enter a comment', 'error');
+        return;
+    }
+    
+    if (!currentVideoId) {
+        showToast('No video selected', 'error');
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/comments/${currentVideoId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                userId: currentUser.id,
+                text: text
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            showToast('Comment posted successfully!', 'success');
+            hideCommentActions();
+            loadComments(currentVideoId); // Reload comments
+        } else {
+            showToast(data.error || 'Failed to post comment', 'error');
+        }
+    } catch (error) {
+        console.error('Comment error:', error);
+        showToast('Failed to post comment', 'error');
+    }
+}
+
+async function loadComments(videoId) {
+    try {
+        const response = await fetch(`/api/comments/${videoId}?page=1&limit=10&sort=newest`);
+        const data = await response.json();
+        
+        displayComments(data.comments);
+        document.getElementById('commentCount').textContent = data.total;
+    } catch (error) {
+        console.error('Error loading comments:', error);
+    }
+}
+
+function displayComments(comments) {
+    const container = document.getElementById('commentsList');
+    
+    if (!comments || comments.length === 0) {
+        container.innerHTML = '<div class="no-comments">No comments yet. Be the first to comment!</div>';
+        return;
+    }
+    
+    container.innerHTML = comments.map(comment => `
+        <div class="comment">
+            <img src="${comment.avatar}" alt="${comment.username}" class="comment-avatar">
+            <div class="comment-content">
+                <div class="comment-header">
+                    <span class="comment-author">${comment.username}</span>
+                    <span class="comment-date">${new Date(comment.createdAt).toLocaleDateString()}</span>
+                </div>
+                <p class="comment-text">${comment.text}</p>
+                <div class="comment-actions">
+                    <button class="comment-like-btn">
+                        <i class="fas fa-thumbs-up"></i>
+                        ${comment.likes}
+                    </button>
+                    <button class="comment-dislike-btn">
+                        <i class="fas fa-thumbs-down"></i>
+                        ${comment.dislikes}
+                    </button>
+                    <button class="comment-reply-btn">
+                        <i class="fas fa-reply"></i>
+                        Reply
+                    </button>
+                </div>
+            </div>
+        </div>
+    `).join('');
+}
+
 // Video hover preview functionality
 function setupVideoHoverPreview(card, video) {
     const thumbnail = card.querySelector('.video-thumbnail');
@@ -1812,7 +1949,17 @@ async function openVideoModal(video) {
     
     // Update modal content
     document.getElementById('modalVideoTitle').textContent = video.title;
-    document.getElementById('modalVideoPerformer').textContent = video.artist;
+    
+    // Make performer name clickable in modal
+    const performerElement = document.getElementById('modalVideoPerformer');
+    performerElement.textContent = video.artist;
+    performerElement.style.cursor = 'pointer';
+    performerElement.onclick = (e) => {
+        e.preventDefault();
+        closeVideoModal();
+        setTimeout(() => handlePerformerClick(null, video.artist), 100);
+    };
+    
     document.getElementById('modalVideoViews').textContent = formatNumber(video.views);
     document.getElementById('modalVideoRating').textContent = video.rating.toFixed(1);
     document.getElementById('modalVideoDuration').textContent = video.duration || 'Unknown';
@@ -1837,6 +1984,11 @@ async function openVideoModal(video) {
     const favBtn = document.getElementById('modalFavBtn');
     favBtn.classList.toggle('active', video.isFavorite);
     
+    // Check subscription status
+    if (isAuthenticated) {
+        checkSubscriptionStatus(video.artist);
+    }
+    
     // Show modal
     document.getElementById('videoModal').classList.add('active');
     document.body.style.overflow = 'hidden';
@@ -1846,6 +1998,29 @@ async function openVideoModal(video) {
     
     // Load related videos
     loadRelatedVideos(video);
+    
+    // Load comments
+    loadComments(video.id);
+}
+
+async function checkSubscriptionStatus(performerName) {
+    try {
+        const response = await fetch(`/api/subscriptions/${currentUser.id}`);
+        const data = await response.json();
+        
+        const isSubscribed = data.subscriptions.some(sub => sub.name === performerName);
+        const subscribeBtn = document.getElementById('subscribeBtn');
+        
+        if (isSubscribed) {
+            subscribeBtn.classList.add('active');
+            subscribeBtn.innerHTML = '<i class="fas fa-bell-slash"></i><span>Unsubscribe</span>';
+        } else {
+            subscribeBtn.classList.remove('active');
+            subscribeBtn.innerHTML = '<i class="fas fa-bell"></i><span>Subscribe</span>';
+        }
+    } catch (error) {
+        console.error('Error checking subscription status:', error);
+    }
 }
 
 function closeVideoModal() {

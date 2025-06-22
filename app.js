@@ -17,7 +17,7 @@ const DATA_DIR = path.join(__dirname, 'data');
 
 // Middleware
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '10mb' })); // Increased limit for base64 images
 app.use(express.static('public'));
 app.use('/videos', express.static(VIDEOS_DIR));
 app.use('/thumbnails', express.static(THUMBNAILS_DIR));
@@ -33,43 +33,21 @@ app.use('/thumbnails', express.static(THUMBNAILS_DIR));
 const initDataFiles = () => {
     const dataFiles = {
         users: path.join(DATA_DIR, 'users.json'),
+        favorites: path.join(DATA_DIR, 'favorites.json'),
         playlists: path.join(DATA_DIR, 'playlists.json'),
-        favorites: path.join(DATA_DIR, 'favorites.json'), // Changed from likes.json to favorites.json
-        subscriptions: path.join(DATA_DIR, 'subscriptions.json')
+        subscriptions: path.join(DATA_DIR, 'subscriptions.json'),
+        comments: path.join(DATA_DIR, 'comments.json')
     };
     
     Object.entries(dataFiles).forEach(([key, filePath]) => {
         if (!fs.existsSync(filePath)) {
-            const initialData = key === 'users' || key === 'playlists' ? [] : {};
+            const initialData = key === 'users' ? [] : {};
             fs.writeFileSync(filePath, JSON.stringify(initialData, null, 2));
         }
     });
-    
-    return dataFiles;
 };
 
-const dataFiles = initDataFiles();
-
-// Helper functions for data management
-const readDataFile = (filePath) => {
-    try {
-        const data = fs.readFileSync(filePath, 'utf8');
-        return JSON.parse(data);
-    } catch (error) {
-        console.error(`Error reading ${filePath}:`, error);
-        return filePath.includes('users') || filePath.includes('playlists') ? [] : {};
-    }
-};
-
-const writeDataFile = (filePath, data) => {
-    try {
-        fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
-        return true;
-    } catch (error) {
-        console.error(`Error writing ${filePath}:`, error);
-        return false;
-    }
-};
+initDataFiles();
 
 const VIDEO_EXTENSIONS = ['.mp4', '.avi', '.mov', '.mkv', '.webm', '.m4v'];
 const IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.webp'];
@@ -82,6 +60,7 @@ const watchers = new Map();
 let randomSeed = Math.random();
 
 // Enhanced storage with watch history
+let favorites = new Set();
 let watchHistory = [];
 let videoRatings = new Map();
 let videoViews = new Map();
@@ -92,6 +71,31 @@ const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 let categoriesCache = null;
 let performersCache = null;
 let lastCacheUpdate = 0;
+
+// Helper functions for data persistence
+const loadData = (filename) => {
+    try {
+        const filePath = path.join(DATA_DIR, filename);
+        if (fs.existsSync(filePath)) {
+            return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+        }
+        return filename === 'users.json' ? [] : {};
+    } catch (error) {
+        console.error(`Error loading ${filename}:`, error);
+        return filename === 'users.json' ? [] : {};
+    }
+};
+
+const saveData = (filename, data) => {
+    try {
+        const filePath = path.join(DATA_DIR, filename);
+        fs.writeFileSync(filePath, JSON.stringify(data, null, 2));
+        return true;
+    } catch (error) {
+        console.error(`Error saving ${filename}:`, error);
+        return false;
+    }
+};
 
 // Helper function to format names
 const formatName = (name) => {
@@ -380,7 +384,7 @@ const countVideos = (celebrityFilter = '', categoryFilter = '') => {
 };
 
 // Enhanced video generator with better performance
-const generateRandomVideos = function* (startIndex, limit, searchTerm = '', celebrityFilter = '', categoryFilter = '', favoritesOnly = false, sortBy = 'random') {
+const generateRandomVideos = function* (startIndex, limit, searchTerm = '', celebrityFilter = '', categoryFilter = '', favoritesOnly = false, sortBy = 'random', userId = null) {
     const items = fs.readdirSync(VIDEOS_DIR, { withFileTypes: true });
     const allPaths = [];
     
@@ -434,15 +438,15 @@ const generateRandomVideos = function* (startIndex, limit, searchTerm = '', cele
         });
     }
     
-    if (favoritesOnly) {
-        const favoritesData = readDataFile(dataFiles.favorites);
+    if (favoritesOnly && userId) {
+        const favoritesData = loadData('favorites.json');
+        const userFavorites = favoritesData[userId] || [];
+        
         filtered = filtered.filter(p => {
             const videoId = p.isRoot ? 
                 `root_${path.parse(p.name).name}` : 
                 `${p.folder}_${path.parse(p.name).name}`;
-            return Object.values(favoritesData).some(userFavorites => 
-                userFavorites && userFavorites.includes(videoId)
-            );
+            return userFavorites.includes(videoId);
         });
     }
     
@@ -520,11 +524,13 @@ const generateRandomVideos = function* (startIndex, limit, searchTerm = '', cele
         const views = videoViews.get(videoId) || Math.floor(Math.random() * 1000000) + 1000;
         const rating = videoRatings.get(videoId) || (Math.random() * 2 + 3); // 3-5 stars
         
-        // Check if video is favorited
-        const favoritesData = readDataFile(dataFiles.favorites);
-        const isFavorite = Object.values(favoritesData).some(userFavorites => 
-            userFavorites && userFavorites.includes(videoId)
-        );
+        // Check if favorited by user
+        let isFavorite = false;
+        if (userId) {
+            const favoritesData = loadData('favorites.json');
+            const userFavorites = favoritesData[userId] || [];
+            isFavorite = userFavorites.includes(videoId);
+        }
         
         yield {
             id: videoId,
@@ -637,7 +643,7 @@ app.post('/api/auth/register', (req, res) => {
             return res.status(400).json({ error: 'All fields are required' });
         }
         
-        const users = readDataFile(dataFiles.users);
+        const users = loadData('users.json');
         
         // Check if user already exists
         const existingUser = users.find(u => u.email === email || u.username === username);
@@ -657,7 +663,7 @@ app.post('/api/auth/register', (req, res) => {
         };
         
         users.push(newUser);
-        writeDataFile(dataFiles.users, users);
+        saveData('users.json', users);
         
         // Remove password from response
         const { password: _, ...userResponse } = newUser;
@@ -677,7 +683,7 @@ app.post('/api/auth/login', (req, res) => {
             return res.status(400).json({ error: 'Email and password are required' });
         }
         
-        const users = readDataFile(dataFiles.users);
+        const users = loadData('users.json');
         const user = users.find(u => u.email === email && u.password === password);
         
         if (!user) {
@@ -700,14 +706,14 @@ app.put('/api/user/profile/:userId', (req, res) => {
         const { userId } = req.params;
         const { username, email, bio, avatar } = req.body;
         
-        const users = readDataFile(dataFiles.users);
+        const users = loadData('users.json');
         const userIndex = users.findIndex(u => u.id === userId);
         
         if (userIndex === -1) {
             return res.status(404).json({ error: 'User not found' });
         }
         
-        // Update user
+        // Update user data
         users[userIndex] = {
             ...users[userIndex],
             username,
@@ -717,7 +723,7 @@ app.put('/api/user/profile/:userId', (req, res) => {
             updatedAt: new Date().toISOString()
         };
         
-        writeDataFile(dataFiles.users, users);
+        saveData('users.json', users);
         
         // Remove password from response
         const { password: _, ...userResponse } = users[userIndex];
@@ -739,14 +745,15 @@ app.get('/api/videos', (req, res) => {
             celebrity = '', 
             category = '', 
             favorites = 'false',
-            sort = 'random'
+            sort = 'random',
+            userId = null
         } = req.query;
         
         const startIndex = (parseInt(page) - 1) * parseInt(limit);
         const favoritesOnly = favorites === 'true';
         
         const videos = [];
-        const generator = generateRandomVideos(startIndex, parseInt(limit), search, celebrity, category, favoritesOnly, sort);
+        const generator = generateRandomVideos(startIndex, parseInt(limit), search, celebrity, category, favoritesOnly, sort, userId);
         
         for (const video of generator) {
             videos.push(video);
@@ -764,7 +771,7 @@ app.get('/api/videos', (req, res) => {
         }
         
         const totalCount = favoritesOnly ? 
-            Object.values(readDataFile(dataFiles.favorites)).reduce((sum, userFavs) => sum + (userFavs ? userFavs.length : 0), 0) : 
+            (userId ? (loadData('favorites.json')[userId] || []).length : 0) : 
             countVideos(celebrity, category);
         
         res.json({
@@ -877,17 +884,17 @@ app.get('/api/categories', (req, res) => {
     }
 });
 
-// Enhanced favorites management (merged likes and favorites)
+// Enhanced favorites management
 app.post('/api/favorites/:id', (req, res) => {
     try {
         const { id } = req.params;
         const { userId } = req.body;
         
         if (!userId) {
-            return res.status(400).json({ error: 'User ID required' });
+            return res.status(400).json({ error: 'User ID is required' });
         }
         
-        const favoritesData = readDataFile(dataFiles.favorites);
+        const favoritesData = loadData('favorites.json');
         
         if (!favoritesData[userId]) {
             favoritesData[userId] = [];
@@ -895,11 +902,12 @@ app.post('/api/favorites/:id', (req, res) => {
         
         if (!favoritesData[userId].includes(id)) {
             favoritesData[userId].push(id);
-            writeDataFile(dataFiles.favorites, favoritesData);
+            saveData('favorites.json', favoritesData);
         }
         
         res.json({ message: 'Added to favorites', id, total: favoritesData[userId].length });
     } catch (err) {
+        console.error('Error adding to favorites:', err);
         res.status(500).json({ error: 'Failed to add to favorites' });
     }
 });
@@ -910,18 +918,19 @@ app.delete('/api/favorites/:id', (req, res) => {
         const { userId } = req.query;
         
         if (!userId) {
-            return res.status(400).json({ error: 'User ID required' });
+            return res.status(400).json({ error: 'User ID is required' });
         }
         
-        const favoritesData = readDataFile(dataFiles.favorites);
+        const favoritesData = loadData('favorites.json');
         
         if (favoritesData[userId]) {
-            favoritesData[userId] = favoritesData[userId].filter(favId => favId !== id);
-            writeDataFile(dataFiles.favorites, favoritesData);
+            favoritesData[userId] = favoritesData[userId].filter(fav => fav !== id);
+            saveData('favorites.json', favoritesData);
         }
         
-        res.json({ message: 'Removed from favorites', id, total: favoritesData[userId] ? favoritesData[userId].length : 0 });
+        res.json({ message: 'Removed from favorites', id, total: favoritesData[userId]?.length || 0 });
     } catch (err) {
+        console.error('Error removing from favorites:', err);
         res.status(500).json({ error: 'Failed to remove from favorites' });
     }
 });
@@ -929,32 +938,32 @@ app.delete('/api/favorites/:id', (req, res) => {
 app.get('/api/favorites', (req, res) => {
     try {
         const { userId } = req.query;
-        const favoritesData = readDataFile(dataFiles.favorites);
         
-        if (userId) {
-            const userFavorites = favoritesData[userId] || [];
-            res.json({ favorites: userFavorites, total: userFavorites.length });
-        } else {
-            // Return total count across all users
-            const totalFavorites = Object.values(favoritesData).reduce((sum, userFavs) => sum + (userFavs ? userFavs.length : 0), 0);
-            res.json({ favorites: [], total: totalFavorites });
+        if (!userId) {
+            return res.status(400).json({ error: 'User ID is required' });
         }
+        
+        const favoritesData = loadData('favorites.json');
+        const userFavorites = favoritesData[userId] || [];
+        
+        res.json({ favorites: userFavorites, total: userFavorites.length });
     } catch (err) {
+        console.error('Error getting favorites:', err);
         res.status(500).json({ error: 'Failed to get favorites' });
     }
 });
 
-// Subscription endpoints
+// Subscription management
 app.post('/api/subscriptions/:performerName', (req, res) => {
     try {
         const { performerName } = req.params;
         const { userId } = req.body;
         
         if (!userId) {
-            return res.status(400).json({ error: 'User ID required' });
+            return res.status(400).json({ error: 'User ID is required' });
         }
         
-        const subscriptionsData = readDataFile(dataFiles.subscriptions);
+        const subscriptionsData = loadData('subscriptions.json');
         
         if (!subscriptionsData[userId]) {
             subscriptionsData[userId] = [];
@@ -963,7 +972,7 @@ app.post('/api/subscriptions/:performerName', (req, res) => {
         // Check if already subscribed
         const existingSubscription = subscriptionsData[userId].find(sub => sub.name === performerName);
         if (existingSubscription) {
-            return res.status(400).json({ error: 'Already subscribed' });
+            return res.status(400).json({ error: 'Already subscribed to this performer' });
         }
         
         // Get performer info
@@ -974,6 +983,7 @@ app.post('/api/subscriptions/:performerName', (req, res) => {
             return res.status(404).json({ error: 'Performer not found' });
         }
         
+        // Add subscription
         subscriptionsData[userId].push({
             name: performer.name,
             displayName: performer.displayName,
@@ -982,11 +992,11 @@ app.post('/api/subscriptions/:performerName', (req, res) => {
             subscribedAt: new Date().toISOString()
         });
         
-        writeDataFile(dataFiles.subscriptions, subscriptionsData);
+        saveData('subscriptions.json', subscriptionsData);
         
         res.json({ message: 'Subscribed successfully', performer: performer.displayName });
-    } catch (error) {
-        console.error('Subscription error:', error);
+    } catch (err) {
+        console.error('Error subscribing:', err);
         res.status(500).json({ error: 'Failed to subscribe' });
     }
 });
@@ -997,19 +1007,19 @@ app.delete('/api/subscriptions/:performerName', (req, res) => {
         const { userId } = req.query;
         
         if (!userId) {
-            return res.status(400).json({ error: 'User ID required' });
+            return res.status(400).json({ error: 'User ID is required' });
         }
         
-        const subscriptionsData = readDataFile(dataFiles.subscriptions);
+        const subscriptionsData = loadData('subscriptions.json');
         
         if (subscriptionsData[userId]) {
             subscriptionsData[userId] = subscriptionsData[userId].filter(sub => sub.name !== performerName);
-            writeDataFile(dataFiles.subscriptions, subscriptionsData);
+            saveData('subscriptions.json', subscriptionsData);
         }
         
         res.json({ message: 'Unsubscribed successfully' });
-    } catch (error) {
-        console.error('Unsubscription error:', error);
+    } catch (err) {
+        console.error('Error unsubscribing:', err);
         res.status(500).json({ error: 'Failed to unsubscribe' });
     }
 });
@@ -1017,18 +1027,18 @@ app.delete('/api/subscriptions/:performerName', (req, res) => {
 app.get('/api/subscriptions/:userId', (req, res) => {
     try {
         const { userId } = req.params;
-        const subscriptionsData = readDataFile(dataFiles.subscriptions);
         
+        const subscriptionsData = loadData('subscriptions.json');
         const userSubscriptions = subscriptionsData[userId] || [];
         
         res.json({ subscriptions: userSubscriptions });
-    } catch (error) {
-        console.error('Get subscriptions error:', error);
+    } catch (err) {
+        console.error('Error getting subscriptions:', err);
         res.status(500).json({ error: 'Failed to get subscriptions' });
     }
 });
 
-// Playlist endpoints
+// Playlist management
 app.post('/api/playlists', (req, res) => {
     try {
         const { name, userId, description = '', isPrivate = false } = req.body;
@@ -1037,25 +1047,28 @@ app.post('/api/playlists', (req, res) => {
             return res.status(400).json({ error: 'Name and user ID are required' });
         }
         
-        const playlists = readDataFile(dataFiles.playlists);
+        const playlistsData = loadData('playlists.json');
+        
+        if (!playlistsData[userId]) {
+            playlistsData[userId] = [];
+        }
         
         const newPlaylist = {
             id: Date.now().toString(),
             name,
             description,
             isPrivate,
-            userId,
             videos: [],
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString()
         };
         
-        playlists.push(newPlaylist);
-        writeDataFile(dataFiles.playlists, playlists);
+        playlistsData[userId].push(newPlaylist);
+        saveData('playlists.json', playlistsData);
         
         res.json({ playlist: newPlaylist });
-    } catch (error) {
-        console.error('Create playlist error:', error);
+    } catch (err) {
+        console.error('Error creating playlist:', err);
         res.status(500).json({ error: 'Failed to create playlist' });
     }
 });
@@ -1063,13 +1076,13 @@ app.post('/api/playlists', (req, res) => {
 app.get('/api/playlists/:userId', (req, res) => {
     try {
         const { userId } = req.params;
-        const playlists = readDataFile(dataFiles.playlists);
         
-        const userPlaylists = playlists.filter(playlist => playlist.userId === userId);
+        const playlistsData = loadData('playlists.json');
+        const userPlaylists = playlistsData[userId] || [];
         
         res.json({ playlists: userPlaylists });
-    } catch (error) {
-        console.error('Get playlists error:', error);
+    } catch (err) {
+        console.error('Error getting playlists:', err);
         res.status(500).json({ error: 'Failed to get playlists' });
     }
 });
@@ -1083,59 +1096,28 @@ app.post('/api/playlists/:playlistId/videos', (req, res) => {
             return res.status(400).json({ error: 'Video ID and user ID are required' });
         }
         
-        const playlists = readDataFile(dataFiles.playlists);
-        const playlistIndex = playlists.findIndex(p => p.id === playlistId && p.userId === userId);
+        const playlistsData = loadData('playlists.json');
+        const userPlaylists = playlistsData[userId] || [];
         
-        if (playlistIndex === -1) {
-            return res.status(404).json({ error: 'Playlist not found' });
-        }
-        
-        // Check if video already in playlist
-        if (playlists[playlistIndex].videos.includes(videoId)) {
-            return res.status(400).json({ error: 'Video already in playlist' });
-        }
-        
-        playlists[playlistIndex].videos.push(videoId);
-        playlists[playlistIndex].updatedAt = new Date().toISOString();
-        
-        writeDataFile(dataFiles.playlists, playlists);
-        
-        res.json({ message: 'Video added to playlist' });
-    } catch (error) {
-        console.error('Add to playlist error:', error);
-        res.status(500).json({ error: 'Failed to add video to playlist' });
-    }
-});
-
-app.get('/api/playlists/:playlistId/videos', (req, res) => {
-    try {
-        const { playlistId } = req.params;
-        const playlists = readDataFile(dataFiles.playlists);
-        
-        const playlist = playlists.find(p => p.id === playlistId);
-        
+        const playlist = userPlaylists.find(p => p.id === playlistId);
         if (!playlist) {
             return res.status(404).json({ error: 'Playlist not found' });
         }
         
-        // Get video details for each video ID in the playlist
-        const videos = [];
-        const generator = generateRandomVideos(0, 1000); // Get all videos to find matches
-        
-        for (const video of generator) {
-            if (playlist.videos.includes(video.id)) {
-                videos.push(video);
-            }
+        // Check if video already in playlist
+        if (playlist.videos.includes(videoId)) {
+            return res.status(400).json({ error: 'Video already in playlist' });
         }
         
-        res.json({ 
-            playlist: playlist,
-            videos: videos,
-            total: videos.length
-        });
-    } catch (error) {
-        console.error('Get playlist videos error:', error);
-        res.status(500).json({ error: 'Failed to get playlist videos' });
+        playlist.videos.push(videoId);
+        playlist.updatedAt = new Date().toISOString();
+        
+        saveData('playlists.json', playlistsData);
+        
+        res.json({ message: 'Video added to playlist' });
+    } catch (err) {
+        console.error('Error adding video to playlist:', err);
+        res.status(500).json({ error: 'Failed to add video to playlist' });
     }
 });
 
@@ -1145,22 +1127,98 @@ app.delete('/api/playlists/:playlistId', (req, res) => {
         const { userId } = req.query;
         
         if (!userId) {
-            return res.status(400).json({ error: 'User ID required' });
+            return res.status(400).json({ error: 'User ID is required' });
         }
         
-        const playlists = readDataFile(dataFiles.playlists);
-        const filteredPlaylists = playlists.filter(p => !(p.id === playlistId && p.userId === userId));
+        const playlistsData = loadData('playlists.json');
         
-        if (filteredPlaylists.length === playlists.length) {
-            return res.status(404).json({ error: 'Playlist not found' });
+        if (playlistsData[userId]) {
+            playlistsData[userId] = playlistsData[userId].filter(p => p.id !== playlistId);
+            saveData('playlists.json', playlistsData);
         }
-        
-        writeDataFile(dataFiles.playlists, filteredPlaylists);
         
         res.json({ message: 'Playlist deleted successfully' });
-    } catch (error) {
-        console.error('Delete playlist error:', error);
+    } catch (err) {
+        console.error('Error deleting playlist:', err);
         res.status(500).json({ error: 'Failed to delete playlist' });
+    }
+});
+
+// Comments system
+app.post('/api/comments/:videoId', (req, res) => {
+    try {
+        const { videoId } = req.params;
+        const { userId, text } = req.body;
+        
+        if (!userId || !text) {
+            return res.status(400).json({ error: 'User ID and comment text are required' });
+        }
+        
+        // Get user info
+        const users = loadData('users.json');
+        const user = users.find(u => u.id === userId);
+        
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+        
+        const commentsData = loadData('comments.json');
+        
+        if (!commentsData[videoId]) {
+            commentsData[videoId] = [];
+        }
+        
+        const newComment = {
+            id: Date.now().toString(),
+            userId,
+            username: user.username,
+            avatar: user.avatar,
+            text,
+            likes: 0,
+            dislikes: 0,
+            createdAt: new Date().toISOString(),
+            replies: []
+        };
+        
+        commentsData[videoId].push(newComment);
+        saveData('comments.json', commentsData);
+        
+        res.json({ comment: newComment });
+    } catch (err) {
+        console.error('Error posting comment:', err);
+        res.status(500).json({ error: 'Failed to post comment' });
+    }
+});
+
+app.get('/api/comments/:videoId', (req, res) => {
+    try {
+        const { videoId } = req.params;
+        const { page = 1, limit = 10, sort = 'newest' } = req.query;
+        
+        const commentsData = loadData('comments.json');
+        let comments = commentsData[videoId] || [];
+        
+        // Sort comments
+        if (sort === 'newest') {
+            comments.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        } else if (sort === 'oldest') {
+            comments.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+        } else if (sort === 'most-liked') {
+            comments.sort((a, b) => b.likes - a.likes);
+        }
+        
+        // Paginate
+        const startIndex = (parseInt(page) - 1) * parseInt(limit);
+        const paginatedComments = comments.slice(startIndex, startIndex + parseInt(limit));
+        
+        res.json({ 
+            comments: paginatedComments,
+            total: comments.length,
+            hasMore: startIndex + paginatedComments.length < comments.length
+        });
+    } catch (err) {
+        console.error('Error getting comments:', err);
+        res.status(500).json({ error: 'Failed to get comments' });
     }
 });
 
@@ -1339,12 +1397,9 @@ app.post('/api/reshuffle', (req, res) => {
 
 // Enhanced stats
 app.get('/api/stats', (req, res) => {
-    const favoritesData = readDataFile(dataFiles.favorites);
-    const totalFavorites = Object.values(favoritesData).reduce((sum, userFavs) => sum + (userFavs ? userFavs.length : 0), 0);
-    
     res.json({
         totalVideos: videoCount,
-        totalFavorites: totalFavorites,
+        totalFavorites: favorites.size,
         totalWatchHistory: watchHistory.length,
         watchedDirectories: watchers.size,
         pendingThumbnails: thumbnailQueue.size,
@@ -1433,5 +1488,6 @@ app.listen(PORT, () => {
     console.log(`💾 Memory-optimized streaming with hover preview`);
     console.log(`⭐ Enhanced features: Watch History, Favorites, Ratings, Trending`);
     console.log(`🖼️ Performer images support enabled`);
-    console.log(`💾 Data persistence enabled in ${DATA_DIR}`);
+    console.log(`💬 Comments system enabled`);
+    console.log(`👤 User authentication enabled`);
 });
