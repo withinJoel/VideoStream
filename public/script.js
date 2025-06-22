@@ -14,6 +14,8 @@ let currentVideoId = null;
 let isAuthenticated = false;
 let currentUser = null;
 let searchTimeout = null;
+let hoverPreviewTimeout = null;
+let currentHoverVideo = null;
 
 // Initialize the application
 document.addEventListener('DOMContentLoaded', function() {
@@ -575,6 +577,99 @@ async function loadPerformers() {
     }
 }
 
+// Video hover preview functionality
+function setupVideoHoverPreview(card, video) {
+    const thumbnail = card.querySelector('.video-thumbnail');
+    const img = thumbnail.querySelector('img');
+    
+    let previewVideo = null;
+    let isHovering = false;
+    
+    const startPreview = () => {
+        if (previewVideo || !isHovering) return;
+        
+        // Create video element for preview
+        previewVideo = document.createElement('video');
+        previewVideo.className = 'hover-preview-video';
+        previewVideo.muted = true;
+        previewVideo.loop = true;
+        previewVideo.preload = 'metadata';
+        previewVideo.style.opacity = '0';
+        
+        // Set video source
+        previewVideo.src = `/api/video-stream/${video.id}#t=10`;
+        
+        // Add to thumbnail
+        thumbnail.appendChild(previewVideo);
+        
+        // Start playing when loaded
+        previewVideo.addEventListener('loadeddata', () => {
+            if (isHovering && previewVideo) {
+                previewVideo.currentTime = 10; // Start at 10 seconds
+                previewVideo.play().then(() => {
+                    if (previewVideo && isHovering) {
+                        previewVideo.style.opacity = '1';
+                        img.style.opacity = '0';
+                    }
+                }).catch(() => {
+                    // Fallback if autoplay fails
+                    if (previewVideo) {
+                        previewVideo.remove();
+                        previewVideo = null;
+                    }
+                });
+            }
+        });
+        
+        // Handle errors
+        previewVideo.addEventListener('error', () => {
+            if (previewVideo) {
+                previewVideo.remove();
+                previewVideo = null;
+            }
+        });
+    };
+    
+    const stopPreview = () => {
+        if (previewVideo) {
+            previewVideo.pause();
+            previewVideo.remove();
+            previewVideo = null;
+        }
+        img.style.opacity = '1';
+    };
+    
+    // Mouse enter event
+    card.addEventListener('mouseenter', () => {
+        isHovering = true;
+        clearTimeout(hoverPreviewTimeout);
+        
+        // Start preview after a short delay
+        hoverPreviewTimeout = setTimeout(startPreview, 800);
+    });
+    
+    // Mouse leave event
+    card.addEventListener('mouseleave', () => {
+        isHovering = false;
+        clearTimeout(hoverPreviewTimeout);
+        stopPreview();
+    });
+    
+    // Cleanup on card removal
+    const observer = new MutationObserver((mutations) => {
+        mutations.forEach((mutation) => {
+            mutation.removedNodes.forEach((node) => {
+                if (node === card) {
+                    stopPreview();
+                    observer.disconnect();
+                }
+            });
+        });
+    });
+    
+    observer.observe(card.parentNode, { childList: true });
+}
+
 // Display functions
 function displayVideos(videos, reset = false) {
     const container = document.getElementById('videoGrid');
@@ -586,6 +681,9 @@ function displayVideos(videos, reset = false) {
     videos.forEach(video => {
         const videoCard = createVideoCard(video);
         container.appendChild(videoCard);
+        
+        // Setup hover preview for this card
+        setupVideoHoverPreview(videoCard, video);
     });
 }
 
