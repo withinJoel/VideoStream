@@ -203,3 +203,74 @@ async function deletePlaylist(playlistId) {
         showToast('Failed to delete playlist', 'error');
     }
 }
+
+function displayPlaylists(playlists) {
+    const container = document.getElementById('playlistsGrid');
+    container.innerHTML = '';
+    
+    if (!playlists || playlists.length === 0) {
+        container.innerHTML = `
+            <div class="no-playlists-message">
+                <i class="fas fa-list"></i>
+                <h3>No Playlists Found</h3>
+                <p>You haven't created any playlists yet.</p>
+                <button class="auth-submit-btn" onclick="showCreatePlaylistModal()">
+                    <i class="fas fa-plus"></i>
+                    Create Your First Playlist
+                </button>
+            </div>
+        `;
+        return;
+    }
+    
+    playlists.forEach(playlist => {
+        const playlistCard = document.createElement('div');
+        playlistCard.className = 'playlist-card';
+        playlistCard.onclick = () => loadPlaylistVideos(playlist.id);
+        
+        playlistCard.innerHTML = `
+            <div class="playlist-thumbnail">
+                <i class="fas fa-list"></i>
+                <div class="playlist-video-count">${playlist.videos.length} videos</div>
+            </div>
+            <div class="playlist-info">
+                <h3 class="playlist-name">${playlist.name}</h3>
+                <p class="playlist-description">${playlist.description || 'No description'}</p>
+                <div class="playlist-meta">
+                    <span class="playlist-privacy">
+                        <i class="fas ${playlist.isPrivate ? 'fa-lock' : 'fa-globe'}"></i>
+                        ${playlist.isPrivate ? 'Private' : 'Public'}
+                    </span>
+                    <span>${new Date(playlist.createdAt).toLocaleDateString()}</span>
+                </div>
+            </div>
+            <div class="playlist-actions">
+                <button class="playlist-action-btn" onclick="event.stopPropagation(); loadPlaylistVideos('${playlist.id}')">
+                    <i class="fas fa-play"></i>
+                    Play
+                </button>
+                <button class="playlist-action-btn" onclick="event.stopPropagation(); deletePlaylist('${playlist.id}')">
+                    <i class="fas fa-trash"></i>
+                    Delete
+                </button>
+            </div>
+        `;
+        
+        container.appendChild(playlistCard);
+    });
+}
+
+function showPlaylistsAuthRequired() {
+    const container = document.getElementById('playlistsGrid');
+    container.innerHTML = `
+        <div class="auth-required">
+            <i class="fas fa-lock"></i>
+            <h3>Login Required</h3>
+            <p>Please login to view and manage your playlists.</p>
+            <button class="auth-submit-btn" onclick="showAuthModal('login')">
+                <i class="fas fa-sign-in-alt"></i>
+                Login Now
+            </button>
+        </div>
+    `;
+}

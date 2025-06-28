@@ -90,3 +90,55 @@ async function handlePerformerSubscribe(e, performerName) {
         showToast('Failed to update subscription', 'error');
     }
 }
+
+
+async function loadSubscriptions() {
+    if (!isAuthenticated) {
+        showNoResults('Login Required', 'Please login to view your subscriptions');
+        return;
+    }
+    
+    if (isLoading) return;
+    
+    isLoading = true;
+    showLoadingIndicator();
+    
+    try {
+        // Get user's subscriptions
+        const subscriptionsResponse = await fetch(`/api/subscriptions/${currentUser.id}`);
+        const subscriptionsData = await subscriptionsResponse.json();
+        
+        if (subscriptionsData.subscriptions && subscriptionsData.subscriptions.length > 0) {
+            // Display only the subscribed performers (not their videos)
+            displaySubscribedPerformers(subscriptionsData.subscriptions);
+        } else {
+            showNoResults('No subscriptions', 'Subscribe to performers to see them here');
+        }
+    } catch (error) {
+        console.error('Error loading subscriptions:', error);
+        showToast('Failed to load subscriptions', 'error');
+    } finally {
+        isLoading = false;
+        hideLoadingIndicator();
+    }
+}
+
+async function checkSubscriptionStatus(performerName) {
+    try {
+        const response = await fetch(`/api/subscriptions/${currentUser.id}`);
+        const data = await response.json();
+        
+        const isSubscribed = data.subscriptions.some(sub => sub.name === performerName);
+        const subscribeBtn = document.getElementById('subscribeBtn');
+        
+        if (isSubscribed) {
+            subscribeBtn.classList.add('active');
+            subscribeBtn.innerHTML = '<i class="fas fa-bell-slash"></i><span>Unsubscribe</span>';
+        } else {
+            subscribeBtn.classList.remove('active');
+            subscribeBtn.innerHTML = '<i class="fas fa-bell"></i><span>Subscribe</span>';
+        }
+    } catch (error) {
+        console.error('Error checking subscription status:', error);
+    }
+}
