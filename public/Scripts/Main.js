@@ -839,19 +839,97 @@ function displayMobilePerformers(performers) {
 // Utility functions
 function getCategoryIcon(category) {
     const icons = {
-        'anal': 'fa-circle',
+        'facefuck': 'fa-face-grimace',              // Suggestive facial expression
+        'celebrity': 'fa-star',                     // Represents fame and stardom
+        'drunk': 'fa-wine-bottle',                  // Alcohol/drunkenness
+        'gloryhole': 'fa-circle-notch',             // Metaphorically a hole
+        'bdsm': 'fa-handcuffs',                     // Perfect match for bondage
+        'outfit': 'fa-shirt',                       // Represents costume/dressup
+        'fingering': 'fa-hand-point-up',            // Finger gesture
+        'spycam': 'fa-video-slash',                 // Hidden video / surveillance
+        'twerk': 'fa-drum',                         // Rhythmic movement / shaking
+        'dirty-talk': 'fa-comment-dots',            // Symbol for talking
+        'uncensored': 'fa-eye',                     // Unfiltered / visible
+        'caught': 'fa-person-rays',                 // Being caught in the act
+        'oil': 'fa-droplet',                        // Massage oil / slipperiness
+        'indian': 'fa-flag',                        // General fallback (flag 🇮🇳 via CSS possible)
+        'neighbor': 'fa-house-chimney-user',        // Person living next door
+        'nude-yoga': 'fa-person-praying',           // Yoga / spiritual pose
+        'roleplay': 'fa-theater-masks',             // Acting / skit
+        'lingerie': 'fa-person-dress',              // Lingerie/feminine wear
+        'trainer': 'fa-dumbbell',                   // Gym/fitness
+        'cuckold': 'fa-binoculars',                 // Watching / voyeur
+        'step-family': 'fa-people-roof',            // Family group / household
+        'anal': 'fa-circle-dot',
+        'gangbang': 'fa-people-group',
         'lesbian': 'fa-venus-double',
-        'milf': 'fa-female',
+        'milf': 'fa-person-dress',
         'teen': 'fa-user-graduate',
-        'hardcore': 'fa-fire',
-        'blowjob': 'fa-kiss',
-        'threesome': 'fa-users',
+        'hardcore': 'fa-fire-flame-curved',
+        'blowjob': 'fa-kiss-wink-heart',
+        'threesome': 'fa-people-arrows',
+        'creampie': 'fa-egg',
         'big-tits': 'fa-heart',
         'pov': 'fa-eye',
-        'amateur': 'fa-home',
-        'fetish': 'fa-mask',
-        'compilation': 'fa-film'
+        'interracial': 'fa-globe',
+        'amateur': 'fa-house-chimney',
+        'fetish': 'fa-mask-ventilator',
+        'latina': 'fa-pepper-hot',
+        'asian': 'fa-fan',
+        'ebony': 'fa-moon',
+        'blonde': 'fa-sun',
+        'brunette': 'fa-mug-hot',
+        'redhead': 'fa-fire',
+        'big-ass': 'fa-person-dress',
+        'small-tits': 'fa-leaf',
+        'squirting': 'fa-droplet',
+        'masturbation': 'fa-hand-back-fist',
+        'public': 'fa-city',
+        'vintage': 'fa-film',
+        'compilation': 'fa-clapperboard',
+        'facial': 'fa-face-smile-beam',
+        'handjob': 'fa-hand-sparkles',
+        'footjob': 'fa-shoe-prints',
+        'titjob': 'fa-hand-holding-heart',
+        'doggystyle': 'fa-dog',
+        'missionary': 'fa-bed',
+        'cowgirl': 'fa-horse-head',
+        'double-penetration': 'fa-arrows-split-up-and-left',
+        'office': 'fa-briefcase',
+        'bbc': 'fa-drum',
+        'casting': 'fa-microphone-lines',
+        'massage': 'fa-spa',
+        'shower': 'fa-shower',
+        'kitchen': 'fa-utensils',
+        'car': 'fa-car-side',
+        'beach': 'fa-umbrella-beach',
+        'pool': 'fa-water-ladder',
+        'hotel': 'fa-hotel',
+        'party': 'fa-champagne-glasses',
+        'wedding': 'fa-ring',
+        'christmas': 'fa-snowflake',
+        'halloween': 'fa-ghost',
+        'valentine': 'fa-heart-circle-check',
+        'hijab': 'fa-person-dress',
+        'friends': 'fa-people-group',
+        'German': 'fa-flag',
+        'Japan': 'fa-flag',
+        'homemade': 'fa-camera-retro',
+        'Kissing': 'fa-kiss-wink-heart',
+        'muslim': 'fa-mosque',
+        'arab': 'fa-kaaba',
+        'nurse': 'fa-user-nurse',
+        'maid': 'fa-broom',
+        'cheerleader': 'fa-star',
+        'teacher': 'fa-chalkboard-user',
+        'student': 'fa-user-graduate',
+        'cosplay': 'fa-hat-wizard',
+        'superhero': 'fa-user-ninja',
+        'zombie': 'fa-skull-crossbones',
+        'alien': 'fa-user-astronaut',
+        'furry': 'fa-paw'
     };
+
     return icons[category] || 'fa-tag';
 }
 
@@ -934,76 +1012,6 @@ function updateFavoritesCount() {
     }
 }
 
-// Video modal functions
-async function openVideoModal(video) {
-    currentVideoId = video.id;
-    
-    // Update modal content
-    document.getElementById('modalVideoTitle').textContent = video.title;
-    
-    // Make performer name clickable in modal
-    const performerElement = document.getElementById('modalVideoPerformer');
-    performerElement.textContent = video.artist;
-    performerElement.style.cursor = 'pointer';
-    performerElement.onclick = (e) => {
-        e.preventDefault();
-        closeVideoModal();
-        setTimeout(() => handlePerformerClick(null, video.artist), 100);
-    };
-    
-    document.getElementById('modalVideoViews').textContent = formatNumber(video.views);
-    document.getElementById('modalVideoRating').textContent = video.rating.toFixed(1);
-    document.getElementById('modalVideoDuration').textContent = video.duration || 'Unknown';
-    document.getElementById('modalVideoQuality').textContent = video.quality || 'HD';
-    
-    // Update video source
-    const videoElement = document.getElementById('modalVideo');
-    videoElement.src = `/api/video-stream/${video.id}`;
-    
-    // Update categories
-    const categoriesContainer = document.getElementById('modalVideoCategories');
-    categoriesContainer.innerHTML = video.categories.map(cat => 
-        `<span class="category-tag" onclick="handleCategoryClick(event, '${cat}')">${cat}</span>`
-    ).join('');
-    
-    // Update favorite button
-    const favoriteBtn = document.getElementById('modalFavoriteBtn');
-    favoriteBtn.classList.toggle('active', video.isFavorite);
-    favoriteBtn.onclick = (e) => toggleFavorite(e, video.id);
-    
-    // Update favorite action button
-    const favBtn = document.getElementById('modalFavBtn');
-    favBtn.classList.toggle('active', video.isFavorite);
-
-    // Add download button event listeners
-    const downloadBtn = document.getElementById('modalDownloadBtn');
-    if (downloadBtn) {
-        downloadBtn.onclick = () => handleVideoDownload(video);
-    }
-    const downloadActionBtn = document.getElementById('modalDownloadActionBtn');
-    if (downloadActionBtn) {
-        downloadActionBtn.onclick = () => handleVideoDownload(video);
-    }
-
-    // Check subscription status
-    if (isAuthenticated) {
-        checkSubscriptionStatus(video.artist);
-    }
-    
-    // Show modal
-    document.getElementById('videoModal').classList.add('active');
-    document.body.style.overflow = 'hidden';
-    
-    // Add to watch history
-    addToWatchHistory(video.id);
-    
-    // Load related videos
-    loadRelatedVideos(video);
-    
-    // Load comments
-    loadComments(video.id);
-}
-
 async function checkSubscriptionStatus(performerName) {
     try {
         const response = await fetch(`/api/subscriptions/${currentUser.id}`);
@@ -1022,21 +1030,6 @@ async function checkSubscriptionStatus(performerName) {
     } catch (error) {
         console.error('Error checking subscription status:', error);
     }
-}
-
-function closeVideoModal() {
-    const modal = document.getElementById('videoModal');
-    const video = document.getElementById('modalVideo');
-    
-    modal.classList.remove('active');
-    document.body.style.overflow = '';
-    
-    // Pause and reset video
-    video.pause();
-    video.currentTime = 0;
-    video.src = '';
-    
-    currentVideoId = null;
 }
 
 function addToWatchHistory(videoId) {
@@ -1135,53 +1128,5 @@ function handleScroll() {
     }
 }
 
-// Keyboard shortcuts
-function handleKeyboardShortcuts(e) {
-    // Escape key to close modals
-    if (e.key === 'Escape') {
-        if (document.getElementById('videoModal').classList.contains('active')) {
-            closeVideoModal();
-        } else if (document.getElementById('loginModal').classList.contains('active')) {
-            hideAuthModal('login');
-        } else if (document.getElementById('registerModal').classList.contains('active')) {
-            hideAuthModal('register');
-        } else if (document.getElementById('profileModal').classList.contains('active')) {
-            hideProfileModal();
-        } else if (document.getElementById('playlistModal').classList.contains('active')) {
-            hidePlaylistModal();
-        }
-    }
-    
-    // Search shortcut (Ctrl/Cmd + K)
-    if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
-        e.preventDefault();
-        document.getElementById('searchInput').focus();
-    }
-}
-
-// Toast notifications
-function showToast(message, type = 'info') {
-    const toast = document.createElement('div');
-    toast.className = `toast ${type}`;
-    toast.textContent = message;
-    
-    document.getElementById('toastContainer').appendChild(toast);
-    
-    // Remove toast after 3 seconds
-    setTimeout(() => {
-        toast.remove();
-    }, 3000);
-}
-
 // Initialize favorites count on load
 updateFavoritesCount();
-
-function handleVideoDownload(video) {
-    // Create a temporary link to trigger download
-    const link = document.createElement('a');
-    link.href = `/api/video-download/${video.id}`;
-    link.download = `${video.title || 'video'}.mp4`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-}
