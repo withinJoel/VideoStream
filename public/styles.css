@@ -1421,9 +1421,12 @@ body {
 
 .modal-video-container video {
     width: 100%;
-    max-width: 800px;
+    max-width: 90vw;
+    max-height: 80vh;
     height: auto;
     display: block;
+    object-fit: contain;
+    background: #000;
 }
 
 .video-overlay-controls {
@@ -2448,7 +2451,7 @@ body {
     }
     
     .auth-modal-container,
-    .playlist-modal-container,
+    .playlist-modal_container,
     .profile-modal-container {
         width: 95%;
         margin: 20px;
