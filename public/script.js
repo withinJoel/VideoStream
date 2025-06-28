@@ -1904,8 +1904,9 @@ function toggleFavorite(event, videoId) {
         showToast('Please login to favorite videos', 'error');
         return;
     }
-    
-    const btn = event.target.closest('.video-favorite-btn');
+    // Support both grid and modal favorite buttons
+    let btn = event.target.closest('.video-favorite-btn') || event.target.closest('.favorite-video-btn');
+    if (!btn) return; // If not found, exit gracefully
     const isCurrentlyFavorite = btn.classList.contains('active');
     
     const method = isCurrentlyFavorite ? 'DELETE' : 'POST';
