@@ -1105,7 +1105,10 @@ async function handleCreatePlaylist() {
         showToast('Please enter a playlist name', 'error');
         return;
     }
-    
+    if (!currentUser || !currentUser.id) {
+        showToast('You must be logged in to create a playlist', 'error');
+        return;
+    }
     try {
         const response = await fetch('/api/playlists', {
             method: 'POST',
