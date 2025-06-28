@@ -78,6 +78,7 @@ function getCategoryIcon(category) {
         'homemade': 'fa-camera-retro',
         'Kissing': 'fa-kiss-wink-heart',
         'muslim': 'fa-mosque',
+        'watch': 'fa-tv',
         'arab': 'fa-kaaba',
         'nurse': 'fa-user-nurse',
         'maid': 'fa-broom',

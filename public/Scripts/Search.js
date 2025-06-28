@@ -1,4 +1,3 @@
-
 function handleSearchInput(e) {
     const query = e.target.value.trim();
     
@@ -35,6 +34,7 @@ function performSearch() {
         
         navigateToSection('home');
         hideSearchSuggestions();
+        window.dispatchEvent(new Event('videos:reset'));
     }
 }
 

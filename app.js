@@ -129,6 +129,7 @@ const extractCategories = (filename) => {
     'gangbang': ['gang-bang', 'gangbang', 'group-sex', 'orgy'],
     'lesbian': ['lesbian', 'girl-girl', 'lez', 'sapphic'],
     'milf': ['milf', 'mature', 'mom', 'mommy', 'cougar'],
+    'watch': ['watch', 'watching'],
     'teen': ['teen', '18+', 'young', 'college', 'schoolgirl'],
     'hardcore': ['hardcore', 'rough', 'hard', 'roughsex', 'rough-sex', 'hard-core', 'extreme'],
     'blowjob': ['blowjob', 'oral', 'bj', 'deepthroat', 'blow-job', 'fellatio', 'head'],

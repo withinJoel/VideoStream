@@ -462,3 +462,29 @@ function displayRelatedVideos(videos) {
         container.appendChild(videoCard);
     });
 }
+
+// Infinite Scroll for Video Grid
+(function setupInfiniteScroll() {
+    const sentinel = document.getElementById('videoGridSentinel');
+    const loadingSpinner = document.getElementById('videoGridLoading');
+    if (!sentinel) return;
+
+    let observer = new IntersectionObserver(async (entries) => {
+        if (entries[0].isIntersecting && hasMore && !isLoading) {
+            loadingSpinner.style.display = 'block';
+            await loadVideos(false);
+            loadingSpinner.style.display = 'none';
+        }
+    }, {
+        root: null,
+        rootMargin: '0px',
+        threshold: 0.1
+    });
+    observer.observe(sentinel);
+
+    // Reset observer on filter/search change
+    window.addEventListener('videos:reset', () => {
+        observer.disconnect();
+        observer.observe(sentinel);
+    });
+})();

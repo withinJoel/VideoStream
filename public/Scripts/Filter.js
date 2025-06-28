@@ -1,9 +1,9 @@
-
 function handleSortChange(e) {
     currentFilters.sort = e.target.value;
     currentPage = 1;
     hasMore = true;
     loadVideos(true);
+    window.dispatchEvent(new Event('videos:reset'));
 }
 
 function shuffleVideos() {
@@ -14,6 +14,7 @@ function shuffleVideos() {
             currentPage = 1;
             hasMore = true;
             loadVideos(true);
+            window.dispatchEvent(new Event('videos:reset'));
         })
         .catch(error => {
             console.error('Error shuffling videos:', error);
@@ -37,4 +38,5 @@ function clearAllFilters() {
     hasMore = true;
     
     navigateToSection('home');
+    window.dispatchEvent(new Event('videos:reset'));
 }
