@@ -65,10 +65,6 @@ function updateContentHeader(section) {
     document.getElementById('contentBreadcrumb').innerHTML = breadcrumbs[section] || 'Home';
 }
 
-
-
-
-
 function toggleViewMode(view) {
     const videoGrid = document.getElementById('videoGrid');
     if (view === 'list') {
@@ -978,7 +974,17 @@ async function openVideoModal(video) {
     // Update favorite action button
     const favBtn = document.getElementById('modalFavBtn');
     favBtn.classList.toggle('active', video.isFavorite);
-    
+
+    // Add download button event listeners
+    const downloadBtn = document.getElementById('modalDownloadBtn');
+    if (downloadBtn) {
+        downloadBtn.onclick = () => handleVideoDownload(video);
+    }
+    const downloadActionBtn = document.getElementById('modalDownloadActionBtn');
+    if (downloadActionBtn) {
+        downloadActionBtn.onclick = () => handleVideoDownload(video);
+    }
+
     // Check subscription status
     if (isAuthenticated) {
         checkSubscriptionStatus(video.artist);
@@ -1169,3 +1175,13 @@ function showToast(message, type = 'info') {
 
 // Initialize favorites count on load
 updateFavoritesCount();
+
+function handleVideoDownload(video) {
+    // Create a temporary link to trigger download
+    const link = document.createElement('a');
+    link.href = `/api/video-download/${video.id}`;
+    link.download = `${video.title || 'video'}.mp4`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}

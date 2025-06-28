@@ -790,6 +790,47 @@ app.get('/api/videos', (req, res) => {
     }
 });
 
+// Video download endpoint
+app.get('/api/video-download/:id', (req, res) => {
+    try {
+        const { id } = req.params;
+        const [type, ...nameParts] = id.split('_');
+        const videoName = nameParts.join('_');
+        let videoPath;
+        if (type === 'root') {
+            videoPath = path.join(VIDEOS_DIR, `${videoName}.mp4`);
+            if (!fs.existsSync(videoPath)) {
+                for (const ext of VIDEO_EXTENSIONS) {
+                    const testPath = path.join(VIDEOS_DIR, `${videoName}${ext}`);
+                    if (fs.existsSync(testPath)) {
+                        videoPath = testPath;
+                        break;
+                    }
+                }
+            }
+        } else {
+            const folder = type;
+            videoPath = path.join(VIDEOS_DIR, folder, `${videoName}.mp4`);
+            if (!fs.existsSync(videoPath)) {
+                for (const ext of VIDEO_EXTENSIONS) {
+                    const testPath = path.join(VIDEOS_DIR, folder, `${videoName}${ext}`);
+                    if (fs.existsSync(testPath)) {
+                        videoPath = testPath;
+                        break;
+                    }
+                }
+            }
+        }
+        if (!fs.existsSync(videoPath)) {
+            return res.status(404).json({ error: 'Video not found' });
+        }
+        res.download(videoPath, `${videoName}.mp4`);
+    } catch (err) {
+        console.error('Error downloading video:', err);
+        res.status(500).json({ error: 'Failed to download video' });
+    }
+});
+
 // Get video stream with range support for better performance
 app.get('/api/video-stream/:id', (req, res) => {
     try {

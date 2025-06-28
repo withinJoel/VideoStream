@@ -13,31 +13,38 @@ function updateAuthUI() {
     const userMenu = document.getElementById('userMenu');
     
     if (isAuthenticated && currentUser) {
-        authSection.style.display = 'none';
-        userMenu.style.display = 'block';
+        if (authSection) authSection.style.display = 'none';
+        if (userMenu) userMenu.style.display = 'block';
         
-        document.getElementById('userName').textContent = currentUser.username;
-        document.getElementById('userAvatarImg').src = currentUser.avatar || '/api/placeholder/32/32';
-        
-        // Show authenticated features
-        document.getElementById('createPlaylistBtn').style.display = 'flex';
-        document.getElementById('ratingSection').style.display = 'flex';
-        document.getElementById('commentForm').style.display = 'block';
-        document.getElementById('modalPlaylistBtn').style.display = 'flex';
-        document.getElementById('subscribeBtn').style.display = 'flex';
-        
-        // Update comment form avatar
-        document.getElementById('commentUserAvatar').src = currentUser.avatar || '/api/placeholder/40/40';
+        const userName = document.getElementById('userName');
+        if (userName) userName.textContent = currentUser.username;
+        const userAvatarImg = document.getElementById('userAvatarImg');
+        if (userAvatarImg) userAvatarImg.src = currentUser.avatar || '/api/placeholder/32/32';
+        const createPlaylistBtn = document.getElementById('createPlaylistBtn');
+        if (createPlaylistBtn) createPlaylistBtn.style.display = 'flex';
+        const ratingSection = document.getElementById('ratingSection');
+        if (ratingSection) ratingSection.style.display = 'flex';
+        const commentForm = document.getElementById('commentForm');
+        if (commentForm) commentForm.style.display = 'block';
+        const modalPlaylistBtn = document.getElementById('modalPlaylistBtn');
+        if (modalPlaylistBtn) modalPlaylistBtn.style.display = 'flex';
+        const subscribeBtn = document.getElementById('subscribeBtn');
+        if (subscribeBtn) subscribeBtn.style.display = 'flex';
+        const commentUserAvatar = document.getElementById('commentUserAvatar');
+        if (commentUserAvatar) commentUserAvatar.src = currentUser.avatar || '/api/placeholder/40/40';
     } else {
-        authSection.style.display = 'flex';
-        userMenu.style.display = 'none';
-        
-        // Hide authenticated features
-        document.getElementById('createPlaylistBtn').style.display = 'none';
-        document.getElementById('ratingSection').style.display = 'none';
-        document.getElementById('commentForm').style.display = 'none';
-        document.getElementById('modalPlaylistBtn').style.display = 'none';
-        document.getElementById('subscribeBtn').style.display = 'none';
+        if (authSection) authSection.style.display = 'flex';
+        if (userMenu) userMenu.style.display = 'none';
+        const createPlaylistBtn = document.getElementById('createPlaylistBtn');
+        if (createPlaylistBtn) createPlaylistBtn.style.display = 'none';
+        const ratingSection = document.getElementById('ratingSection');
+        if (ratingSection) ratingSection.style.display = 'none';
+        const commentForm = document.getElementById('commentForm');
+        if (commentForm) commentForm.style.display = 'none';
+        const modalPlaylistBtn = document.getElementById('modalPlaylistBtn');
+        if (modalPlaylistBtn) modalPlaylistBtn.style.display = 'none';
+        const subscribeBtn = document.getElementById('subscribeBtn');
+        if (subscribeBtn) subscribeBtn.style.display = 'none';
     }
 }
 

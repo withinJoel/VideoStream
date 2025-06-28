@@ -1,6 +1,7 @@
 function setupEventListeners() {
     // Header navigation
-    document.getElementById('homeButton').addEventListener('click', () => navigateToSection('home'));
+    const homeButton = document.getElementById('homeButton');
+    if (homeButton) homeButton.addEventListener('click', () => navigateToSection('home'));
     
     // Main navigation
     document.querySelectorAll('.nav-link').forEach(link => {
@@ -12,8 +13,10 @@ function setupEventListeners() {
     });
     
     // Mobile navigation
-    document.getElementById('mobileMenuBtn').addEventListener('click', toggleMobileNav);
-    document.getElementById('mobileNavClose').addEventListener('click', closeMobileNav);
+    const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+    if (mobileMenuBtn) mobileMenuBtn.addEventListener('click', toggleMobileNav);
+    const mobileNavClose = document.getElementById('mobileNavClose');
+    if (mobileNavClose) mobileNavClose.addEventListener('click', closeMobileNav);
     
     document.querySelectorAll('.mobile-nav-link').forEach(link => {
         link.addEventListener('click', (e) => {
@@ -27,15 +30,18 @@ function setupEventListeners() {
     // Search functionality
     const searchInput = document.getElementById('searchInput');
     const searchBtn = document.getElementById('searchBtn');
-    
-    searchInput.addEventListener('input', handleSearchInput);
-    searchInput.addEventListener('focus', showSearchSuggestions);
-    searchInput.addEventListener('blur', hideSearchSuggestions);
-    searchBtn.addEventListener('click', performSearch);
+    if (searchInput) {
+        searchInput.addEventListener('input', handleSearchInput);
+        searchInput.addEventListener('focus', showSearchSuggestions);
+        searchInput.addEventListener('blur', hideSearchSuggestions);
+    }
+    if (searchBtn) searchBtn.addEventListener('click', performSearch);
     
     // Filter controls
-    document.getElementById('sortSelect').addEventListener('change', handleSortChange);
-    document.getElementById('shuffleBtn').addEventListener('click', shuffleVideos);
+    const sortSelect = document.getElementById('sortSelect');
+    if (sortSelect) sortSelect.addEventListener('change', handleSortChange);
+    const shuffleBtn = document.getElementById('shuffleBtn');
+    if (shuffleBtn) shuffleBtn.addEventListener('click', shuffleVideos);
     
     // View options
     document.querySelectorAll('.view-option').forEach(btn => {
@@ -47,53 +53,81 @@ function setupEventListeners() {
     });
     
     // Modal controls
-    document.getElementById('modalCloseBtn').addEventListener('click', closeVideoModal);
-    document.getElementById('modalBackdrop').addEventListener('click', closeVideoModal);
+    const modalCloseBtn = document.getElementById('modalCloseBtn');
+    if (modalCloseBtn) modalCloseBtn.addEventListener('click', closeVideoModal);
+    const modalBackdrop = document.getElementById('modalBackdrop');
+    if (modalBackdrop) modalBackdrop.addEventListener('click', closeVideoModal);
     
     // Authentication
-    document.getElementById('loginBtn').addEventListener('click', () => showAuthModal('login'));
-    document.getElementById('registerBtn').addEventListener('click', () => showAuthModal('register'));
-    document.getElementById('loginModalClose').addEventListener('click', () => hideAuthModal('login'));
-    document.getElementById('registerModalClose').addEventListener('click', () => hideAuthModal('register'));
-    document.getElementById('switchToRegister').addEventListener('click', (e) => {
+    const loginBtn = document.getElementById('loginBtn');
+    if (loginBtn) loginBtn.addEventListener('click', () => showAuthModal('login'));
+    const registerBtn = document.getElementById('registerBtn');
+    if (registerBtn) registerBtn.addEventListener('click', () => showAuthModal('register'));
+    const loginModalClose = document.getElementById('loginModalClose');
+    if (loginModalClose) loginModalClose.addEventListener('click', () => hideAuthModal('login'));
+    const registerModalClose = document.getElementById('registerModalClose');
+    if (registerModalClose) registerModalClose.addEventListener('click', () => hideAuthModal('register'));
+    const switchToRegister = document.getElementById('switchToRegister');
+    if (switchToRegister) switchToRegister.addEventListener('click', (e) => {
         e.preventDefault();
         switchAuthModal('register');
     });
-    document.getElementById('switchToLogin').addEventListener('click', (e) => {
+    const switchToLogin = document.getElementById('switchToLogin');
+    if (switchToLogin) switchToLogin.addEventListener('click', (e) => {
         e.preventDefault();
         switchAuthModal('login');
     });
     
     // Auth forms
-    document.getElementById('loginForm').addEventListener('submit', handleLogin);
-    document.getElementById('registerForm').addEventListener('submit', handleRegister);
+    const loginForm = document.getElementById('loginForm');
+    if (loginForm) loginForm.addEventListener('submit', handleLogin);
+    const registerForm = document.getElementById('registerForm');
+    if (registerForm) registerForm.addEventListener('submit', handleRegister);
     
     // User menu
-    document.getElementById('userAvatarContainer').addEventListener('click', toggleUserDropdown);
-    document.getElementById('profileBtn').addEventListener('click', () => showProfileModal());
-    document.getElementById('myPlaylistsBtn').addEventListener('click', () => navigateToSection('playlists'));
-    document.getElementById('subscriptionsBtn').addEventListener('click', () => navigateToSection('subscriptions'));
-    document.getElementById('favoritesDropdownBtn').addEventListener('click', () => navigateToSection('favorites'));
-    document.getElementById('watchHistoryBtn').addEventListener('click', () => navigateToSection('watch-history'));
-    document.getElementById('logoutBtn').addEventListener('click', handleLogout);
+    const userAvatarContainer = document.getElementById('userAvatarContainer');
+    if (userAvatarContainer) userAvatarContainer.addEventListener('click', toggleUserDropdown);
+    const profileBtn = document.getElementById('profileBtn');
+    if (profileBtn) profileBtn.addEventListener('click', () => showProfileModal());
+    const myPlaylistsBtn = document.getElementById('myPlaylistsBtn');
+    if (myPlaylistsBtn) myPlaylistsBtn.addEventListener('click', () => navigateToSection('playlists'));
+    const subscriptionsBtn = document.getElementById('subscriptionsBtn');
+    if (subscriptionsBtn) subscriptionsBtn.addEventListener('click', () => navigateToSection('subscriptions'));
+    const favoritesDropdownBtn = document.getElementById('favoritesDropdownBtn');
+    if (favoritesDropdownBtn) favoritesDropdownBtn.addEventListener('click', () => navigateToSection('favorites'));
+    const watchHistoryBtn = document.getElementById('watchHistoryBtn');
+    if (watchHistoryBtn) watchHistoryBtn.addEventListener('click', () => navigateToSection('watch-history'));
+    const logoutBtn = document.getElementById('logoutBtn');
+    if (logoutBtn) logoutBtn.addEventListener('click', handleLogout);
     
     // Profile modal
-    document.getElementById('profileModalClose').addEventListener('click', () => hideProfileModal());
-    document.getElementById('profileForm').addEventListener('submit', handleProfileUpdate);
-    document.getElementById('changeAvatarBtn').addEventListener('click', () => {
-        document.getElementById('avatarUpload').click();
+    const profileModalClose = document.getElementById('profileModalClose');
+    if (profileModalClose) profileModalClose.addEventListener('click', () => hideProfileModal());
+    const profileForm = document.getElementById('profileForm');
+    if (profileForm) profileForm.addEventListener('submit', handleProfileUpdate);
+    const changeAvatarBtn = document.getElementById('changeAvatarBtn');
+    if (changeAvatarBtn) changeAvatarBtn.addEventListener('click', () => {
+        const avatarUpload = document.getElementById('avatarUpload');
+        if (avatarUpload) avatarUpload.click();
     });
-    document.getElementById('avatarUpload').addEventListener('change', handleAvatarUpload);
+    const avatarUpload = document.getElementById('avatarUpload');
+    if (avatarUpload) avatarUpload.addEventListener('change', handleAvatarUpload);
     
     // Playlist modal
-    document.getElementById('playlistModalClose').addEventListener('click', () => hidePlaylistModal());
-    document.getElementById('createNewPlaylistBtn').addEventListener('click', handleCreatePlaylist);
-    document.getElementById('createPlaylistBtn').addEventListener('click', () => showCreatePlaylistModal());
+    const playlistModalClose = document.getElementById('playlistModalClose');
+    if (playlistModalClose) playlistModalClose.addEventListener('click', () => hidePlaylistModal());
+    const createNewPlaylistBtn = document.getElementById('createNewPlaylistBtn');
+    if (createNewPlaylistBtn) createNewPlaylistBtn.addEventListener('click', handleCreatePlaylist);
+    const createPlaylistBtn = document.getElementById('createPlaylistBtn');
+    if (createPlaylistBtn) createPlaylistBtn.addEventListener('click', () => showCreatePlaylistModal());
     
     // Video modal actions - Updated for favorites only (no separate likes)
-    document.getElementById('modalFavBtn').addEventListener('click', () => toggleVideoFavorite());
-    document.getElementById('modalPlaylistBtn').addEventListener('click', () => showPlaylistModal());
-    document.getElementById('subscribeBtn').addEventListener('click', handleSubscribe);
+    const modalFavBtn = document.getElementById('modalFavBtn');
+    if (modalFavBtn) modalFavBtn.addEventListener('click', () => toggleVideoFavorite());
+    const modalPlaylistBtn = document.getElementById('modalPlaylistBtn');
+    if (modalPlaylistBtn) modalPlaylistBtn.addEventListener('click', () => showPlaylistModal());
+    const subscribeBtn = document.getElementById('subscribeBtn');
+    if (subscribeBtn) subscribeBtn.addEventListener('click', handleSubscribe);
     
     // Star rating
     document.querySelectorAll('#starRating i').forEach((star, index) => {
@@ -103,9 +137,12 @@ function setupEventListeners() {
     });
     
     // Comments
-    document.getElementById('commentInput').addEventListener('focus', showCommentActions);
-    document.getElementById('commentCancelBtn').addEventListener('click', hideCommentActions);
-    document.getElementById('commentSubmitBtn').addEventListener('click', submitComment);
+    const commentInput = document.getElementById('commentInput');
+    if (commentInput) commentInput.addEventListener('focus', showCommentActions);
+    const commentCancelBtn = document.getElementById('commentCancelBtn');
+    if (commentCancelBtn) commentCancelBtn.addEventListener('click', hideCommentActions);
+    const commentSubmitBtn = document.getElementById('commentSubmitBtn');
+    if (commentSubmitBtn) commentSubmitBtn.addEventListener('click', submitComment);
     
     // Infinite scroll
     window.addEventListener('scroll', handleScroll);
@@ -114,12 +151,14 @@ function setupEventListeners() {
     document.addEventListener('keydown', handleKeyboardShortcuts);
     
     // Clear filters
-    document.getElementById('clearFiltersBtn').addEventListener('click', clearAllFilters);
+    const clearFiltersBtn = document.getElementById('clearFiltersBtn');
+    if (clearFiltersBtn) clearFiltersBtn.addEventListener('click', clearAllFilters);
     
     // Close dropdowns when clicking outside
     document.addEventListener('click', (e) => {
         if (!e.target.closest('.user-menu')) {
-            document.getElementById('userDropdown').classList.remove('active');
+            const userDropdown = document.getElementById('userDropdown');
+            if (userDropdown) userDropdown.classList.remove('active');
         }
     });
 }
