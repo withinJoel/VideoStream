@@ -1,26 +1,44 @@
 let watchLaterVideos = [];
 
-function loadWatchLaterVideos() {
+async function loadWatchLaterVideos() {
     if (!isAuthenticated) {
         showNoResults('Login Required', 'Please login to view your watch later list');
         return;
     }
     
-    fetch(`/api/watch-later/${currentUser.id}`)
-        .then(response => response.json())
-        .then(data => {
-            watchLaterVideos = data.videos || [];
-            if (watchLaterVideos.length > 0) {
-                displayVideos(watchLaterVideos, true);
-                updateVideoCount(watchLaterVideos.length);
+    if (isLoading) return;
+    
+    isLoading = true;
+    showLoadingIndicator();
+    
+    try {
+        const response = await fetch(`/api/watch-later/${currentUser.id}?page=${currentPage}&limit=20`);
+        const data = await response.json();
+        
+        if (data.videos && data.videos.length > 0) {
+            if (currentPage === 1) {
+                watchLaterVideos = data.videos;
+                displayVideos(data.videos, true);
             } else {
-                showNoResults('No videos in watch later', 'Add videos to your watch later list to see them here');
+                watchLaterVideos = [...watchLaterVideos, ...data.videos];
+                displayVideos(data.videos, false);
             }
-        })
-        .catch(error => {
-            console.error('Error loading watch later videos:', error);
-            showToast('Failed to load watch later videos', 'error');
-        });
+            
+            hasMore = data.hasMore;
+            updateVideoCount(data.total);
+        } else if (currentPage === 1) {
+            watchLaterVideos = [];
+            showNoResults('No videos in watch later', 'Add videos to your watch later list to see them here');
+        }
+        
+        currentPage++;
+    } catch (error) {
+        console.error('Error loading watch later videos:', error);
+        showToast('Failed to load watch later videos', 'error');
+    } finally {
+        isLoading = false;
+        hideLoadingIndicator();
+    }
 }
 
 function addToWatchLater(videoId) {
@@ -67,12 +85,21 @@ function removeFromWatchLater(videoId) {
             
             // If we're on the watch later page, remove the video from the grid
             if (currentSection === 'watch-later') {
-                const videoCard = document.querySelector(`[data-video-id="${videoId}"]`);
-                if (videoCard) {
-                    videoCard.remove();
-                }
+                const videoCards = document.querySelectorAll('.video-card');
+                videoCards.forEach(card => {
+                    const cardVideoId = card.getAttribute('data-video-id');
+                    if (cardVideoId === videoId) {
+                        card.remove();
+                    }
+                });
+                
                 watchLaterVideos = watchLaterVideos.filter(v => v.id !== videoId);
                 updateVideoCount(watchLaterVideos.length);
+                
+                // If no videos left, show no results
+                if (watchLaterVideos.length === 0) {
+                    showNoResults('No videos in watch later', 'Add videos to your watch later list to see them here');
+                }
             }
         } else {
             showToast(data.error || 'Failed to remove from watch later', 'error');
@@ -105,6 +132,12 @@ function updateWatchLaterButton(videoId, isInWatchLater) {
     if (btn && currentVideoId === videoId) {
         btn.classList.toggle('active', isInWatchLater);
         btn.title = isInWatchLater ? 'Remove from Watch Later' : 'Add to Watch Later';
+        
+        // Update button icon
+        const icon = btn.querySelector('i');
+        if (icon) {
+            icon.className = isInWatchLater ? 'fas fa-clock-rotate-left' : 'fas fa-clock';
+        }
     }
 }
 

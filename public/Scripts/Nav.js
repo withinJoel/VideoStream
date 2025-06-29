@@ -60,5 +60,9 @@ function navigateToSection(section) {
             showVideoGrid();
             loadWatchHistory();
             break;
+        case 'watch-later':
+            showVideoGrid();
+            loadWatchLaterVideos();
+            break;
     }
 }

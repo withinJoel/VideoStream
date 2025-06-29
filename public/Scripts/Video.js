@@ -19,7 +19,7 @@ async function openVideoModal(video) {
     document.getElementById('modalVideoDuration').textContent = video.duration || 'Unknown';
     document.getElementById('modalVideoQuality').textContent = video.quality || 'HD';
     
-    // Update video source with multiple quality options
+    // Update video source
     const videoElement = document.getElementById('modalVideo');
     setupVideoPlayer(videoElement, video);
     
@@ -51,6 +51,7 @@ async function openVideoModal(video) {
     // Check subscription status
     if (isAuthenticated) {
         checkSubscriptionStatus(video.artist);
+        checkWatchLaterStatus(video.id);
     }
     
     // Show modal
@@ -74,15 +75,11 @@ function setupVideoPlayer(videoElement, video) {
     // Clear existing sources
     videoElement.innerHTML = '';
     
-    // Add multiple quality sources
-    const qualities = ['4K', 'HD', 'SD'];
-    qualities.forEach(quality => {
-        const source = document.createElement('source');
-        source.src = `/api/video-stream/${video.id}?quality=${quality}`;
-        source.type = 'video/mp4';
-        source.setAttribute('data-quality', quality);
-        videoElement.appendChild(source);
-    });
+    // Add single video source (since you only have one resolution)
+    const source = document.createElement('source');
+    source.src = `/api/video-stream/${video.id}`;
+    source.type = 'video/mp4';
+    videoElement.appendChild(source);
     
     // Add subtitles if available
     if (video.subtitles) {
@@ -96,6 +93,9 @@ function setupVideoPlayer(videoElement, video) {
         });
     }
     
+    // Remove default controls and add custom controls
+    videoElement.controls = false;
+    
     // Setup custom video controls
     setupCustomVideoControls(videoElement, video);
     
@@ -104,26 +104,70 @@ function setupVideoPlayer(videoElement, video) {
 }
 
 function setupCustomVideoControls(videoElement, video) {
-    // Add quality selector
-    const qualitySelector = document.createElement('div');
-    qualitySelector.className = 'video-quality-selector';
-    qualitySelector.innerHTML = `
-        <button class="quality-btn" title="Quality">
-            <i class="fas fa-cog"></i>
-            <span class="quality-text">HD</span>
-        </button>
-        <div class="quality-menu">
-            <div class="quality-option" data-quality="4K">4K</div>
-            <div class="quality-option" data-quality="HD">HD</div>
-            <div class="quality-option" data-quality="SD">SD</div>
-        </div>
-    `;
+    // Remove any existing custom controls
+    const existingControls = videoElement.parentElement.querySelector('.custom-video-controls');
+    if (existingControls) {
+        existingControls.remove();
+    }
     
-    // Add playback speed control
+    // Create custom controls container
+    const controlsContainer = document.createElement('div');
+    controlsContainer.className = 'custom-video-controls';
+    
+    // Play/Pause button
+    const playPauseBtn = document.createElement('button');
+    playPauseBtn.className = 'control-btn play-pause-btn';
+    playPauseBtn.innerHTML = '<i class="fas fa-play"></i>';
+    playPauseBtn.onclick = () => togglePlayPause(videoElement, playPauseBtn);
+    
+    // Progress bar container
+    const progressContainer = document.createElement('div');
+    progressContainer.className = 'progress-container';
+    
+    const progressBar = document.createElement('div');
+    progressBar.className = 'progress-bar';
+    
+    const progressFilled = document.createElement('div');
+    progressFilled.className = 'progress-filled';
+    
+    const progressHandle = document.createElement('div');
+    progressHandle.className = 'progress-handle';
+    
+    progressBar.appendChild(progressFilled);
+    progressBar.appendChild(progressHandle);
+    progressContainer.appendChild(progressBar);
+    
+    // Time display
+    const timeDisplay = document.createElement('div');
+    timeDisplay.className = 'time-display';
+    timeDisplay.innerHTML = '<span class="current-time">0:00</span> / <span class="total-time">0:00</span>';
+    
+    // Volume control
+    const volumeContainer = document.createElement('div');
+    volumeContainer.className = 'volume-container';
+    
+    const volumeBtn = document.createElement('button');
+    volumeBtn.className = 'control-btn volume-btn';
+    volumeBtn.innerHTML = '<i class="fas fa-volume-up"></i>';
+    volumeBtn.onclick = () => toggleMute(videoElement, volumeBtn);
+    
+    const volumeSlider = document.createElement('input');
+    volumeSlider.type = 'range';
+    volumeSlider.className = 'volume-slider';
+    volumeSlider.min = '0';
+    volumeSlider.max = '1';
+    volumeSlider.step = '0.1';
+    volumeSlider.value = '1';
+    volumeSlider.oninput = (e) => setVolume(videoElement, e.target.value, volumeBtn);
+    
+    volumeContainer.appendChild(volumeBtn);
+    volumeContainer.appendChild(volumeSlider);
+    
+    // Playback speed control
     const speedSelector = document.createElement('div');
-    speedSelector.className = 'video-speed-selector';
+    speedSelector.className = 'speed-selector';
     speedSelector.innerHTML = `
-        <button class="speed-btn" title="Playback Speed">
+        <button class="control-btn speed-btn" title="Playback Speed">
             <i class="fas fa-tachometer-alt"></i>
             <span class="speed-text">1x</span>
         </button>
@@ -138,56 +182,68 @@ function setupCustomVideoControls(videoElement, video) {
         </div>
     `;
     
-    // Add picture-in-picture button
+    // Picture-in-picture button
     const pipButton = document.createElement('button');
-    pipButton.className = 'pip-btn';
+    pipButton.className = 'control-btn pip-btn';
     pipButton.innerHTML = '<i class="fas fa-external-link-alt"></i>';
     pipButton.title = 'Picture in Picture';
     pipButton.onclick = () => togglePictureInPicture(videoElement);
     
-    // Add theater mode button
+    // Theater mode button
     const theaterButton = document.createElement('button');
-    theaterButton.className = 'theater-btn';
+    theaterButton.className = 'control-btn theater-btn';
     theaterButton.innerHTML = '<i class="fas fa-expand-arrows-alt"></i>';
     theaterButton.title = 'Theater Mode';
     theaterButton.onclick = () => toggleTheaterMode();
     
-    // Add controls to video container
-    const controlsContainer = document.createElement('div');
-    controlsContainer.className = 'custom-video-controls';
-    controlsContainer.appendChild(qualitySelector);
-    controlsContainer.appendChild(speedSelector);
-    controlsContainer.appendChild(pipButton);
-    controlsContainer.appendChild(theaterButton);
+    // Fullscreen button
+    const fullscreenButton = document.createElement('button');
+    fullscreenButton.className = 'control-btn fullscreen-btn';
+    fullscreenButton.innerHTML = '<i class="fas fa-expand"></i>';
+    fullscreenButton.title = 'Fullscreen';
+    fullscreenButton.onclick = () => toggleFullscreen(videoElement, fullscreenButton);
     
+    // Assemble controls
+    const leftControls = document.createElement('div');
+    leftControls.className = 'controls-left';
+    leftControls.appendChild(playPauseBtn);
+    leftControls.appendChild(volumeContainer);
+    leftControls.appendChild(timeDisplay);
+    
+    const centerControls = document.createElement('div');
+    centerControls.className = 'controls-center';
+    centerControls.appendChild(progressContainer);
+    
+    const rightControls = document.createElement('div');
+    rightControls.className = 'controls-right';
+    rightControls.appendChild(speedSelector);
+    rightControls.appendChild(pipButton);
+    rightControls.appendChild(theaterButton);
+    rightControls.appendChild(fullscreenButton);
+    
+    controlsContainer.appendChild(leftControls);
+    controlsContainer.appendChild(centerControls);
+    controlsContainer.appendChild(rightControls);
+    
+    // Add controls to video container
     const videoContainer = videoElement.parentElement;
     videoContainer.appendChild(controlsContainer);
     
     // Setup control events
-    setupControlEvents(qualitySelector, speedSelector, videoElement);
+    setupControlEvents(speedSelector, videoElement, progressBar, progressFilled, timeDisplay);
+    
+    // Show/hide controls on hover
+    setupControlsVisibility(videoContainer, controlsContainer);
 }
 
-function setupControlEvents(qualitySelector, speedSelector, videoElement) {
-    // Quality selector events
-    qualitySelector.querySelector('.quality-btn').onclick = (e) => {
-        e.stopPropagation();
-        qualitySelector.querySelector('.quality-menu').classList.toggle('active');
-    };
-    
-    qualitySelector.querySelectorAll('.quality-option').forEach(option => {
-        option.onclick = (e) => {
-            e.stopPropagation();
-            const quality = option.dataset.quality;
-            changeVideoQuality(videoElement, quality);
-            qualitySelector.querySelector('.quality-text').textContent = quality;
-            qualitySelector.querySelector('.quality-menu').classList.remove('active');
-        };
-    });
-    
+function setupControlEvents(speedSelector, videoElement, progressBar, progressFilled, timeDisplay) {
     // Speed selector events
-    speedSelector.querySelector('.speed-btn').onclick = (e) => {
+    const speedBtn = speedSelector.querySelector('.speed-btn');
+    const speedMenu = speedSelector.querySelector('.speed-menu');
+    
+    speedBtn.onclick = (e) => {
         e.stopPropagation();
-        speedSelector.querySelector('.speed-menu').classList.toggle('active');
+        speedMenu.classList.toggle('active');
     };
     
     speedSelector.querySelectorAll('.speed-option').forEach(option => {
@@ -196,7 +252,7 @@ function setupControlEvents(qualitySelector, speedSelector, videoElement) {
             const speed = parseFloat(option.dataset.speed);
             videoElement.playbackRate = speed;
             speedSelector.querySelector('.speed-text').textContent = `${speed}x`;
-            speedSelector.querySelector('.speed-menu').classList.remove('active');
+            speedMenu.classList.remove('active');
             
             // Update active state
             speedSelector.querySelectorAll('.speed-option').forEach(opt => opt.classList.remove('active'));
@@ -204,33 +260,119 @@ function setupControlEvents(qualitySelector, speedSelector, videoElement) {
         };
     });
     
+    // Progress bar events
+    let isDragging = false;
+    
+    progressBar.onclick = (e) => {
+        if (!isDragging) {
+            const rect = progressBar.getBoundingClientRect();
+            const percent = (e.clientX - rect.left) / rect.width;
+            videoElement.currentTime = percent * videoElement.duration;
+        }
+    };
+    
+    progressBar.onmousedown = (e) => {
+        isDragging = true;
+        const rect = progressBar.getBoundingClientRect();
+        const percent = (e.clientX - rect.left) / rect.width;
+        videoElement.currentTime = percent * videoElement.duration;
+    };
+    
+    document.onmousemove = (e) => {
+        if (isDragging) {
+            const rect = progressBar.getBoundingClientRect();
+            const percent = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+            videoElement.currentTime = percent * videoElement.duration;
+        }
+    };
+    
+    document.onmouseup = () => {
+        isDragging = false;
+    };
+    
+    // Update progress and time
+    videoElement.ontimeupdate = () => {
+        if (!isDragging && videoElement.duration) {
+            const percent = (videoElement.currentTime / videoElement.duration) * 100;
+            progressFilled.style.width = `${percent}%`;
+            
+            const currentTime = formatTime(videoElement.currentTime);
+            const totalTime = formatTime(videoElement.duration);
+            timeDisplay.innerHTML = `<span class="current-time">${currentTime}</span> / <span class="total-time">${totalTime}</span>`;
+        }
+    };
+    
     // Close menus when clicking outside
     document.addEventListener('click', () => {
-        qualitySelector.querySelector('.quality-menu').classList.remove('active');
-        speedSelector.querySelector('.speed-menu').classList.remove('active');
+        speedMenu.classList.remove('active');
     });
 }
 
-function changeVideoQuality(videoElement, quality) {
-    const currentTime = videoElement.currentTime;
-    const wasPlaying = !videoElement.paused;
+function setupControlsVisibility(videoContainer, controlsContainer) {
+    let hideTimeout;
     
-    // Find the source with the requested quality
-    const sources = videoElement.querySelectorAll('source');
-    sources.forEach(source => {
-        if (source.dataset.quality === quality) {
-            videoElement.src = source.src;
-        }
-    });
+    const showControls = () => {
+        controlsContainer.classList.add('visible');
+        clearTimeout(hideTimeout);
+    };
     
-    // Restore playback state
-    videoElement.addEventListener('loadedmetadata', function onLoaded() {
-        videoElement.currentTime = currentTime;
-        if (wasPlaying) {
-            videoElement.play();
-        }
-        videoElement.removeEventListener('loadedmetadata', onLoaded);
-    });
+    const hideControls = () => {
+        hideTimeout = setTimeout(() => {
+            controlsContainer.classList.remove('visible');
+        }, 3000);
+    };
+    
+    videoContainer.onmouseenter = showControls;
+    videoContainer.onmousemove = showControls;
+    videoContainer.onmouseleave = hideControls;
+    
+    // Show controls initially
+    showControls();
+    hideControls();
+}
+
+function togglePlayPause(videoElement, button) {
+    if (videoElement.paused) {
+        videoElement.play();
+        button.innerHTML = '<i class="fas fa-pause"></i>';
+    } else {
+        videoElement.pause();
+        button.innerHTML = '<i class="fas fa-play"></i>';
+    }
+}
+
+function toggleMute(videoElement, button) {
+    videoElement.muted = !videoElement.muted;
+    if (videoElement.muted) {
+        button.innerHTML = '<i class="fas fa-volume-mute"></i>';
+    } else {
+        button.innerHTML = '<i class="fas fa-volume-up"></i>';
+    }
+}
+
+function setVolume(videoElement, value, button) {
+    videoElement.volume = value;
+    if (value == 0) {
+        button.innerHTML = '<i class="fas fa-volume-mute"></i>';
+    } else if (value < 0.5) {
+        button.innerHTML = '<i class="fas fa-volume-down"></i>';
+    } else {
+        button.innerHTML = '<i class="fas fa-volume-up"></i>';
+    }
+}
+
+function toggleFullscreen(videoElement, button) {
+    if (!document.fullscreenElement) {
+        videoElement.parentElement.requestFullscreen().then(() => {
+            button.innerHTML = '<i class="fas fa-compress"></i>';
+        }).catch(err => {
+            console.error('Error attempting to enable fullscreen:', err);
+        });
+    } else {
+        document.exitFullscreen().then(() => {
+            button.innerHTML = '<i class="fas fa-expand"></i>';
+        });
+    }
 }
 
 function togglePictureInPicture(videoElement) {
@@ -254,6 +396,12 @@ function toggleTheaterMode() {
     } else {
         theaterBtn.className = 'fas fa-expand-arrows-alt';
     }
+}
+
+function formatTime(seconds) {
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = Math.floor(seconds % 60);
+    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
 }
 
 function setupVideoEvents(videoElement, video) {
@@ -293,8 +441,9 @@ function setupVideoEvents(videoElement, video) {
     
     // Double-click to fullscreen
     videoElement.addEventListener('dblclick', () => {
-        if (videoElement.requestFullscreen) {
-            videoElement.requestFullscreen();
+        const fullscreenBtn = document.querySelector('.fullscreen-btn');
+        if (fullscreenBtn) {
+            toggleFullscreen(videoElement, fullscreenBtn);
         }
     });
 }
@@ -304,10 +453,9 @@ function handleVideoKeyboardShortcuts(e, videoElement) {
         case ' ':
         case 'k':
             e.preventDefault();
-            if (videoElement.paused) {
-                videoElement.play();
-            } else {
-                videoElement.pause();
+            const playPauseBtn = document.querySelector('.play-pause-btn');
+            if (playPauseBtn) {
+                togglePlayPause(videoElement, playPauseBtn);
             }
             break;
         case 'ArrowLeft':
@@ -320,20 +468,34 @@ function handleVideoKeyboardShortcuts(e, videoElement) {
             break;
         case 'ArrowUp':
             e.preventDefault();
-            videoElement.volume = Math.min(1, videoElement.volume + 0.1);
+            const newVolumeUp = Math.min(1, videoElement.volume + 0.1);
+            videoElement.volume = newVolumeUp;
+            const volumeSlider = document.querySelector('.volume-slider');
+            const volumeBtn = document.querySelector('.volume-btn');
+            if (volumeSlider) volumeSlider.value = newVolumeUp;
+            if (volumeBtn) setVolume(videoElement, newVolumeUp, volumeBtn);
             break;
         case 'ArrowDown':
             e.preventDefault();
-            videoElement.volume = Math.max(0, videoElement.volume - 0.1);
+            const newVolumeDown = Math.max(0, videoElement.volume - 0.1);
+            videoElement.volume = newVolumeDown;
+            const volumeSliderDown = document.querySelector('.volume-slider');
+            const volumeBtnDown = document.querySelector('.volume-btn');
+            if (volumeSliderDown) volumeSliderDown.value = newVolumeDown;
+            if (volumeBtnDown) setVolume(videoElement, newVolumeDown, volumeBtnDown);
             break;
         case 'm':
             e.preventDefault();
-            videoElement.muted = !videoElement.muted;
+            const muteBtn = document.querySelector('.volume-btn');
+            if (muteBtn) {
+                toggleMute(videoElement, muteBtn);
+            }
             break;
         case 'f':
             e.preventDefault();
-            if (videoElement.requestFullscreen) {
-                videoElement.requestFullscreen();
+            const fullscreenBtn = document.querySelector('.fullscreen-btn');
+            if (fullscreenBtn) {
+                toggleFullscreen(videoElement, fullscreenBtn);
             }
             break;
     }
