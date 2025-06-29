@@ -58,7 +58,7 @@ html {
 }
 
 body {
-    font-family: "Rubik", sans-serif;
+    font-family: "Poppins";
     background-color: #0d0d0d;
     color: #ffffff;
     line-height: 1.6;
@@ -68,14 +68,14 @@ body {
 /* Header Styles */
 .header {
     position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
+    top: 10px;
+    left: 10px;
+    right: 10px;
     background: #000000;
     border-bottom: 1px solid #1a1a1a;
     z-index: 1000;
     height: 60px;
-    border-radius: 0 0 24px 24px;
+    border-radius: 24px;
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
 }
 
@@ -596,8 +596,8 @@ body {
 .filter-bar {
     background: #1a1a1a;
     border-bottom: 1px solid #333333;
-    padding: 20px 0;
-    border-radius: 0 0 24px 24px;
+    margin-top: 80px;
+    padding: 20px;
 }
 
 .filter-container {
@@ -899,8 +899,8 @@ body {
 }
 
 .performer-avatar img {
-    width: 100%;
-    height: 100%;
+    width: 500px;
+    height: 300px;
     object-fit: cover;
     object-position: center;
     display: block;
@@ -917,19 +917,22 @@ body {
 .performer-info {
     padding: 20px;
     text-align: center;
+    display: flex;
+    flex-direction: column; /* Stack children vertically */
+    align-items: center;     /* Center them horizontally */
 }
 
 .performer-name {
     font-size: 16px;
-    font-weight: 600;
+    font-weight: 800;
     color: #ffffff;
-    margin-bottom: 8px;
+    margin-bottom: 2px;
 }
 
 .performer-video-count {
     font-size: 13px;
     color: #666666;
-    margin-bottom: 16px;
+    margin-bottom: 2px;
 }
 
 .performer-subscribe-btn {
@@ -3308,7 +3311,7 @@ body {
     .logo-text {
         font-size: 24px;
         color: var(--md-sys-color-primary);
-        font-weight: 600;
+        font-weight: 800;
     }
     
     .search-input {
