@@ -67,6 +67,7 @@ function updateContentHeader(section) {
         'trending': 'Trending Videos',
         'new': 'New Videos',
         'top-rated': 'Top Rated Videos',
+        'ai': 'AI Recommendations',
         'categories': 'Categories',
         'performers': 'Celebs',
         'playlists': 'My Playlists',
@@ -81,6 +82,7 @@ function updateContentHeader(section) {
         'trending': 'Home / Trending',
         'new': 'Home / New',
         'top-rated': 'Home / Top Rated',
+        'ai': 'Home / AI Recommendations',
         'categories': 'Home / Categories',
         'performers': 'Home / Celebs',
         'playlists': 'Home / My Playlists',
@@ -672,7 +674,7 @@ function closeMobileNav() {
 
 // Scroll handling
 function handleScroll() {
-    if (currentSection === 'home' || currentSection === 'trending' || currentSection === 'favorites' || currentSection === 'watch-history' || currentSection === 'watch-later') {
+    if (currentSection === 'home' || currentSection === 'trending' || currentSection === 'favorites' || currentSection === 'watch-history' || currentSection === 'watch-later' || currentSection === 'ai') {
         const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
         const windowHeight = window.innerHeight;
         const documentHeight = document.documentElement.scrollHeight;
@@ -684,6 +686,9 @@ function handleScroll() {
                 loadWatchHistory();
             } else if (currentSection === 'watch-later') {
                 loadWatchLaterVideos();
+            } else if (currentSection === 'ai') {
+                // AI recommendations don't support pagination yet
+                return;
             } else {
                 loadVideos();
             }

@@ -36,6 +36,10 @@ function navigateToSection(section) {
             showVideoGrid();
             loadVideos(true);
             break;
+        case 'ai':
+            showVideoGrid();
+            loadAIRecommendations();
+            break;
         case 'categories':
             showCategoriesGrid();
             break;
