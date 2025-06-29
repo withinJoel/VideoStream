@@ -57,6 +57,9 @@ async function openVideoModal(video) {
     document.getElementById('videoModal').classList.add('active');
     document.body.style.overflow = 'hidden';
     
+    // Add to watch historyAdd commentMore actions
+    addToWatchHistory(video.id);
+    
     // Load related videos
     loadRelatedVideos(video);
     
