@@ -263,23 +263,38 @@ class AIRecommendationEngine {
         return patterns;
     }
 
-    parseDuration(durationStr) {
-        // Enhanced duration parsing with proper error handling
-        if (!durationStr) return 0;
+    parseDuration(durationInput) {
+        // Enhanced duration parsing with comprehensive error handling
+        if (!durationInput) return 0;
         
         // Handle different input types
-        if (typeof durationStr === 'number') {
-            return durationStr; // Already in seconds
+        if (typeof durationInput === 'number') {
+            return Math.max(0, durationInput); // Already in seconds, ensure positive
         }
         
-        if (typeof durationStr !== 'string') {
-            console.warn('Invalid duration format:', durationStr);
+        // Handle objects (extract duration property if exists)
+        if (typeof durationInput === 'object') {
+            if (durationInput.duration) {
+                return this.parseDuration(durationInput.duration);
+            }
+            if (durationInput.length) {
+                return this.parseDuration(durationInput.length);
+            }
+            if (durationInput.time) {
+                return this.parseDuration(durationInput.time);
+            }
+            console.warn('Invalid duration object format:', durationInput);
+            return 0;
+        }
+        
+        if (typeof durationInput !== 'string') {
+            console.warn('Invalid duration format:', typeof durationInput, durationInput);
             return 0;
         }
         
         try {
             // Handle different duration formats
-            const cleanDuration = durationStr.toString().trim();
+            const cleanDuration = durationInput.toString().trim();
             
             // Format: "5:30" or "1:05:30"
             if (cleanDuration.includes(':')) {
@@ -290,10 +305,10 @@ class AIRecommendationEngine {
                 
                 if (parts.length === 2) {
                     // MM:SS format
-                    return parts[0] * 60 + parts[1];
+                    return Math.max(0, parts[0] * 60 + parts[1]);
                 } else if (parts.length === 3) {
                     // HH:MM:SS format
-                    return parts[0] * 3600 + parts[1] * 60 + parts[2];
+                    return Math.max(0, parts[0] * 3600 + parts[1] * 60 + parts[2]);
                 }
             }
             
@@ -303,26 +318,28 @@ class AIRecommendationEngine {
                 const value = parseFloat(timeMatch[1]);
                 const unit = timeMatch[2].toLowerCase();
                 
+                if (isNaN(value)) return 0;
+                
                 switch (unit) {
-                    case 'h': return value * 3600;
-                    case 'm': return value * 60;
+                    case 'h': return Math.max(0, value * 3600);
+                    case 'm': return Math.max(0, value * 60);
                     case 's':
-                    case '': return value;
-                    default: return value;
+                    case '': return Math.max(0, value);
+                    default: return Math.max(0, value);
                 }
             }
             
             // Try to parse as plain number (seconds)
             const numValue = parseFloat(cleanDuration);
             if (!isNaN(numValue)) {
-                return numValue;
+                return Math.max(0, numValue);
             }
             
-            console.warn('Could not parse duration:', durationStr);
+            console.warn('Could not parse duration:', durationInput);
             return 0;
             
         } catch (error) {
-            console.error('Error parsing duration:', durationStr, error);
+            console.error('Error parsing duration:', durationInput, error);
             return 0;
         }
     }

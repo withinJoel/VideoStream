@@ -13,17 +13,26 @@ function handleSearchInput(e) {
 }
 
 function showSearchSuggestions() {
-    document.getElementById('searchSuggestions').style.display = 'block';
+    const suggestions = document.getElementById('searchSuggestions');
+    if (suggestions) {
+        suggestions.style.display = 'block';
+    }
 }
 
 function hideSearchSuggestions() {
     setTimeout(() => {
-        document.getElementById('searchSuggestions').style.display = 'none';
+        const suggestions = document.getElementById('searchSuggestions');
+        if (suggestions) {
+            suggestions.style.display = 'none';
+        }
     }, 200);
 }
 
 function performSearch() {
-    const query = document.getElementById('searchInput').value.trim();
+    const searchInput = document.getElementById('searchInput');
+    if (!searchInput) return;
+    
+    const query = searchInput.value.trim();
     if (query) {
         currentFilters.search = query;
         currentPage = 1;
@@ -60,6 +69,7 @@ async function loadSearchSuggestions(query) {
 
 function displaySearchSuggestions(suggestions) {
     const container = document.getElementById('searchSuggestions');
+    if (!container) return;
     
     if (suggestions.length === 0) {
         container.innerHTML = '<div class="suggestion-item">No suggestions found</div>';
@@ -122,13 +132,15 @@ function applySuggestion(type, value, text) {
     } else if (type === 'video') {
         // Search for specific video
         currentFilters.search = text;
-        document.getElementById('searchInput').value = text;
+        const searchInput = document.getElementById('searchInput');
+        if (searchInput) searchInput.value = text;
         currentPage = 1;
         hasMore = true;
         navigateToSection('home');
     } else {
         currentFilters.search = text;
-        document.getElementById('searchInput').value = text;
+        const searchInput = document.getElementById('searchInput');
+        if (searchInput) searchInput.value = text;
         currentPage = 1;
         hasMore = true;
         navigateToSection('home');
@@ -139,18 +151,24 @@ function applySuggestion(type, value, text) {
 // Advanced search filters
 function showAdvancedSearch() {
     const modal = document.getElementById('advancedSearchModal');
-    modal.classList.add('active');
-    document.body.style.overflow = 'hidden';
+    if (modal) {
+        modal.classList.add('active');
+        document.body.style.overflow = 'hidden';
+    }
 }
 
 function hideAdvancedSearch() {
     const modal = document.getElementById('advancedSearchModal');
-    modal.classList.remove('active');
-    document.body.style.overflow = '';
+    if (modal) {
+        modal.classList.remove('active');
+        document.body.style.overflow = '';
+    }
 }
 
 function applyAdvancedSearch() {
     const form = document.getElementById('advancedSearchForm');
+    if (!form) return;
+    
     const formData = new FormData(form);
     
     // Build advanced search filters
@@ -176,9 +194,22 @@ function applyAdvancedSearch() {
     window.dispatchEvent(new Event('videos:reset'));
 }
 
-// Voice search functionality
+// Voice search functionality - Fixed with proper error handling
 function initVoiceSearch() {
-    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+    // Check if speech recognition is supported
+    if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
+        console.log('Speech recognition not supported in this browser');
+        return;
+    }
+    
+    // Wait for DOM to be ready and search container to exist
+    const searchContainer = document.querySelector('.search-container');
+    if (!searchContainer) {
+        console.log('Search container not found, voice search not initialized');
+        return;
+    }
+    
+    try {
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         const recognition = new SpeechRecognition();
         
@@ -188,8 +219,11 @@ function initVoiceSearch() {
         
         recognition.onresult = function(event) {
             const transcript = event.results[0][0].transcript;
-            document.getElementById('searchInput').value = transcript;
-            performSearch();
+            const searchInput = document.getElementById('searchInput');
+            if (searchInput) {
+                searchInput.value = transcript;
+                performSearch();
+            }
         };
         
         recognition.onerror = function(event) {
@@ -197,23 +231,42 @@ function initVoiceSearch() {
             showToast('Voice search failed. Please try again.', 'error');
         };
         
-        // Add voice search button
+        // Create voice search button
         const voiceBtn = document.createElement('button');
         voiceBtn.className = 'voice-search-btn';
         voiceBtn.innerHTML = '<i class="fas fa-microphone"></i>';
         voiceBtn.title = 'Voice Search';
         voiceBtn.onclick = () => {
-            recognition.start();
-            voiceBtn.classList.add('listening');
-            setTimeout(() => voiceBtn.classList.remove('listening'), 3000);
+            try {
+                recognition.start();
+                voiceBtn.classList.add('listening');
+                setTimeout(() => voiceBtn.classList.remove('listening'), 3000);
+            } catch (error) {
+                console.error('Error starting voice recognition:', error);
+                showToast('Voice search failed to start', 'error');
+            }
         };
         
-        const searchContainer = document.querySelector('.search-container');
+        // Safely append to search container
         searchContainer.appendChild(voiceBtn);
+        console.log('Voice search initialized successfully');
+        
+    } catch (error) {
+        console.error('Error initializing voice search:', error);
     }
 }
 
-// Initialize search enhancements
+// Initialize search enhancements - Fixed with proper timing
 document.addEventListener('DOMContentLoaded', function() {
-    initVoiceSearch();
+    // Wait for components to load before initializing voice search
+    setTimeout(() => {
+        initVoiceSearch();
+    }, 1000);
+});
+
+// Also try to initialize when components are loaded
+window.addEventListener('allComponentsLoaded', function() {
+    setTimeout(() => {
+        initVoiceSearch();
+    }, 500);
 });
