@@ -213,46 +213,7 @@ function initVoiceSearch() {
     }
 }
 
-// Search filters and sorting
-function addSearchFilters() {
-    const filterContainer = document.createElement('div');
-    filterContainer.className = 'search-filters';
-    filterContainer.innerHTML = `
-        <div class="search-filter-group">
-            <label>Duration:</label>
-            <select id="durationFilter">
-                <option value="">Any</option>
-                <option value="short">Short (< 10 min)</option>
-                <option value="medium">Medium (10-30 min)</option>
-                <option value="long">Long (> 30 min)</option>
-            </select>
-        </div>
-        <div class="search-filter-group">
-            <label>Quality:</label>
-            <select id="qualityFilter">
-                <option value="">Any</option>
-                <option value="HD">HD</option>
-                <option value="4K">4K</option>
-                <option value="VR">VR</option>
-            </select>
-        </div>
-        <div class="search-filter-group">
-            <label>Rating:</label>
-            <select id="ratingFilter">
-                <option value="">Any</option>
-                <option value="4+">4+ Stars</option>
-                <option value="3+">3+ Stars</option>
-                <option value="2+">2+ Stars</option>
-            </select>
-        </div>
-    `;
-    
-    const contentHeader = document.querySelector('.content-header');
-    contentHeader.appendChild(filterContainer);
-}
-
 // Initialize search enhancements
 document.addEventListener('DOMContentLoaded', function() {
     initVoiceSearch();
-    addSearchFilters();
 });
