@@ -833,7 +833,6 @@ function createAIVideoCard(video) {
             <div class="ai-confidence ${confidenceInfo.class}">
                 ${confidenceInfo.text}
             </div>
-            ${video.duration ? `<div class="video-duration">${video.duration}</div>` : ''}
             ${video.quality ? `<div class="video-quality">${video.quality}</div>` : ''}
             <div class="video-rating">
                 <i class="fas fa-star"></i>

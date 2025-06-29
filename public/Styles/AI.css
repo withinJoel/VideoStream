@@ -271,11 +271,11 @@
     letter-spacing: 0.5px;
 }
 
-/* AI Recommendation Confidence */
+/* AI Recommendation Confidence - Fixed positioning */
 .ai-confidence {
     position: absolute;
     bottom: 12px;
-    right: 60px;
+    left: 12px;
     background: rgba(255, 107, 157, 0.9);
     color: #ffffff;
     padding: 4px 8px;
@@ -296,6 +296,28 @@
 
 .ai-confidence.low {
     background: rgba(244, 67, 54, 0.9);
+}
+
+/* Ensure proper spacing for AI video cards */
+.ai-recommended .video-thumbnail {
+    position: relative;
+}
+
+/* Fix overlapping badges in AI cards */
+.ai-recommended .video-quality {
+    top: 12px;
+    right: 12px;
+    left: auto;
+}
+
+.ai-recommended .video-rating {
+    bottom: 12px;
+    right: 12px;
+    left: auto;
+}
+
+.ai-recommended .video-duration {
+    display: none; /* Remove duration from AI cards to prevent overlap */
 }
 
 /* Responsive Design */
@@ -329,6 +351,11 @@
     .ai-metric {
         min-width: auto;
     }
+    
+    .ai-confidence {
+        font-size: 9px;
+        padding: 3px 6px;
+    }
 }
 
 @media (max-width: 480px) {
@@ -355,6 +382,11 @@
     .ai-recommendation-badge {
         font-size: 9px;
         padding: 4px 8px;
+    }
+    
+    .ai-confidence {
+        font-size: 8px;
+        padding: 2px 5px;
     }
 }
 
