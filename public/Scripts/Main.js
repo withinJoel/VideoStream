@@ -7,7 +7,12 @@ let currentFilters = {
     celebrity: '',
     category: '',
     sort: 'random',
-    favorites: false
+    favorites: false,
+    duration: '',
+    minDuration: '',
+    maxDuration: '',
+    quality: '',
+    minRating: ''
 };
 let currentSection = 'home';
 let currentVideoId = null;
@@ -16,6 +21,7 @@ let currentUser = null;
 let searchTimeout = null;
 let hoverPreviewTimeout = null;
 let currentHoverVideo = null;
+let currentPlaylistVideos = [];
 
 // Initialize the application
 document.addEventListener('DOMContentLoaded', function() {
@@ -45,7 +51,8 @@ function updateContentHeader(section) {
         'playlists': 'My Playlists',
         'subscriptions': 'My Subscriptions',
         'favorites': 'Favorite Videos',
-        'watch-history': 'Watch History'
+        'watch-history': 'Watch History',
+        'watch-later': 'Watch Later'
     };
     
     const breadcrumbs = {
@@ -54,11 +61,12 @@ function updateContentHeader(section) {
         'new': 'Home / New',
         'top-rated': 'Home / Top Rated',
         'categories': 'Home / Categories',
-        'celebs': 'Home / Celebs',
+        'performers': 'Home / Celebs',
         'playlists': 'Home / My Playlists',
         'subscriptions': 'Home / My Subscriptions',
         'favorites': 'Home / Favorites',
-        'watch-history': 'Home / Watch History'
+        'watch-history': 'Home / Watch History',
+        'watch-later': 'Home / Watch Later'
     };
     
     document.getElementById('contentTitle').textContent = titles[section] || 'Videos';
@@ -67,10 +75,12 @@ function updateContentHeader(section) {
 
 function toggleViewMode(view) {
     const videoGrid = document.getElementById('videoGrid');
+    videoGrid.classList.remove('list-view', 'large-view');
+    
     if (view === 'list') {
         videoGrid.classList.add('list-view');
-    } else {
-        videoGrid.classList.remove('list-view');
+    } else if (view === 'large') {
+        videoGrid.classList.add('large-view');
     }
 }
 
@@ -89,7 +99,12 @@ function handleCategoryClick(event, category) {
         celebrity: '',
         category: category,
         sort: currentFilters.sort,
-        favorites: false
+        favorites: false,
+        duration: currentFilters.duration,
+        minDuration: currentFilters.minDuration,
+        maxDuration: currentFilters.maxDuration,
+        quality: currentFilters.quality,
+        minRating: currentFilters.minRating
     };
     
     // Clear search input and update UI
@@ -125,7 +140,12 @@ function handlePerformerClick(event, performer) {
         celebrity: performer,
         category: '',
         sort: currentFilters.sort,
-        favorites: false
+        favorites: false,
+        duration: currentFilters.duration,
+        minDuration: currentFilters.minDuration,
+        maxDuration: currentFilters.maxDuration,
+        quality: currentFilters.quality,
+        minRating: currentFilters.minRating
     };
     
     // Clear search input and update UI
@@ -168,8 +188,22 @@ async function loadCategories() {
         const data = await response.json();
         displayCategories(data.categories);
         displayMobileCategories(data.categories);
+        populateAdvancedSearchCategories(data.categories);
     } catch (error) {
         console.error('Error loading categories:', error);
+    }
+}
+
+function populateAdvancedSearchCategories(categories) {
+    const select = document.getElementById('searchCategory');
+    if (select) {
+        select.innerHTML = '<option value="">Any Category</option>';
+        categories.forEach(category => {
+            const option = document.createElement('option');
+            option.value = category.name;
+            option.textContent = category.displayName;
+            select.appendChild(option);
+        });
     }
 }
 
@@ -199,7 +233,7 @@ async function loadAndDisplayPerformers() {
     }
 }
 
-// Video interaction functions - Updated for favorites only
+// Video interaction functions
 function toggleVideoFavorite() {
     if (!isAuthenticated) {
         showToast('Please login to favorite videos', 'error');
@@ -234,7 +268,85 @@ function toggleVideoFavorite() {
     });
 }
 
+function toggleVideoLike() {
+    if (!isAuthenticated) {
+        showToast('Please login to like videos', 'error');
+        return;
+    }
+    
+    if (!currentVideoId) return;
+    
+    const likeBtn = document.getElementById('modalLikeBtn');
+    const dislikeBtn = document.getElementById('modalDislikeBtn');
+    const isLiked = likeBtn.classList.contains('active');
+    
+    const method = isLiked ? 'DELETE' : 'POST';
+    const url = `/api/likes/${currentVideoId}`;
+    const body = method === 'POST' ? JSON.stringify({ userId: currentUser.id, type: 'like' }) : null;
+    const queryParam = method === 'DELETE' ? `?userId=${currentUser.id}` : '';
+    
+    fetch(url + queryParam, { 
+        method,
+        headers: method === 'POST' ? { 'Content-Type': 'application/json' } : {},
+        body
+    })
+    .then(response => response.json())
+    .then(data => {
+        likeBtn.classList.toggle('active');
+        dislikeBtn.classList.remove('active'); // Remove dislike if present
+        
+        // Update counts
+        document.getElementById('likeCount').textContent = data.likeCount || 0;
+        document.getElementById('dislikeCount').textContent = data.dislikeCount || 0;
+        
+        const action = isLiked ? 'removed like from' : 'liked';
+        showToast(`Video ${action}`, 'success');
+    })
+    .catch(error => {
+        console.error('Error toggling like:', error);
+        showToast('Failed to update like', 'error');
+    });
+}
 
+function toggleVideoDislike() {
+    if (!isAuthenticated) {
+        showToast('Please login to dislike videos', 'error');
+        return;
+    }
+    
+    if (!currentVideoId) return;
+    
+    const likeBtn = document.getElementById('modalLikeBtn');
+    const dislikeBtn = document.getElementById('modalDislikeBtn');
+    const isDisliked = dislikeBtn.classList.contains('active');
+    
+    const method = isDisliked ? 'DELETE' : 'POST';
+    const url = `/api/likes/${currentVideoId}`;
+    const body = method === 'POST' ? JSON.stringify({ userId: currentUser.id, type: 'dislike' }) : null;
+    const queryParam = method === 'DELETE' ? `?userId=${currentUser.id}` : '';
+    
+    fetch(url + queryParam, { 
+        method,
+        headers: method === 'POST' ? { 'Content-Type': 'application/json' } : {},
+        body
+    })
+    .then(response => response.json())
+    .then(data => {
+        dislikeBtn.classList.toggle('active');
+        likeBtn.classList.remove('active'); // Remove like if present
+        
+        // Update counts
+        document.getElementById('likeCount').textContent = data.likeCount || 0;
+        document.getElementById('dislikeCount').textContent = data.dislikeCount || 0;
+        
+        const action = isDisliked ? 'removed dislike from' : 'disliked';
+        showToast(`Video ${action}`, 'success');
+    })
+    .catch(error => {
+        console.error('Error toggling dislike:', error);
+        showToast('Failed to update dislike', 'error');
+    });
+}
 
 function highlightStars(rating) {
     document.querySelectorAll('#starRating i').forEach((star, index) => {
@@ -509,7 +621,7 @@ function closeMobileNav() {
 
 // Scroll handling
 function handleScroll() {
-    if (currentSection === 'home' || currentSection === 'trending' || currentSection === 'favorites' || currentSection === 'watch-history') {
+    if (currentSection === 'home' || currentSection === 'trending' || currentSection === 'favorites' || currentSection === 'watch-history' || currentSection === 'watch-later') {
         const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
         const windowHeight = window.innerHeight;
         const documentHeight = document.documentElement.scrollHeight;
@@ -519,11 +631,59 @@ function handleScroll() {
                 loadTrendingVideos();
             } else if (currentSection === 'watch-history') {
                 loadWatchHistory();
+            } else if (currentSection === 'watch-later') {
+                loadWatchLaterVideos();
             } else {
                 loadVideos();
             }
         }
     }
+}
+
+// Advanced search functions
+function showAdvancedSearch() {
+    const modal = document.getElementById('advancedSearchModal');
+    modal.classList.add('active');
+    document.body.style.overflow = 'hidden';
+}
+
+function hideAdvancedSearch() {
+    const modal = document.getElementById('advancedSearchModal');
+    modal.classList.remove('active');
+    document.body.style.overflow = '';
+}
+
+function applyAdvancedSearch() {
+    const form = document.getElementById('advancedSearchForm');
+    const formData = new FormData(form);
+    
+    // Build advanced search filters
+    const advancedFilters = {
+        search: formData.get('keywords') || '',
+        celebrity: formData.get('performer') || '',
+        category: formData.get('category') || '',
+        minDuration: formData.get('minDuration') || '',
+        maxDuration: formData.get('maxDuration') || '',
+        quality: formData.get('quality') || '',
+        minRating: formData.get('minRating') || '',
+        sort: formData.get('sort') || 'random'
+    };
+    
+    // Apply filters
+    Object.assign(currentFilters, advancedFilters);
+    currentPage = 1;
+    hasMore = true;
+    
+    hideAdvancedSearch();
+    navigateToSection('home');
+    window.dispatchEvent(new Event('videos:reset'));
+    
+    showToast('Advanced search applied', 'success');
+}
+
+function clearAdvancedSearch() {
+    const form = document.getElementById('advancedSearchForm');
+    form.reset();
 }
 
 // Initialize favorites count on load

@@ -30,16 +30,31 @@ function setupEventListeners() {
     // Search functionality
     const searchInput = document.getElementById('searchInput');
     const searchBtn = document.getElementById('searchBtn');
+    const advancedSearchBtn = document.getElementById('advancedSearchBtn');
+    
     if (searchInput) {
         searchInput.addEventListener('input', handleSearchInput);
         searchInput.addEventListener('focus', showSearchSuggestions);
         searchInput.addEventListener('blur', hideSearchSuggestions);
+        searchInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                performSearch();
+            }
+        });
     }
     if (searchBtn) searchBtn.addEventListener('click', performSearch);
+    if (advancedSearchBtn) advancedSearchBtn.addEventListener('click', showAdvancedSearch);
     
     // Filter controls
     const sortSelect = document.getElementById('sortSelect');
     if (sortSelect) sortSelect.addEventListener('change', handleSortChange);
+    
+    const durationFilter = document.getElementById('durationFilter');
+    if (durationFilter) durationFilter.addEventListener('change', handleDurationFilter);
+    
+    const qualityFilter = document.getElementById('qualityFilter');
+    if (qualityFilter) qualityFilter.addEventListener('change', handleQualityFilter);
+    
     const shuffleBtn = document.getElementById('shuffleBtn');
     if (shuffleBtn) shuffleBtn.addEventListener('click', shuffleVideos);
     
@@ -97,6 +112,8 @@ function setupEventListeners() {
     if (favoritesDropdownBtn) favoritesDropdownBtn.addEventListener('click', () => navigateToSection('favorites'));
     const watchHistoryBtn = document.getElementById('watchHistoryBtn');
     if (watchHistoryBtn) watchHistoryBtn.addEventListener('click', () => navigateToSection('watch-history'));
+    const watchLaterBtn = document.getElementById('watchLaterBtn');
+    if (watchLaterBtn) watchLaterBtn.addEventListener('click', () => navigateToSection('watch-later'));
     const logoutBtn = document.getElementById('logoutBtn');
     if (logoutBtn) logoutBtn.addEventListener('click', handleLogout);
     
@@ -121,13 +138,27 @@ function setupEventListeners() {
     const createPlaylistBtn = document.getElementById('createPlaylistBtn');
     if (createPlaylistBtn) createPlaylistBtn.addEventListener('click', () => showCreatePlaylistModal());
     
-    // Video modal actions - Updated for favorites only (no separate likes)
+    // Advanced Search Modal
+    const advancedSearchClose = document.getElementById('advancedSearchClose');
+    if (advancedSearchClose) advancedSearchClose.addEventListener('click', hideAdvancedSearch);
+    const applyAdvancedSearchBtn = document.getElementById('applyAdvancedSearch');
+    if (applyAdvancedSearchBtn) applyAdvancedSearchBtn.addEventListener('click', applyAdvancedSearch);
+    const clearAdvancedSearchBtn = document.getElementById('clearAdvancedSearch');
+    if (clearAdvancedSearchBtn) clearAdvancedSearchBtn.addEventListener('click', clearAdvancedSearch);
+    
+    // Video modal actions
     const modalFavBtn = document.getElementById('modalFavBtn');
     if (modalFavBtn) modalFavBtn.addEventListener('click', () => toggleVideoFavorite());
     const modalPlaylistBtn = document.getElementById('modalPlaylistBtn');
     if (modalPlaylistBtn) modalPlaylistBtn.addEventListener('click', () => showPlaylistModal());
     const subscribeBtn = document.getElementById('subscribeBtn');
     if (subscribeBtn) subscribeBtn.addEventListener('click', handleSubscribe);
+    
+    // Like/Dislike buttons
+    const modalLikeBtn = document.getElementById('modalLikeBtn');
+    if (modalLikeBtn) modalLikeBtn.addEventListener('click', () => toggleVideoLike());
+    const modalDislikeBtn = document.getElementById('modalDislikeBtn');
+    if (modalDislikeBtn) modalDislikeBtn.addEventListener('click', () => toggleVideoDislike());
     
     // Star rating
     document.querySelectorAll('#starRating i').forEach((star, index) => {
@@ -143,6 +174,18 @@ function setupEventListeners() {
     if (commentCancelBtn) commentCancelBtn.addEventListener('click', hideCommentActions);
     const commentSubmitBtn = document.getElementById('commentSubmitBtn');
     if (commentSubmitBtn) commentSubmitBtn.addEventListener('click', submitComment);
+    
+    // Sidebar tabs
+    document.querySelectorAll('.sidebar-tab').forEach(tab => {
+        tab.addEventListener('click', (e) => {
+            const tabName = e.target.dataset.tab;
+            switchSidebarTab(tabName);
+        });
+    });
+    
+    // Description toggle
+    const descriptionToggle = document.getElementById('descriptionToggle');
+    if (descriptionToggle) descriptionToggle.addEventListener('click', toggleDescription);
     
     // Infinite scroll
     window.addEventListener('scroll', handleScroll);
@@ -161,6 +204,46 @@ function setupEventListeners() {
             if (userDropdown) userDropdown.classList.remove('active');
         }
     });
+}
+
+function switchSidebarTab(tabName) {
+    // Remove active class from all tabs and content
+    document.querySelectorAll('.sidebar-tab').forEach(tab => tab.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+    
+    // Add active class to selected tab and content
+    document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
+    document.getElementById(`${tabName}Tab`).classList.add('active');
+    
+    // Load content based on tab
+    switch(tabName) {
+        case 'related':
+            // Related videos are already loaded
+            break;
+        case 'playlist':
+            loadPlaylistVideos();
+            break;
+        case 'recommended':
+            loadRecommendedVideos();
+            break;
+    }
+}
+
+function toggleDescription() {
+    const content = document.getElementById('descriptionContent');
+    const toggle = document.getElementById('descriptionToggle');
+    const span = toggle.querySelector('span');
+    const icon = toggle.querySelector('i');
+    
+    content.classList.toggle('expanded');
+    
+    if (content.classList.contains('expanded')) {
+        span.textContent = 'Show less';
+        icon.className = 'fas fa-chevron-up';
+    } else {
+        span.textContent = 'Show more';
+        icon.className = 'fas fa-chevron-down';
+    }
 }
 
 function hideAllSections() {

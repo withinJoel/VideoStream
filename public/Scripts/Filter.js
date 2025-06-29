@@ -6,6 +6,40 @@ function handleSortChange(e) {
     window.dispatchEvent(new Event('videos:reset'));
 }
 
+function handleDurationFilter(e) {
+    const value = e.target.value;
+    switch(value) {
+        case 'short':
+            currentFilters.minDuration = '';
+            currentFilters.maxDuration = '10';
+            break;
+        case 'medium':
+            currentFilters.minDuration = '10';
+            currentFilters.maxDuration = '30';
+            break;
+        case 'long':
+            currentFilters.minDuration = '30';
+            currentFilters.maxDuration = '';
+            break;
+        default:
+            currentFilters.minDuration = '';
+            currentFilters.maxDuration = '';
+    }
+    currentFilters.duration = value;
+    currentPage = 1;
+    hasMore = true;
+    loadVideos(true);
+    window.dispatchEvent(new Event('videos:reset'));
+}
+
+function handleQualityFilter(e) {
+    currentFilters.quality = e.target.value;
+    currentPage = 1;
+    hasMore = true;
+    loadVideos(true);
+    window.dispatchEvent(new Event('videos:reset'));
+}
+
 function shuffleVideos() {
     fetch('/api/reshuffle', { method: 'POST' })
         .then(response => response.json())
@@ -28,11 +62,18 @@ function clearAllFilters() {
         celebrity: '',
         category: '',
         sort: 'random',
-        favorites: false
+        favorites: false,
+        duration: '',
+        minDuration: '',
+        maxDuration: '',
+        quality: '',
+        minRating: ''
     };
     
     document.getElementById('searchInput').value = '';
     document.getElementById('sortSelect').value = 'random';
+    document.getElementById('durationFilter').value = '';
+    document.getElementById('qualityFilter').value = '';
     
     currentPage = 1;
     hasMore = true;
