@@ -71,7 +71,7 @@ async function openVideoModal(video) {
 }
 
 function setupVideoPlayer(videoElement, video) {
-    // Clear existing sources
+    // Clear existing sources and controls
     videoElement.innerHTML = '';
     
     // Add single video source (since you only have one resolution)
@@ -95,8 +95,380 @@ function setupVideoPlayer(videoElement, video) {
     // Remove default controls and add custom controls
     videoElement.controls = false;
     
+    // Setup custom video controls
+    setupCustomVideoControls(videoElement, video);
+    
     // Setup video events
     setupVideoEvents(videoElement, video);
+}
+
+function setupCustomVideoControls(videoElement, video) {
+    const videoContainer = videoElement.parentElement;
+    
+    // Remove existing custom controls
+    const existingControls = videoContainer.querySelector('.custom-video-controls');
+    if (existingControls) {
+        existingControls.remove();
+    }
+    
+    // Create custom controls container
+    const controlsContainer = document.createElement('div');
+    controlsContainer.className = 'custom-video-controls';
+    
+    controlsContainer.innerHTML = `
+        <div class="video-controls-overlay">
+            <!-- Progress Bar -->
+            <div class="video-progress-container">
+                <div class="video-progress-bar">
+                    <div class="video-progress-buffer"></div>
+                    <div class="video-progress-played"></div>
+                    <div class="video-progress-handle"></div>
+                </div>
+                <div class="video-time-tooltip">0:00</div>
+            </div>
+            
+            <!-- Main Controls -->
+            <div class="video-controls-main">
+                <div class="video-controls-left">
+                    <button class="video-control-btn play-pause-btn" title="Play/Pause">
+                        <i class="fas fa-play"></i>
+                    </button>
+                    <button class="video-control-btn volume-btn" title="Mute/Unmute">
+                        <i class="fas fa-volume-up"></i>
+                    </button>
+                    <div class="volume-slider-container">
+                        <div class="volume-slider">
+                            <div class="volume-slider-track">
+                                <div class="volume-slider-fill"></div>
+                                <div class="volume-slider-handle"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="video-time-display">
+                        <span class="current-time">0:00</span>
+                        <span class="time-separator">/</span>
+                        <span class="total-time">0:00</span>
+                    </div>
+                </div>
+                
+                <div class="video-controls-right">
+                    <div class="speed-control-container">
+                        <button class="video-control-btn speed-btn" title="Playback Speed">
+                            <span class="speed-text">1x</span>
+                        </button>
+                        <div class="speed-menu">
+                            <div class="speed-option" data-speed="0.25">0.25x</div>
+                            <div class="speed-option" data-speed="0.5">0.5x</div>
+                            <div class="speed-option" data-speed="0.75">0.75x</div>
+                            <div class="speed-option active" data-speed="1">1x</div>
+                            <div class="speed-option" data-speed="1.25">1.25x</div>
+                            <div class="speed-option" data-speed="1.5">1.5x</div>
+                            <div class="speed-option" data-speed="2">2x</div>
+                        </div>
+                    </div>
+                    <button class="video-control-btn pip-btn" title="Picture in Picture">
+                        <i class="fas fa-external-link-alt"></i>
+                    </button>
+                    <button class="video-control-btn theater-btn" title="Theater Mode">
+                        <i class="fas fa-expand-arrows-alt"></i>
+                    </button>
+                    <button class="video-control-btn fullscreen-btn" title="Fullscreen">
+                        <i class="fas fa-expand"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    videoContainer.appendChild(controlsContainer);
+    
+    // Setup control events
+    setupControlEvents(controlsContainer, videoElement);
+    
+    // Auto-hide controls
+    setupControlsAutoHide(videoContainer, controlsContainer);
+}
+
+function setupControlEvents(controlsContainer, videoElement) {
+    // Play/Pause button
+    const playPauseBtn = controlsContainer.querySelector('.play-pause-btn');
+    const playPauseIcon = playPauseBtn.querySelector('i');
+    
+    playPauseBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (videoElement.paused) {
+            videoElement.play();
+            playPauseIcon.className = 'fas fa-pause';
+        } else {
+            videoElement.pause();
+            playPauseIcon.className = 'fas fa-play';
+        }
+    });
+    
+    // Volume controls
+    const volumeBtn = controlsContainer.querySelector('.volume-btn');
+    const volumeIcon = volumeBtn.querySelector('i');
+    const volumeSlider = controlsContainer.querySelector('.volume-slider');
+    const volumeSliderFill = controlsContainer.querySelector('.volume-slider-fill');
+    const volumeSliderHandle = controlsContainer.querySelector('.volume-slider-handle');
+    
+    volumeBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        videoElement.muted = !videoElement.muted;
+        updateVolumeIcon();
+    });
+    
+    function updateVolumeIcon() {
+        if (videoElement.muted || videoElement.volume === 0) {
+            volumeIcon.className = 'fas fa-volume-mute';
+        } else if (videoElement.volume < 0.5) {
+            volumeIcon.className = 'fas fa-volume-down';
+        } else {
+            volumeIcon.className = 'fas fa-volume-up';
+        }
+    }
+    
+    // Volume slider
+    let isDraggingVolume = false;
+    
+    volumeSlider.addEventListener('mousedown', (e) => {
+        isDraggingVolume = true;
+        updateVolume(e);
+    });
+    
+    document.addEventListener('mousemove', (e) => {
+        if (isDraggingVolume) {
+            updateVolume(e);
+        }
+    });
+    
+    document.addEventListener('mouseup', () => {
+        isDraggingVolume = false;
+    });
+    
+    function updateVolume(e) {
+        const rect = volumeSlider.getBoundingClientRect();
+        const percent = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+        videoElement.volume = percent;
+        videoElement.muted = false;
+        volumeSliderFill.style.width = `${percent * 100}%`;
+        volumeSliderHandle.style.left = `${percent * 100}%`;
+        updateVolumeIcon();
+    }
+    
+    // Progress bar
+    const progressContainer = controlsContainer.querySelector('.video-progress-container');
+    const progressBar = controlsContainer.querySelector('.video-progress-bar');
+    const progressPlayed = controlsContainer.querySelector('.video-progress-played');
+    const progressHandle = controlsContainer.querySelector('.video-progress-handle');
+    const timeTooltip = controlsContainer.querySelector('.video-time-tooltip');
+    
+    let isDraggingProgress = false;
+    
+    progressBar.addEventListener('mousedown', (e) => {
+        isDraggingProgress = true;
+        updateProgress(e);
+    });
+    
+    progressBar.addEventListener('mousemove', (e) => {
+        if (!isDraggingProgress) {
+            showTimeTooltip(e);
+        }
+    });
+    
+    progressBar.addEventListener('mouseleave', () => {
+        timeTooltip.style.display = 'none';
+    });
+    
+    document.addEventListener('mousemove', (e) => {
+        if (isDraggingProgress) {
+            updateProgress(e);
+        }
+    });
+    
+    document.addEventListener('mouseup', () => {
+        isDraggingProgress = false;
+    });
+    
+    function updateProgress(e) {
+        const rect = progressBar.getBoundingClientRect();
+        const percent = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+        const newTime = percent * videoElement.duration;
+        
+        if (!isNaN(newTime)) {
+            videoElement.currentTime = newTime;
+            updateProgressDisplay();
+        }
+    }
+    
+    function showTimeTooltip(e) {
+        const rect = progressBar.getBoundingClientRect();
+        const percent = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+        const time = percent * videoElement.duration;
+        
+        if (!isNaN(time)) {
+            timeTooltip.textContent = formatTime(time);
+            timeTooltip.style.display = 'block';
+            timeTooltip.style.left = `${e.clientX - rect.left}px`;
+        }
+    }
+    
+    function updateProgressDisplay() {
+        if (videoElement.duration) {
+            const percent = (videoElement.currentTime / videoElement.duration) * 100;
+            progressPlayed.style.width = `${percent}%`;
+            progressHandle.style.left = `${percent}%`;
+        }
+    }
+    
+    // Time display
+    const currentTimeDisplay = controlsContainer.querySelector('.current-time');
+    const totalTimeDisplay = controlsContainer.querySelector('.total-time');
+    
+    function updateTimeDisplay() {
+        currentTimeDisplay.textContent = formatTime(videoElement.currentTime);
+        totalTimeDisplay.textContent = formatTime(videoElement.duration);
+    }
+    
+    // Speed control
+    const speedBtn = controlsContainer.querySelector('.speed-btn');
+    const speedMenu = controlsContainer.querySelector('.speed-menu');
+    const speedText = speedBtn.querySelector('.speed-text');
+    
+    speedBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        speedMenu.classList.toggle('active');
+    });
+    
+    speedMenu.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (e.target.classList.contains('speed-option')) {
+            const speed = parseFloat(e.target.dataset.speed);
+            videoElement.playbackRate = speed;
+            speedText.textContent = `${speed}x`;
+            
+            // Update active state
+            speedMenu.querySelectorAll('.speed-option').forEach(opt => opt.classList.remove('active'));
+            e.target.classList.add('active');
+            
+            speedMenu.classList.remove('active');
+        }
+    });
+    
+    // Picture in Picture
+    const pipBtn = controlsContainer.querySelector('.pip-btn');
+    pipBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        togglePictureInPicture(videoElement);
+    });
+    
+    // Theater Mode
+    const theaterBtn = controlsContainer.querySelector('.theater-btn');
+    theaterBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        toggleTheaterMode();
+    });
+    
+    // Fullscreen
+    const fullscreenBtn = controlsContainer.querySelector('.fullscreen-btn');
+    const fullscreenIcon = fullscreenBtn.querySelector('i');
+    fullscreenBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        toggleFullscreen(videoElement);
+    });
+    
+    // Update fullscreen icon
+    document.addEventListener('fullscreenchange', () => {
+        if (document.fullscreenElement) {
+            fullscreenIcon.className = 'fas fa-compress';
+        } else {
+            fullscreenIcon.className = 'fas fa-expand';
+        }
+    });
+    
+    // Video event listeners
+    videoElement.addEventListener('loadedmetadata', () => {
+        updateTimeDisplay();
+        updateProgressDisplay();
+        // Set initial volume
+        volumeSliderFill.style.width = `${videoElement.volume * 100}%`;
+        volumeSliderHandle.style.left = `${videoElement.volume * 100}%`;
+        updateVolumeIcon();
+    });
+    
+    videoElement.addEventListener('timeupdate', () => {
+        updateTimeDisplay();
+        updateProgressDisplay();
+    });
+    
+    videoElement.addEventListener('play', () => {
+        playPauseIcon.className = 'fas fa-pause';
+    });
+    
+    videoElement.addEventListener('pause', () => {
+        playPauseIcon.className = 'fas fa-play';
+    });
+    
+    videoElement.addEventListener('volumechange', () => {
+        updateVolumeIcon();
+    });
+    
+    // Close speed menu when clicking outside
+    document.addEventListener('click', () => {
+        speedMenu.classList.remove('active');
+    });
+}
+
+function setupControlsAutoHide(videoContainer, controlsContainer) {
+    let hideTimeout;
+    let isControlsVisible = true;
+    
+    function showControls() {
+        controlsContainer.classList.add('visible');
+        isControlsVisible = true;
+        clearTimeout(hideTimeout);
+        
+        hideTimeout = setTimeout(() => {
+            if (!videoContainer.matches(':hover') && !document.querySelector('.speed-menu.active')) {
+                hideControls();
+            }
+        }, 3000);
+    }
+    
+    function hideControls() {
+        controlsContainer.classList.remove('visible');
+        isControlsVisible = false;
+    }
+    
+    // Show controls on mouse move
+    videoContainer.addEventListener('mousemove', showControls);
+    videoContainer.addEventListener('mouseenter', showControls);
+    
+    // Keep controls visible when hovering over them
+    controlsContainer.addEventListener('mouseenter', () => {
+        clearTimeout(hideTimeout);
+    });
+    
+    controlsContainer.addEventListener('mouseleave', () => {
+        hideTimeout = setTimeout(hideControls, 1000);
+    });
+    
+    // Show controls initially
+    showControls();
+}
+
+function formatTime(seconds) {
+    if (isNaN(seconds)) return '0:00';
+    
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = Math.floor(seconds % 60);
+    
+    if (hours > 0) {
+        return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    } else {
+        return `${minutes}:${secs.toString().padStart(2, '0')}`;
+    }
 }
 
 function setupVideoEvents(videoElement, video) {
@@ -139,12 +511,14 @@ function setupVideoEvents(videoElement, video) {
         toggleFullscreen(videoElement);
     });
     
-    // Click to play/pause
-    videoElement.addEventListener('click', () => {
-        if (videoElement.paused) {
-            videoElement.play();
-        } else {
-            videoElement.pause();
+    // Click to play/pause (only if not clicking on controls)
+    videoElement.addEventListener('click', (e) => {
+        if (!e.target.closest('.custom-video-controls')) {
+            if (videoElement.paused) {
+                videoElement.play();
+            } else {
+                videoElement.pause();
+            }
         }
     });
 }
@@ -307,6 +681,12 @@ function closeVideoModal() {
     video.pause();
     video.currentTime = 0;
     video.src = '';
+    
+    // Remove custom controls
+    const customControls = modal.querySelector('.custom-video-controls');
+    if (customControls) {
+        customControls.remove();
+    }
     
     currentVideoId = null;
 }
