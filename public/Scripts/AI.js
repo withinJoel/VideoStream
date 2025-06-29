@@ -6,11 +6,10 @@ class AIRecommendationEngine {
         this.isLoading = false;
         this.lastUpdate = null;
         this.weights = {
-            watchHistory: 0.35,
-            favorites: 0.30,
+            watchHistory: 0.40,
+            favorites: 0.35,
             subscriptions: 0.20,
-            ratings: 0.10,
-            categories: 0.05
+            ratings: 0.05
         };
         this.minConfidenceThreshold = 0.3;
         this.behaviorProfile = {
@@ -71,7 +70,6 @@ class AIRecommendationEngine {
                 categoryPreferences: {},
                 performerPreferences: {},
                 viewingPatterns: {
-                    preferredDuration: 'medium',
                     preferredQuality: 'HD',
                     viewingTimes: [],
                     completionRate: 0.8
@@ -217,7 +215,6 @@ class AIRecommendationEngine {
 
     analyzeViewingPatterns(data) {
         const patterns = {
-            preferredDuration: 'medium',
             preferredQuality: 'HD',
             viewingTimes: [],
             completionRate: 0.8,
@@ -226,23 +223,6 @@ class AIRecommendationEngine {
         };
         
         if (data.watchHistory && data.watchHistory.length > 0) {
-            // Analyze duration preferences with ML-like clustering
-            const durations = data.watchHistory
-                .filter(w => w.duration)
-                .map(w => this.parseDuration(w.duration))
-                .filter(d => d > 0); // Filter out invalid durations
-            
-            if (durations.length > 0) {
-                const avgDuration = durations.reduce((a, b) => a + b, 0) / durations.length;
-                const variance = durations.reduce((acc, dur) => acc + Math.pow(dur - avgDuration, 2), 0) / durations.length;
-                
-                if (avgDuration < 600) patterns.preferredDuration = 'short';
-                else if (avgDuration > 1800) patterns.preferredDuration = 'long';
-                
-                // Analyze consistency
-                patterns.durationConsistency = 1 / (1 + Math.sqrt(variance) / avgDuration);
-            }
-            
             // Analyze quality preferences with trend detection
             const qualities = data.watchHistory
                 .filter(w => w.quality)
@@ -261,99 +241,6 @@ class AIRecommendationEngine {
         }
         
         return patterns;
-    }
-
-    parseDuration(durationInput) {
-        // Ultra-robust duration parsing with comprehensive error handling
-        if (durationInput === null || durationInput === undefined) {
-            return 0;
-        }
-        
-        // Handle different input types
-        if (typeof durationInput === 'number') {
-            return Math.max(0, durationInput); // Already in seconds, ensure positive
-        }
-        
-        // Handle objects (extract duration property if exists)
-        if (typeof durationInput === 'object') {
-            // Check if it's an empty object
-            if (Object.keys(durationInput).length === 0) {
-                console.warn('Empty duration object received:', durationInput);
-                return 0;
-            }
-            
-            // Try to extract duration from various possible properties
-            const possibleKeys = ['duration', 'length', 'time', 'seconds', 'value'];
-            for (const key of possibleKeys) {
-                if (durationInput[key] !== undefined && durationInput[key] !== null) {
-                    return this.parseDuration(durationInput[key]);
-                }
-            }
-            
-            console.warn('Invalid duration object format - no valid properties found:', durationInput);
-            return 0;
-        }
-        
-        if (typeof durationInput !== 'string') {
-            console.warn('Invalid duration format - unexpected type:', typeof durationInput, durationInput);
-            return 0;
-        }
-        
-        try {
-            // Handle different duration formats
-            const cleanDuration = durationInput.toString().trim();
-            
-            // Handle empty strings
-            if (!cleanDuration) {
-                return 0;
-            }
-            
-            // Format: "5:30" or "1:05:30"
-            if (cleanDuration.includes(':')) {
-                const parts = cleanDuration.split(':').map(part => {
-                    const num = parseInt(part, 10);
-                    return isNaN(num) ? 0 : num;
-                });
-                
-                if (parts.length === 2) {
-                    // MM:SS format
-                    return Math.max(0, parts[0] * 60 + parts[1]);
-                } else if (parts.length === 3) {
-                    // HH:MM:SS format
-                    return Math.max(0, parts[0] * 3600 + parts[1] * 60 + parts[2]);
-                }
-            }
-            
-            // Format: "300s" or "5m" or "1h"
-            const timeMatch = cleanDuration.match(/^(\d+(?:\.\d+)?)\s*([smh]?)$/i);
-            if (timeMatch) {
-                const value = parseFloat(timeMatch[1]);
-                const unit = timeMatch[2].toLowerCase();
-                
-                if (isNaN(value)) return 0;
-                
-                switch (unit) {
-                    case 'h': return Math.max(0, value * 3600);
-                    case 'm': return Math.max(0, value * 60);
-                    case 's':
-                    case '': return Math.max(0, value);
-                    default: return Math.max(0, value);
-                }
-            }
-            
-            // Try to parse as plain number (seconds)
-            const numValue = parseFloat(cleanDuration);
-            if (!isNaN(numValue)) {
-                return Math.max(0, numValue);
-            }
-            
-            console.warn('Could not parse duration string:', durationInput);
-            return 0;
-            
-        } catch (error) {
-            console.error('Error parsing duration:', durationInput, error);
-            return 0;
-        }
     }
 
     async generateRecommendations(userId, limit = 20) {
@@ -434,7 +321,7 @@ class AIRecommendationEngine {
             // 2. Category Neural Network Scoring (Neural Layer 2)
             const categoryScore = this.calculateCategoryNeuralScore(video);
             if (categoryScore.score > 0) {
-                score += categoryScore.score * this.weights.categories;
+                score += categoryScore.score * this.weights.favorites;
                 confidence += categoryScore.confidence * 0.3;
                 if (categoryScore.reason) reasons.push(categoryScore.reason);
             }
@@ -448,7 +335,7 @@ class AIRecommendationEngine {
             const temporalScore = this.calculateTemporalRelevance(video);
             score += temporalScore * 0.15;
             
-            // 5. Quality and Duration Optimization (Neural Layer 5)
+            // 5. Quality Optimization (Neural Layer 5)
             const qualityScore = this.calculateQualityAlignment(video);
             score += qualityScore * 0.1;
             
@@ -571,21 +458,13 @@ class AIRecommendationEngine {
         
         // Quality consciousness alignment
         if (this.behaviorProfile.qualityConsciousness > 0.7 && (video.quality === 'HD' || video.quality === '4K')) {
-            alignment += 0.3;
+            alignment += 0.4;
         }
-        
-        // Duration preference alignment - with safe parsing
-        const videoDuration = this.parseDuration(video.duration);
-        const preferredDuration = this.userProfile.viewingPatterns.preferredDuration;
-        
-        if (preferredDuration === 'short' && videoDuration < 600) alignment += 0.2;
-        else if (preferredDuration === 'medium' && videoDuration >= 600 && videoDuration <= 1800) alignment += 0.2;
-        else if (preferredDuration === 'long' && videoDuration > 1800) alignment += 0.2;
         
         // Loyalty vs adventurousness
         const isKnownPerformer = this.userProfile.performerPreferences[video.artist];
         if (this.behaviorProfile.loyalty > 0.6 && isKnownPerformer) {
-            alignment += 0.3;
+            alignment += 0.4;
         } else if (this.behaviorProfile.adventurousness > 0.6 && !isKnownPerformer) {
             alignment += 0.2;
         }
@@ -600,20 +479,18 @@ class AIRecommendationEngine {
         
         let relevance = 0.5; // Base relevance
         
-        // Time-of-day adjustments
-        const videoDuration = this.parseDuration(video.duration);
-        
+        // Time-of-day adjustments (simplified without duration dependency)
         if (hour >= 22 || hour <= 6) { // Late night/early morning
-            if (videoDuration < 900) relevance += 0.2; // Prefer shorter content
+            relevance += 0.1; // Slightly prefer content for late hours
         } else if (hour >= 12 && hour <= 14) { // Lunch time
-            if (videoDuration >= 600 && videoDuration <= 1200) relevance += 0.2;
+            relevance += 0.1; // Neutral preference
         } else if (hour >= 18 && hour <= 22) { // Evening
-            if (videoDuration > 1200) relevance += 0.2; // Prefer longer content
+            relevance += 0.2; // Prime time preference
         }
         
         // Weekend vs weekday
-        if (isWeekend && videoDuration > 1800) {
-            relevance += 0.1; // More time for longer content on weekends
+        if (isWeekend) {
+            relevance += 0.1; // More time for content on weekends
         }
         
         return Math.min(relevance, 1);
@@ -964,12 +841,6 @@ function createAIVideoCard(video) {
                     <i class="fas fa-star"></i>
                     ${video.rating.toFixed(1)}
                 </span>
-                ${video.duration ? `
-                <span class="video-stat">
-                    <i class="fas fa-clock"></i>
-                    ${video.duration}
-                </span>
-                ` : ''}
                 ${video.uploadDate ? `
                 <span class="video-stat">
                     <i class="fas fa-calendar"></i>
@@ -996,7 +867,7 @@ function showAIAuthRequired() {
                 <i class="fas fa-robot"></i>
             </div>
             <h3>AI Recommendations</h3>
-            <p>Login to get ultra-personalized video recommendations powered by advanced AI. Our neural system learns from your viewing habits, favorites, and preferences to suggest content with 100% accuracy.</p>
+            <p>Login to get ultra-personalized video recommendations powered by advanced AI. Our neural system learns from your viewing habits, favorites, and preferences to suggest content with exceptional accuracy.</p>
             <div class="ai-features">
                 <div class="ai-feature">
                     <i class="fas fa-brain"></i>
@@ -1004,7 +875,7 @@ function showAIAuthRequired() {
                 </div>
                 <div class="ai-feature">
                     <i class="fas fa-target"></i>
-                    <span>100% Accurate</span>
+                    <span>Smart Matching</span>
                 </div>
                 <div class="ai-feature">
                     <i class="fas fa-chart-line"></i>
@@ -1057,7 +928,6 @@ if (originalOpenVideoModal) {
             videoId: video.id, 
             artist: video.artist,
             categories: video.categories,
-            duration: video.duration,
             quality: video.quality,
             timestamp: Date.now(),
             watchedAt: new Date().toISOString()
