@@ -264,8 +264,10 @@ class AIRecommendationEngine {
     }
 
     parseDuration(durationInput) {
-        // Enhanced duration parsing with comprehensive error handling
-        if (!durationInput) return 0;
+        // Ultra-robust duration parsing with comprehensive error handling
+        if (durationInput === null || durationInput === undefined) {
+            return 0;
+        }
         
         // Handle different input types
         if (typeof durationInput === 'number') {
@@ -274,27 +276,37 @@ class AIRecommendationEngine {
         
         // Handle objects (extract duration property if exists)
         if (typeof durationInput === 'object') {
-            if (durationInput.duration) {
-                return this.parseDuration(durationInput.duration);
+            // Check if it's an empty object
+            if (Object.keys(durationInput).length === 0) {
+                console.warn('Empty duration object received:', durationInput);
+                return 0;
             }
-            if (durationInput.length) {
-                return this.parseDuration(durationInput.length);
+            
+            // Try to extract duration from various possible properties
+            const possibleKeys = ['duration', 'length', 'time', 'seconds', 'value'];
+            for (const key of possibleKeys) {
+                if (durationInput[key] !== undefined && durationInput[key] !== null) {
+                    return this.parseDuration(durationInput[key]);
+                }
             }
-            if (durationInput.time) {
-                return this.parseDuration(durationInput.time);
-            }
-            console.warn('Invalid duration object format:', durationInput);
+            
+            console.warn('Invalid duration object format - no valid properties found:', durationInput);
             return 0;
         }
         
         if (typeof durationInput !== 'string') {
-            console.warn('Invalid duration format:', typeof durationInput, durationInput);
+            console.warn('Invalid duration format - unexpected type:', typeof durationInput, durationInput);
             return 0;
         }
         
         try {
             // Handle different duration formats
             const cleanDuration = durationInput.toString().trim();
+            
+            // Handle empty strings
+            if (!cleanDuration) {
+                return 0;
+            }
             
             // Format: "5:30" or "1:05:30"
             if (cleanDuration.includes(':')) {
@@ -335,7 +347,7 @@ class AIRecommendationEngine {
                 return Math.max(0, numValue);
             }
             
-            console.warn('Could not parse duration:', durationInput);
+            console.warn('Could not parse duration string:', durationInput);
             return 0;
             
         } catch (error) {
@@ -562,7 +574,7 @@ class AIRecommendationEngine {
             alignment += 0.3;
         }
         
-        // Duration preference alignment
+        // Duration preference alignment - with safe parsing
         const videoDuration = this.parseDuration(video.duration);
         const preferredDuration = this.userProfile.viewingPatterns.preferredDuration;
         
