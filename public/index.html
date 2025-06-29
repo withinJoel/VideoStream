@@ -34,9 +34,12 @@
             
             <div class="header-center">
                 <div class="search-container">
-                    <input type="text" id="searchInput" placeholder="Search videos, celebs, categories..." class="search-input">
+                    <input type="text" id="searchInput" placeholder="Search videos, celebs, categories, tags..." class="search-input">
                     <button class="search-btn" id="searchBtn">
                         <i class="fas fa-search"></i>
+                    </button>
+                    <button class="advanced-search-btn" id="advancedSearchBtn" title="Advanced Search">
+                        <i class="fas fa-sliders-h"></i>
                     </button>
                     <div class="search-suggestions" id="searchSuggestions"></div>
                 </div>
@@ -84,7 +87,19 @@
                             <i class="fas fa-history"></i>
                             Watch History
                         </a>
+                        <a href="#" class="dropdown-item" id="watchLaterBtn">
+                            <i class="fas fa-clock"></i>
+                            Watch Later
+                        </a>
+                        <a href="#" class="dropdown-item" id="downloadsBtn">
+                            <i class="fas fa-download"></i>
+                            Downloads
+                        </a>
                         <div class="dropdown-divider"></div>
+                        <a href="#" class="dropdown-item" id="settingsBtn">
+                            <i class="fas fa-cog"></i>
+                            Settings
+                        </a>
                         <a href="#" class="dropdown-item" id="logoutBtn">
                             <i class="fas fa-sign-out-alt"></i>
                             Logout
@@ -133,6 +148,10 @@
                     <i class="fas fa-history"></i>
                     Watch History
                 </a>
+                <a href="#" class="mobile-nav-link" data-section="watch-later">
+                    <i class="fas fa-clock"></i>
+                    Watch Later
+                </a>
             </nav>
             
             <div class="mobile-nav-section">
@@ -165,6 +184,26 @@
                             <option value="oldest">Oldest</option>
                             <option value="most-viewed">Most Viewed</option>
                             <option value="highest-rated">Highest Rated</option>
+                            <option value="longest">Longest</option>
+                            <option value="shortest">Shortest</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label class="filter-label">Duration:</label>
+                        <select class="filter-select" id="durationFilter">
+                            <option value="">Any</option>
+                            <option value="short">Short (< 10 min)</option>
+                            <option value="medium">Medium (10-30 min)</option>
+                            <option value="long">Long (> 30 min)</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label class="filter-label">Quality:</label>
+                        <select class="filter-select" id="qualityFilter">
+                            <option value="">Any</option>
+                            <option value="4K">4K</option>
+                            <option value="HD">HD</option>
+                            <option value="SD">SD</option>
                         </select>
                     </div>
                 </div>
@@ -175,6 +214,9 @@
                     </button>
                     <button class="view-option" data-view="list" title="List View">
                         <i class="fas fa-list"></i>
+                    </button>
+                    <button class="view-option" data-view="large" title="Large View">
+                        <i class="fas fa-th-large"></i>
                     </button>
                     <button class="shuffle-btn" id="shuffleBtn" title="Shuffle">
                         <i class="fas fa-random"></i>
@@ -230,7 +272,7 @@
         <!-- Video Grid Loading Spinner -->
         <div class="video-grid-loading" id="videoGridLoading" style="display: none; text-align: center; margin: 20px 0;">
             <div class="loading-spinner"></div>
-            <p>Loading more babes...</p>
+            <p>Loading more videos...</p>
         </div>
 
         <!-- No Results -->
@@ -238,7 +280,7 @@
             <div class="no-results-icon">
                 <i class="fas fa-search"></i>
             </div>
-            <h3 class="no-results-title" id="noResultsTitle">No babes found</h3>
+            <h3 class="no-results-title" id="noResultsTitle">No videos found</h3>
             <p class="no-results-text" id="noResultsText">Try adjusting your search terms or filters</p>
             <button class="clear-filters-btn" id="clearFiltersBtn">
                 <i class="fas fa-times"></i>
@@ -261,6 +303,9 @@
                     </button>
                     <button class="modal-action-btn" id="modalShareBtn" title="Share">
                         <i class="fas fa-share"></i>
+                    </button>
+                    <button class="modal-action-btn" id="modalWatchLaterBtn" title="Watch Later">
+                        <i class="fas fa-clock"></i>
                     </button>
                 </div>
             </div>
@@ -314,6 +359,16 @@
                             </div>
                             <div class="video-meta-right">
                                 <div class="video-actions">
+                                    <div class="like-dislike-container">
+                                        <button class="action-btn like-btn" id="modalLikeBtn">
+                                            <i class="fas fa-thumbs-up"></i>
+                                            <span id="likeCount">0</span>
+                                        </button>
+                                        <button class="action-btn dislike-btn" id="modalDislikeBtn">
+                                            <i class="fas fa-thumbs-down"></i>
+                                            <span id="dislikeCount">0</span>
+                                        </button>
+                                    </div>
                                     <button class="action-btn favorite-btn" id="modalFavBtn">
                                         <i class="fas fa-heart"></i>
                                         <span>Favorite</span>
@@ -325,6 +380,10 @@
                                     <button class="action-btn download-btn" id="modalDownloadActionBtn">
                                         <i class="fas fa-download"></i>
                                         <span>Download</span>
+                                    </button>
+                                    <button class="action-btn share-btn" id="modalShareActionBtn">
+                                        <i class="fas fa-share"></i>
+                                        <span>Share</span>
                                     </button>
                                 </div>
                             </div>
@@ -344,6 +403,20 @@
                         
                         <div class="video-categories" id="modalVideoCategories">
                             <!-- Categories will be added dynamically -->
+                        </div>
+                        
+                        <!-- Video Description -->
+                        <div class="video-description" id="videoDescription">
+                            <div class="description-header">
+                                <h3>Description</h3>
+                                <button class="description-toggle" id="descriptionToggle">
+                                    <span>Show more</span>
+                                    <i class="fas fa-chevron-down"></i>
+                                </button>
+                            </div>
+                            <div class="description-content" id="descriptionContent">
+                                <p id="videoDescriptionText">No description available.</p>
+                            </div>
                         </div>
                         
                         <!-- Comments Section -->
@@ -381,12 +454,115 @@
                 
                 <!-- Related Videos Sidebar -->
                 <div class="related-videos-sidebar">
-                    <h3 class="related-videos-title">Related Videos</h3>
-                    <div class="related-videos-list" id="relatedVideosGrid">
-                        <!-- Related videos will be loaded dynamically -->
+                    <div class="sidebar-tabs">
+                        <button class="sidebar-tab active" data-tab="related">Related</button>
+                        <button class="sidebar-tab" data-tab="playlist">Playlist</button>
+                        <button class="sidebar-tab" data-tab="recommended">For You</button>
+                    </div>
+                    <div class="sidebar-content">
+                        <div class="tab-content active" id="relatedTab">
+                            <h3 class="related-videos-title">Related Videos</h3>
+                            <div class="related-videos-list" id="relatedVideosGrid">
+                                <!-- Related videos will be loaded dynamically -->
+                            </div>
+                        </div>
+                        <div class="tab-content" id="playlistTab">
+                            <h3 class="related-videos-title">Playlist</h3>
+                            <div class="playlist-videos-list" id="playlistVideosGrid">
+                                <!-- Playlist videos will be loaded dynamically -->
+                            </div>
+                        </div>
+                        <div class="tab-content" id="recommendedTab">
+                            <h3 class="related-videos-title">Recommended for You</h3>
+                            <div class="recommended-videos-list" id="recommendedVideosGrid">
+                                <!-- Recommended videos will be loaded dynamically -->
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <!-- Advanced Search Modal -->
+    <div class="auth-modal" id="advancedSearchModal">
+        <div class="modal-backdrop"></div>
+        <div class="auth-modal-container advanced-search-container">
+            <div class="auth-modal-header">
+                <h2>Advanced Search</h2>
+                <button class="modal-close-btn" id="advancedSearchClose">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <form class="auth-form" id="advancedSearchForm">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="searchKeywords">Keywords</label>
+                        <input type="text" id="searchKeywords" name="keywords" placeholder="Enter keywords...">
+                    </div>
+                    <div class="form-group">
+                        <label for="searchPerformer">Performer</label>
+                        <input type="text" id="searchPerformer" name="performer" placeholder="Performer name...">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="searchCategory">Category</label>
+                        <select id="searchCategory" name="category">
+                            <option value="">Any Category</option>
+                            <!-- Categories will be populated dynamically -->
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="searchQuality">Quality</label>
+                        <select id="searchQuality" name="quality">
+                            <option value="">Any Quality</option>
+                            <option value="4K">4K</option>
+                            <option value="HD">HD</option>
+                            <option value="SD">SD</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="searchMinDuration">Min Duration (minutes)</label>
+                        <input type="number" id="searchMinDuration" name="minDuration" min="0" placeholder="0">
+                    </div>
+                    <div class="form-group">
+                        <label for="searchMaxDuration">Max Duration (minutes)</label>
+                        <input type="number" id="searchMaxDuration" name="maxDuration" min="0" placeholder="999">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="searchMinRating">Min Rating</label>
+                        <select id="searchMinRating" name="minRating">
+                            <option value="">Any Rating</option>
+                            <option value="1">1+ Stars</option>
+                            <option value="2">2+ Stars</option>
+                            <option value="3">3+ Stars</option>
+                            <option value="4">4+ Stars</option>
+                            <option value="5">5 Stars</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="searchSort">Sort By</label>
+                        <select id="searchSort" name="sort">
+                            <option value="relevance">Relevance</option>
+                            <option value="newest">Newest</option>
+                            <option value="oldest">Oldest</option>
+                            <option value="most-viewed">Most Viewed</option>
+                            <option value="highest-rated">Highest Rated</option>
+                            <option value="longest">Longest</option>
+                            <option value="shortest">Shortest</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="auth-submit-btn secondary" id="clearAdvancedSearch">Clear</button>
+                    <button type="button" class="auth-submit-btn" id="applyAdvancedSearch">Search</button>
+                </div>
+            </form>
         </div>
     </div>
 
@@ -516,10 +692,65 @@
         </div>
     </div>
 
+    <!-- Share Modal -->
+    <div class="auth-modal" id="shareModal">
+        <div class="modal-backdrop"></div>
+        <div class="auth-modal-container">
+            <div class="auth-modal-header">
+                <h2>Share Video</h2>
+                <button class="modal-close-btn" id="shareModalClose">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="share-modal-content">
+                <div class="share-link-section">
+                    <label>Video Link</label>
+                    <div class="share-link-container">
+                        <input type="text" id="shareLink" readonly>
+                        <button class="copy-link-btn" id="copyLinkBtn">
+                            <i class="fas fa-copy"></i>
+                            Copy
+                        </button>
+                    </div>
+                </div>
+                <div class="share-options">
+                    <h3>Share on Social Media</h3>
+                    <div class="social-share-buttons">
+                        <button class="social-btn twitter" id="shareTwitter">
+                            <i class="fab fa-twitter"></i>
+                            Twitter
+                        </button>
+                        <button class="social-btn facebook" id="shareFacebook">
+                            <i class="fab fa-facebook"></i>
+                            Facebook
+                        </button>
+                        <button class="social-btn reddit" id="shareReddit">
+                            <i class="fab fa-reddit"></i>
+                            Reddit
+                        </button>
+                        <button class="social-btn telegram" id="shareTelegram">
+                            <i class="fab fa-telegram"></i>
+                            Telegram
+                        </button>
+                    </div>
+                </div>
+                <div class="embed-section">
+                    <label>Embed Code</label>
+                    <textarea id="embedCode" readonly rows="4"></textarea>
+                    <button class="copy-embed-btn" id="copyEmbedBtn">
+                        <i class="fas fa-copy"></i>
+                        Copy Embed Code
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Toast Notifications -->
     <div class="toast-container" id="toastContainer">
         <!-- Toast notifications will be added dynamically -->
     </div>
+    
     <script src="Scripts/Dom.js"></script>
     <script src="Scripts/Category.js"></script>
     <script src="Scripts/Notification.js"></script>
@@ -534,6 +765,8 @@
     <script src="Scripts/Subscribe.js"></script>
     <script src="Scripts/Playlist.js"></script>
     <script src="Scripts/Comment.js"></script>
+    <script src="Scripts/Share.js"></script>
+    <script src="Scripts/WatchLater.js"></script>
     <script src="Scripts/Main.js"></script>
 </body>
 </html>

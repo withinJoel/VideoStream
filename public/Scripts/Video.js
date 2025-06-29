@@ -19,9 +19,9 @@ async function openVideoModal(video) {
     document.getElementById('modalVideoDuration').textContent = video.duration || 'Unknown';
     document.getElementById('modalVideoQuality').textContent = video.quality || 'HD';
     
-    // Update video source
+    // Update video source with multiple quality options
     const videoElement = document.getElementById('modalVideo');
-    videoElement.src = `/api/video-stream/${video.id}`;
+    setupVideoPlayer(videoElement, video);
     
     // Update categories
     const categoriesContainer = document.getElementById('modalVideoCategories');
@@ -65,19 +65,373 @@ async function openVideoModal(video) {
     
     // Load comments
     loadComments(video.id);
+    
+    // Setup video analytics
+    setupVideoAnalytics(video);
+}
+
+function setupVideoPlayer(videoElement, video) {
+    // Clear existing sources
+    videoElement.innerHTML = '';
+    
+    // Add multiple quality sources
+    const qualities = ['4K', 'HD', 'SD'];
+    qualities.forEach(quality => {
+        const source = document.createElement('source');
+        source.src = `/api/video-stream/${video.id}?quality=${quality}`;
+        source.type = 'video/mp4';
+        source.setAttribute('data-quality', quality);
+        videoElement.appendChild(source);
+    });
+    
+    // Add subtitles if available
+    if (video.subtitles) {
+        video.subtitles.forEach(subtitle => {
+            const track = document.createElement('track');
+            track.kind = 'subtitles';
+            track.src = subtitle.url;
+            track.srclang = subtitle.lang;
+            track.label = subtitle.label;
+            videoElement.appendChild(track);
+        });
+    }
+    
+    // Setup custom video controls
+    setupCustomVideoControls(videoElement, video);
+    
+    // Setup video events
+    setupVideoEvents(videoElement, video);
+}
+
+function setupCustomVideoControls(videoElement, video) {
+    // Add quality selector
+    const qualitySelector = document.createElement('div');
+    qualitySelector.className = 'video-quality-selector';
+    qualitySelector.innerHTML = `
+        <button class="quality-btn" title="Quality">
+            <i class="fas fa-cog"></i>
+            <span class="quality-text">HD</span>
+        </button>
+        <div class="quality-menu">
+            <div class="quality-option" data-quality="4K">4K</div>
+            <div class="quality-option" data-quality="HD">HD</div>
+            <div class="quality-option" data-quality="SD">SD</div>
+        </div>
+    `;
+    
+    // Add playback speed control
+    const speedSelector = document.createElement('div');
+    speedSelector.className = 'video-speed-selector';
+    speedSelector.innerHTML = `
+        <button class="speed-btn" title="Playback Speed">
+            <i class="fas fa-tachometer-alt"></i>
+            <span class="speed-text">1x</span>
+        </button>
+        <div class="speed-menu">
+            <div class="speed-option" data-speed="0.25">0.25x</div>
+            <div class="speed-option" data-speed="0.5">0.5x</div>
+            <div class="speed-option" data-speed="0.75">0.75x</div>
+            <div class="speed-option" data-speed="1" class="active">1x</div>
+            <div class="speed-option" data-speed="1.25">1.25x</div>
+            <div class="speed-option" data-speed="1.5">1.5x</div>
+            <div class="speed-option" data-speed="2">2x</div>
+        </div>
+    `;
+    
+    // Add picture-in-picture button
+    const pipButton = document.createElement('button');
+    pipButton.className = 'pip-btn';
+    pipButton.innerHTML = '<i class="fas fa-external-link-alt"></i>';
+    pipButton.title = 'Picture in Picture';
+    pipButton.onclick = () => togglePictureInPicture(videoElement);
+    
+    // Add theater mode button
+    const theaterButton = document.createElement('button');
+    theaterButton.className = 'theater-btn';
+    theaterButton.innerHTML = '<i class="fas fa-expand-arrows-alt"></i>';
+    theaterButton.title = 'Theater Mode';
+    theaterButton.onclick = () => toggleTheaterMode();
+    
+    // Add controls to video container
+    const controlsContainer = document.createElement('div');
+    controlsContainer.className = 'custom-video-controls';
+    controlsContainer.appendChild(qualitySelector);
+    controlsContainer.appendChild(speedSelector);
+    controlsContainer.appendChild(pipButton);
+    controlsContainer.appendChild(theaterButton);
+    
+    const videoContainer = videoElement.parentElement;
+    videoContainer.appendChild(controlsContainer);
+    
+    // Setup control events
+    setupControlEvents(qualitySelector, speedSelector, videoElement);
+}
+
+function setupControlEvents(qualitySelector, speedSelector, videoElement) {
+    // Quality selector events
+    qualitySelector.querySelector('.quality-btn').onclick = (e) => {
+        e.stopPropagation();
+        qualitySelector.querySelector('.quality-menu').classList.toggle('active');
+    };
+    
+    qualitySelector.querySelectorAll('.quality-option').forEach(option => {
+        option.onclick = (e) => {
+            e.stopPropagation();
+            const quality = option.dataset.quality;
+            changeVideoQuality(videoElement, quality);
+            qualitySelector.querySelector('.quality-text').textContent = quality;
+            qualitySelector.querySelector('.quality-menu').classList.remove('active');
+        };
+    });
+    
+    // Speed selector events
+    speedSelector.querySelector('.speed-btn').onclick = (e) => {
+        e.stopPropagation();
+        speedSelector.querySelector('.speed-menu').classList.toggle('active');
+    };
+    
+    speedSelector.querySelectorAll('.speed-option').forEach(option => {
+        option.onclick = (e) => {
+            e.stopPropagation();
+            const speed = parseFloat(option.dataset.speed);
+            videoElement.playbackRate = speed;
+            speedSelector.querySelector('.speed-text').textContent = `${speed}x`;
+            speedSelector.querySelector('.speed-menu').classList.remove('active');
+            
+            // Update active state
+            speedSelector.querySelectorAll('.speed-option').forEach(opt => opt.classList.remove('active'));
+            option.classList.add('active');
+        };
+    });
+    
+    // Close menus when clicking outside
+    document.addEventListener('click', () => {
+        qualitySelector.querySelector('.quality-menu').classList.remove('active');
+        speedSelector.querySelector('.speed-menu').classList.remove('active');
+    });
+}
+
+function changeVideoQuality(videoElement, quality) {
+    const currentTime = videoElement.currentTime;
+    const wasPlaying = !videoElement.paused;
+    
+    // Find the source with the requested quality
+    const sources = videoElement.querySelectorAll('source');
+    sources.forEach(source => {
+        if (source.dataset.quality === quality) {
+            videoElement.src = source.src;
+        }
+    });
+    
+    // Restore playback state
+    videoElement.addEventListener('loadedmetadata', function onLoaded() {
+        videoElement.currentTime = currentTime;
+        if (wasPlaying) {
+            videoElement.play();
+        }
+        videoElement.removeEventListener('loadedmetadata', onLoaded);
+    });
+}
+
+function togglePictureInPicture(videoElement) {
+    if (document.pictureInPictureElement) {
+        document.exitPictureInPicture();
+    } else if (document.pictureInPictureEnabled) {
+        videoElement.requestPictureInPicture().catch(error => {
+            console.error('Failed to enter picture-in-picture mode:', error);
+            showToast('Picture-in-picture not supported', 'error');
+        });
+    }
+}
+
+function toggleTheaterMode() {
+    const modal = document.getElementById('videoModal');
+    modal.classList.toggle('theater-mode');
+    
+    const theaterBtn = document.querySelector('.theater-btn i');
+    if (modal.classList.contains('theater-mode')) {
+        theaterBtn.className = 'fas fa-compress-arrows-alt';
+    } else {
+        theaterBtn.className = 'fas fa-expand-arrows-alt';
+    }
+}
+
+function setupVideoEvents(videoElement, video) {
+    let watchTime = 0;
+    let totalWatchTime = 0;
+    
+    // Track watch time
+    videoElement.addEventListener('timeupdate', () => {
+        watchTime = videoElement.currentTime;
+        totalWatchTime += 0.25; // Approximate time increment
+        
+        // Save progress every 10 seconds
+        if (Math.floor(watchTime) % 10 === 0) {
+            saveWatchProgress(video.id, watchTime, videoElement.duration);
+        }
+    });
+    
+    // Track video completion
+    videoElement.addEventListener('ended', () => {
+        markVideoAsWatched(video.id);
+        autoplayNextVideo();
+    });
+    
+    // Track video interactions
+    videoElement.addEventListener('play', () => {
+        trackVideoEvent('play', video.id);
+    });
+    
+    videoElement.addEventListener('pause', () => {
+        trackVideoEvent('pause', video.id);
+    });
+    
+    // Keyboard shortcuts
+    videoElement.addEventListener('keydown', (e) => {
+        handleVideoKeyboardShortcuts(e, videoElement);
+    });
+    
+    // Double-click to fullscreen
+    videoElement.addEventListener('dblclick', () => {
+        if (videoElement.requestFullscreen) {
+            videoElement.requestFullscreen();
+        }
+    });
+}
+
+function handleVideoKeyboardShortcuts(e, videoElement) {
+    switch(e.key) {
+        case ' ':
+        case 'k':
+            e.preventDefault();
+            if (videoElement.paused) {
+                videoElement.play();
+            } else {
+                videoElement.pause();
+            }
+            break;
+        case 'ArrowLeft':
+            e.preventDefault();
+            videoElement.currentTime = Math.max(0, videoElement.currentTime - 10);
+            break;
+        case 'ArrowRight':
+            e.preventDefault();
+            videoElement.currentTime = Math.min(videoElement.duration, videoElement.currentTime + 10);
+            break;
+        case 'ArrowUp':
+            e.preventDefault();
+            videoElement.volume = Math.min(1, videoElement.volume + 0.1);
+            break;
+        case 'ArrowDown':
+            e.preventDefault();
+            videoElement.volume = Math.max(0, videoElement.volume - 0.1);
+            break;
+        case 'm':
+            e.preventDefault();
+            videoElement.muted = !videoElement.muted;
+            break;
+        case 'f':
+            e.preventDefault();
+            if (videoElement.requestFullscreen) {
+                videoElement.requestFullscreen();
+            }
+            break;
+    }
+}
+
+function setupVideoAnalytics(video) {
+    // Track video view
+    fetch(`/api/analytics/view/${video.id}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            userId: isAuthenticated ? currentUser.id : null,
+            timestamp: Date.now(),
+            referrer: document.referrer,
+            userAgent: navigator.userAgent
+        })
+    }).catch(console.error);
+}
+
+function trackVideoEvent(event, videoId) {
+    fetch(`/api/analytics/event`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            event,
+            videoId,
+            userId: isAuthenticated ? currentUser.id : null,
+            timestamp: Date.now()
+        })
+    }).catch(console.error);
+}
+
+function saveWatchProgress(videoId, currentTime, duration) {
+    if (isAuthenticated) {
+        fetch(`/api/watch-progress/${videoId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                userId: currentUser.id,
+                currentTime,
+                duration,
+                percentage: (currentTime / duration) * 100
+            })
+        }).catch(console.error);
+    }
+}
+
+function markVideoAsWatched(videoId) {
+    if (isAuthenticated) {
+        fetch(`/api/watched/${videoId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                userId: currentUser.id,
+                completedAt: Date.now()
+            })
+        }).catch(console.error);
+    }
+}
+
+function autoplayNextVideo() {
+    if (currentSection === 'playlists' && currentPlaylistVideos.length > 0) {
+        const currentIndex = currentPlaylistVideos.findIndex(v => v.id === currentVideoId);
+        if (currentIndex < currentPlaylistVideos.length - 1) {
+            const nextVideo = currentPlaylistVideos[currentIndex + 1];
+            setTimeout(() => {
+                closeVideoModal();
+                setTimeout(() => openVideoModal(nextVideo), 500);
+            }, 3000);
+        }
+    }
 }
 
 function closeVideoModal() {
     const modal = document.getElementById('videoModal');
     const video = document.getElementById('modalVideo');
     
-    modal.classList.remove('active');
+    modal.classList.remove('active', 'theater-mode');
     document.body.style.overflow = '';
     
     // Pause and reset video
     video.pause();
     video.currentTime = 0;
     video.src = '';
+    
+    // Remove custom controls
+    const customControls = modal.querySelector('.custom-video-controls');
+    if (customControls) {
+        customControls.remove();
+    }
     
     currentVideoId = null;
 }
@@ -103,7 +457,11 @@ async function loadVideos(reset = false) {
             category: currentFilters.category,
             sort: currentFilters.sort,
             favorites: currentFilters.favorites.toString(),
-            userId: isAuthenticated ? currentUser.id : ''
+            userId: isAuthenticated ? currentUser.id : '',
+            minDuration: currentFilters.minDuration || '',
+            maxDuration: currentFilters.maxDuration || '',
+            quality: currentFilters.quality || '',
+            minRating: currentFilters.minRating || ''
         });
         
         console.log('Loading videos with filters:', currentFilters);
@@ -349,6 +707,10 @@ function createVideoCard(video) {
     
     const thumbnailUrl = video.thumbnailExists ? video.thumbnailUrl : '/api/placeholder/400/225';
     
+    // Calculate watch progress
+    const watchProgress = video.watchProgress || 0;
+    const progressBar = watchProgress > 0 ? `<div class="watch-progress" style="width: ${watchProgress}%"></div>` : '';
+    
     card.innerHTML = `
         <div class="video-thumbnail">
             <img src="${thumbnailUrl}" alt="${video.title}" loading="lazy">
@@ -366,6 +728,9 @@ function createVideoCard(video) {
                 <i class="fas fa-star"></i>
                 ${video.rating.toFixed(1)}
             </div>
+            ${video.isNew ? '<div class="video-new-badge">NEW</div>' : ''}
+            ${video.isWatched ? '<div class="video-watched-badge"><i class="fas fa-check"></i></div>' : ''}
+            ${progressBar ? `<div class="video-progress-bar">${progressBar}</div>` : ''}
         </div>
         <div class="video-info">
             <h3 class="video-title">${video.title}</h3>
@@ -387,6 +752,12 @@ function createVideoCard(video) {
                 <span class="video-stat">
                     <i class="fas fa-clock"></i>
                     ${video.duration}
+                </span>
+                ` : ''}
+                ${video.uploadDate ? `
+                <span class="video-stat">
+                    <i class="fas fa-calendar"></i>
+                    ${new Date(video.uploadDate).toLocaleDateString()}
                 </span>
                 ` : ''}
             </div>
