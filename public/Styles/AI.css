@@ -45,28 +45,10 @@
     gap: 4px;
     z-index: 4;
     box-shadow: 0 4px 12px rgba(255, 107, 157, 0.4);
-    animation: aiPulse 2s infinite;
-}
-
-@keyframes aiPulse {
-    0%, 100% { 
-        box-shadow: 0 4px 12px rgba(255, 107, 157, 0.4);
-        transform: scale(1);
-    }
-    50% { 
-        box-shadow: 0 6px 16px rgba(255, 107, 157, 0.6);
-        transform: scale(1.05);
-    }
 }
 
 .ai-recommendation-badge i {
     font-size: 10px;
-    animation: aiRotate 3s linear infinite;
-}
-
-@keyframes aiRotate {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
 }
 
 .ai-explanation {
@@ -405,14 +387,12 @@
 
 /* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
-    .ai-recommendation-badge,
     .ai-icon i,
     .ai-loading-spinner,
     .ai-loading-spinner::after {
         animation: none;
     }
     
-    .ai-recommended::before,
     .ai-auth-required::before {
         animation: none;
         opacity: 0.5;

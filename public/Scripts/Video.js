@@ -774,13 +774,14 @@ function rateVideo(rating) {
     });
 }
 
-// Video hover preview functionality
+// Video hover preview functionality - Enhanced for AI recommendations
 function setupVideoHoverPreview(card, video) {
     const thumbnail = card.querySelector('.video-thumbnail');
     const img = thumbnail.querySelector('img');
     
     let previewVideo = null;
     let isHovering = false;
+    let previewTimeout = null;
     
     const startPreview = () => {
         if (previewVideo || !isHovering) return;
@@ -792,6 +793,7 @@ function setupVideoHoverPreview(card, video) {
         previewVideo.loop = true;
         previewVideo.preload = 'metadata';
         previewVideo.style.opacity = '0';
+        previewVideo.style.transition = 'opacity 0.3s ease';
         
         // Set video source
         previewVideo.src = `/api/video-stream/${video.id}#t=10`;
@@ -828,6 +830,11 @@ function setupVideoHoverPreview(card, video) {
     };
     
     const stopPreview = () => {
+        if (previewTimeout) {
+            clearTimeout(previewTimeout);
+            previewTimeout = null;
+        }
+        
         if (previewVideo) {
             previewVideo.pause();
             previewVideo.remove();
@@ -839,16 +846,15 @@ function setupVideoHoverPreview(card, video) {
     // Mouse enter event
     card.addEventListener('mouseenter', () => {
         isHovering = true;
-        clearTimeout(hoverPreviewTimeout);
         
-        // Start preview after a short delay
-        hoverPreviewTimeout = setTimeout(startPreview, 800);
+        // Start preview after a delay (longer for AI recommendations to show explanation)
+        const delay = card.classList.contains('ai-recommended') ? 1200 : 800;
+        previewTimeout = setTimeout(startPreview, delay);
     });
     
     // Mouse leave event
     card.addEventListener('mouseleave', () => {
         isHovering = false;
-        clearTimeout(hoverPreviewTimeout);
         stopPreview();
     });
     

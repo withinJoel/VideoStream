@@ -6,12 +6,13 @@ class AIRecommendationEngine {
         this.isLoading = false;
         this.lastUpdate = null;
         this.weights = {
-            watchHistory: 0.3,
-            favorites: 0.25,
-            subscriptions: 0.2,
-            ratings: 0.15,
-            categories: 0.1
+            watchHistory: 0.35,
+            favorites: 0.30,
+            subscriptions: 0.20,
+            ratings: 0.10,
+            categories: 0.05
         };
+        this.minConfidenceThreshold = 0.3;
     }
 
     async initializeUserProfile(userId) {
@@ -27,9 +28,9 @@ class AIRecommendationEngine {
                 favorites: data.favorites || [],
                 subscriptions: data.subscriptions || [],
                 ratings: data.ratings || [],
-                categoryPreferences: data.categoryPreferences || {},
-                performerPreferences: data.performerPreferences || {},
-                viewingPatterns: data.viewingPatterns || {},
+                categoryPreferences: this.calculateCategoryPreferences(data),
+                performerPreferences: this.calculatePerformerPreferences(data),
+                viewingPatterns: this.analyzeViewingPatterns(data),
                 lastActivity: data.lastActivity || Date.now()
             };
 
@@ -38,6 +39,142 @@ class AIRecommendationEngine {
             console.error('Error initializing user profile:', error);
             return null;
         }
+    }
+
+    calculateCategoryPreferences(data) {
+        const categoryScores = {};
+        const categoryFrequency = {};
+        
+        // Analyze watch history
+        if (data.watchHistory) {
+            data.watchHistory.forEach(watch => {
+                if (watch.categories) {
+                    watch.categories.forEach(category => {
+                        categoryFrequency[category] = (categoryFrequency[category] || 0) + 1;
+                        categoryScores[category] = (categoryScores[category] || 0) + 0.5;
+                    });
+                }
+            });
+        }
+        
+        // Analyze favorites (higher weight)
+        if (data.favorites) {
+            data.favorites.forEach(fav => {
+                if (fav.categories) {
+                    fav.categories.forEach(category => {
+                        categoryFrequency[category] = (categoryFrequency[category] || 0) + 1;
+                        categoryScores[category] = (categoryScores[category] || 0) + 1.0;
+                    });
+                }
+            });
+        }
+        
+        // Analyze ratings (weighted by rating value)
+        if (data.ratings) {
+            data.ratings.forEach(rating => {
+                if (rating.categories && rating.rating >= 3) {
+                    rating.categories.forEach(category => {
+                        const weight = (rating.rating - 2) / 3; // 3-5 stars = 0.33-1.0 weight
+                        categoryScores[category] = (categoryScores[category] || 0) + weight;
+                    });
+                }
+            });
+        }
+        
+        // Normalize scores
+        const preferences = {};
+        Object.keys(categoryScores).forEach(category => {
+            const frequency = categoryFrequency[category] || 1;
+            preferences[category] = {
+                score: Math.min(categoryScores[category] / Math.max(frequency, 1), 1),
+                frequency: frequency
+            };
+        });
+        
+        return preferences;
+    }
+
+    calculatePerformerPreferences(data) {
+        const performerScores = {};
+        const performerFrequency = {};
+        
+        // Analyze subscriptions (highest weight)
+        if (data.subscriptions) {
+            data.subscriptions.forEach(sub => {
+                performerScores[sub.name] = 1.0;
+                performerFrequency[sub.name] = (performerFrequency[sub.name] || 0) + 5;
+            });
+        }
+        
+        // Analyze favorites
+        if (data.favorites) {
+            data.favorites.forEach(fav => {
+                performerScores[fav.artist] = (performerScores[fav.artist] || 0) + 0.8;
+                performerFrequency[fav.artist] = (performerFrequency[fav.artist] || 0) + 2;
+            });
+        }
+        
+        // Analyze watch history
+        if (data.watchHistory) {
+            data.watchHistory.forEach(watch => {
+                performerScores[watch.artist] = (performerScores[watch.artist] || 0) + 0.3;
+                performerFrequency[watch.artist] = (performerFrequency[watch.artist] || 0) + 1;
+            });
+        }
+        
+        // Analyze ratings
+        if (data.ratings) {
+            data.ratings.forEach(rating => {
+                if (rating.rating >= 4) {
+                    const weight = (rating.rating - 3) / 2; // 4-5 stars = 0.5-1.0 weight
+                    performerScores[rating.artist] = (performerScores[rating.artist] || 0) + weight;
+                }
+            });
+        }
+        
+        return performerScores;
+    }
+
+    analyzeViewingPatterns(data) {
+        const patterns = {
+            preferredDuration: 'medium',
+            preferredQuality: 'HD',
+            viewingTimes: [],
+            completionRate: 0.8
+        };
+        
+        if (data.watchHistory && data.watchHistory.length > 0) {
+            // Analyze duration preferences
+            const durations = data.watchHistory
+                .filter(w => w.duration)
+                .map(w => this.parseDuration(w.duration));
+            
+            if (durations.length > 0) {
+                const avgDuration = durations.reduce((a, b) => a + b, 0) / durations.length;
+                if (avgDuration < 600) patterns.preferredDuration = 'short'; // < 10 min
+                else if (avgDuration > 1800) patterns.preferredDuration = 'long'; // > 30 min
+            }
+            
+            // Analyze quality preferences
+            const qualities = data.watchHistory
+                .filter(w => w.quality)
+                .map(w => w.quality);
+            
+            if (qualities.length > 0) {
+                const qualityCount = {};
+                qualities.forEach(q => qualityCount[q] = (qualityCount[q] || 0) + 1);
+                patterns.preferredQuality = Object.keys(qualityCount)
+                    .reduce((a, b) => qualityCount[a] > qualityCount[b] ? a : b);
+            }
+        }
+        
+        return patterns;
+    }
+
+    parseDuration(durationStr) {
+        if (!durationStr) return 0;
+        const parts = durationStr.split(':').map(Number);
+        return parts.length === 2 ? parts[0] * 60 + parts[1] : 0;
     }
 
     async generateRecommendations(userId, limit = 20) {
@@ -50,16 +187,24 @@ class AIRecommendationEngine {
             // Initialize or update user profile
             await this.initializeUserProfile(userId);
             
-            if (!this.userProfile) {
-                // For new users, return trending/popular videos
+            if (!this.userProfile || this.hasInsufficientData()) {
+                // For new users or insufficient data, return trending/popular videos
                 return await this.getDefaultRecommendations(limit);
             }
 
             // Generate personalized recommendations
-            const recommendations = await this.calculatePersonalizedRecommendations(limit);
+            const recommendations = await this.calculatePersonalizedRecommendations(limit * 3);
+            
+            // Filter by confidence threshold
+            const confidentRecommendations = recommendations.filter(item => 
+                item.confidence >= this.minConfidenceThreshold
+            );
             
             // Apply diversity and freshness filters
-            const diversifiedRecommendations = this.applyDiversityFilters(recommendations);
+            const diversifiedRecommendations = this.applyDiversityFilters(
+                confidentRecommendations.length > 0 ? confidentRecommendations : recommendations,
+                limit
+            );
             
             // Cache recommendations
             this.recommendations = diversifiedRecommendations;
@@ -76,6 +221,18 @@ class AIRecommendationEngine {
         }
     }
 
+    hasInsufficientData() {
+        if (!this.userProfile) return true;
+        
+        const totalInteractions = 
+            (this.userProfile.watchHistory?.length || 0) +
+            (this.userProfile.favorites?.length || 0) +
+            (this.userProfile.subscriptions?.length || 0) +
+            (this.userProfile.ratings?.length || 0);
+            
+        return totalInteractions < 3; // Need at least 3 interactions for meaningful recommendations
+    }
+
     async calculatePersonalizedRecommendations(limit) {
         const scoredVideos = new Map();
         
@@ -86,97 +243,96 @@ class AIRecommendationEngine {
 
         // Score each video based on different factors
         for (const video of allVideos) {
-            let score = 0;
-            
             // Skip videos user has already watched recently
             if (this.hasWatchedRecently(video.id)) continue;
             
-            // 1. Watch History Based Scoring (30%)
-            score += this.calculateWatchHistoryScore(video) * this.weights.watchHistory;
+            let score = 0;
+            let confidence = 0;
+            const reasons = [];
             
-            // 2. Favorites Based Scoring (25%)
-            score += this.calculateFavoritesScore(video) * this.weights.favorites;
+            // 1. Subscription Based Scoring (highest priority)
+            const subscriptionScore = this.calculateSubscriptionScore(video);
+            if (subscriptionScore > 0) {
+                score += subscriptionScore * this.weights.subscriptions;
+                confidence += 0.4;
+                reasons.push(`You're subscribed to ${video.artist}`);
+            }
             
-            // 3. Subscription Based Scoring (20%)
-            score += this.calculateSubscriptionScore(video) * this.weights.subscriptions;
+            // 2. Favorites Based Scoring
+            const favoritesScore = this.calculateFavoritesScore(video);
+            if (favoritesScore > 0) {
+                score += favoritesScore * this.weights.favorites;
+                confidence += 0.3;
+                if (favoritesScore > 0.5) {
+                    reasons.push(`You've favorited videos by ${video.artist}`);
+                } else {
+                    reasons.push('Similar to your favorites');
+                }
+            }
             
-            // 4. Rating Based Scoring (15%)
-            score += this.calculateRatingScore(video) * this.weights.ratings;
+            // 3. Watch History Based Scoring
+            const watchHistoryScore = this.calculateWatchHistoryScore(video);
+            if (watchHistoryScore > 0) {
+                score += watchHistoryScore * this.weights.watchHistory;
+                confidence += 0.25;
+                reasons.push('Based on your viewing history');
+            }
             
-            // 5. Category Preference Scoring (10%)
-            score += this.calculateCategoryScore(video) * this.weights.categories;
+            // 4. Rating Based Scoring
+            const ratingScore = this.calculateRatingScore(video);
+            if (ratingScore > 0) {
+                score += ratingScore * this.weights.ratings;
+                confidence += 0.15;
+                reasons.push('Matches your rating preferences');
+            }
+            
+            // 5. Category Preference Scoring
+            const categoryScore = this.calculateCategoryScore(video);
+            if (categoryScore > 0) {
+                score += categoryScore * this.weights.categories;
+                confidence += 0.1;
+                const preferredCategories = this.getPreferredCategories(video.categories);
+                if (preferredCategories.length > 0) {
+                    reasons.push(`You enjoy ${preferredCategories.slice(0, 2).join(', ')} content`);
+                }
+            }
+            
+            // Apply quality and duration preferences
+            score += this.calculateQualityBoost(video);
+            score += this.calculateDurationBoost(video);
             
             // Apply recency boost for newer videos
             score += this.calculateRecencyBoost(video);
             
-            // Apply quality boost
-            score += this.calculateQualityBoost(video);
-            
-            if (score > 0) {
-                scoredVideos.set(video.id, { video, score });
+            // Only include videos with meaningful scores
+            if (score > 0.1) {
+                scoredVideos.set(video.id, { 
+                    video, 
+                    score, 
+                    confidence: Math.min(confidence, 1),
+                    reasons: reasons.slice(0, 1) // Keep only the most relevant reason
+                });
             }
         }
 
         // Sort by score and return top recommendations
         const sortedRecommendations = Array.from(scoredVideos.values())
             .sort((a, b) => b.score - a.score)
-            .slice(0, limit * 2) // Get more than needed for diversity filtering
-            .map(item => item.video);
+            .slice(0, limit)
+            .map(item => ({
+                ...item.video,
+                aiScore: item.score,
+                aiConfidence: item.confidence,
+                aiReasons: item.reasons
+            }));
 
         return sortedRecommendations;
     }
 
-    calculateWatchHistoryScore(video) {
-        if (!this.userProfile.watchHistory.length) return 0;
-        
-        let score = 0;
-        const recentWatches = this.userProfile.watchHistory.slice(-50); // Last 50 watches
-        
-        for (const watch of recentWatches) {
-            // Same performer
-            if (watch.artist === video.artist) {
-                score += 0.4;
-            }
-            
-            // Similar categories
-            const commonCategories = video.categories.filter(cat => 
-                watch.categories && watch.categories.includes(cat)
-            );
-            score += commonCategories.length * 0.2;
-            
-            // Similar duration preference
-            if (this.isSimilarDuration(watch.duration, video.duration)) {
-                score += 0.1;
-            }
-            
-            // Similar quality preference
-            if (watch.quality === video.quality) {
-                score += 0.1;
-            }
-        }
-        
-        return Math.min(score, 1); // Cap at 1
-    }
-
-    calculateFavoritesScore(video) {
-        if (!this.userProfile.favorites.length) return 0;
-        
-        let score = 0;
-        
-        for (const favorite of this.userProfile.favorites) {
-            // Same performer
-            if (favorite.artist === video.artist) {
-                score += 0.5;
-            }
-            
-            // Similar categories
-            const commonCategories = video.categories.filter(cat => 
-                favorite.categories && favorite.categories.includes(cat)
-            );
-            score += commonCategories.length * 0.3;
-        }
-        
-        return Math.min(score, 1);
+    getPreferredCategories(videoCategories) {
+        return videoCategories.filter(cat => 
+            this.userProfile.categoryPreferences[cat]?.score > 0.5
+        );
     }
 
     calculateSubscriptionScore(video) {
@@ -189,6 +345,60 @@ class AIRecommendationEngine {
         return isSubscribed ? 1 : 0;
     }
 
+    calculateFavoritesScore(video) {
+        if (!this.userProfile.favorites.length) return 0;
+        
+        let score = 0;
+        
+        // Same performer (high weight)
+        const favoritesByArtist = this.userProfile.favorites.filter(fav => fav.artist === video.artist);
+        if (favoritesByArtist.length > 0) {
+            score += Math.min(favoritesByArtist.length * 0.3, 1);
+        }
+        
+        // Similar categories (medium weight)
+        for (const favorite of this.userProfile.favorites) {
+            const commonCategories = video.categories.filter(cat => 
+                favorite.categories && favorite.categories.includes(cat)
+            );
+            score += commonCategories.length * 0.15;
+        }
+        
+        return Math.min(score, 1);
+    }
+
+    calculateWatchHistoryScore(video) {
+        if (!this.userProfile.watchHistory.length) return 0;
+        
+        let score = 0;
+        const recentWatches = this.userProfile.watchHistory.slice(-30); // Last 30 watches
+        
+        for (const watch of recentWatches) {
+            // Same performer
+            if (watch.artist === video.artist) {
+                score += 0.4;
+            }
+            
+            // Similar categories
+            const commonCategories = video.categories.filter(cat => 
+                watch.categories && watch.categories.includes(cat)
+            );
+            score += commonCategories.length * 0.15;
+            
+            // Similar duration preference
+            if (this.isSimilarDuration(watch.duration, video.duration)) {
+                score += 0.1;
+            }
+            
+            // Similar quality preference
+            if (watch.quality === video.quality) {
+                score += 0.05;
+            }
+        }
+        
+        return Math.min(score, 1);
+    }
+
     calculateRatingScore(video) {
         if (!this.userProfile.ratings.length) return 0;
         
@@ -196,22 +406,24 @@ class AIRecommendationEngine {
         let totalRatings = 0;
         
         for (const rating of this.userProfile.ratings) {
-            if (rating.artist === video.artist) {
-                score += rating.rating / 5; // Normalize to 0-1
-                totalRatings++;
-            }
-            
-            // Check category ratings
-            const commonCategories = video.categories.filter(cat => 
-                rating.categories && rating.categories.includes(cat)
-            );
-            if (commonCategories.length > 0) {
-                score += (rating.rating / 5) * 0.5;
-                totalRatings++;
+            if (rating.rating >= 4) { // Only consider good ratings
+                if (rating.artist === video.artist) {
+                    score += (rating.rating / 5) * 0.8;
+                    totalRatings++;
+                }
+                
+                // Check category ratings
+                const commonCategories = video.categories.filter(cat => 
+                    rating.categories && rating.categories.includes(cat)
+                );
+                if (commonCategories.length > 0) {
+                    score += (rating.rating / 5) * 0.3;
+                    totalRatings++;
+                }
             }
         }
         
-        return totalRatings > 0 ? score / totalRatings : 0;
+        return totalRatings > 0 ? Math.min(score / totalRatings, 1) : 0;
     }
 
     calculateCategoryScore(video) {
@@ -221,12 +433,33 @@ class AIRecommendationEngine {
         
         for (const category of video.categories) {
             const preference = this.userProfile.categoryPreferences[category];
-            if (preference) {
-                score += preference.score * preference.frequency;
+            if (preference && preference.score > 0.3) {
+                score += preference.score * Math.min(preference.frequency / 5, 1);
             }
         }
         
         return Math.min(score, 1);
+    }
+
+    calculateQualityBoost(video) {
+        const preferredQuality = this.userProfile.viewingPatterns.preferredQuality;
+        if (video.quality === preferredQuality) {
+            return 0.1;
+        }
+        return 0;
+    }
+
+    calculateDurationBoost(video) {
+        if (!video.duration) return 0;
+        
+        const videoDuration = this.parseDuration(video.duration);
+        const preferredDuration = this.userProfile.viewingPatterns.preferredDuration;
+        
+        if (preferredDuration === 'short' && videoDuration < 600) return 0.05;
+        if (preferredDuration === 'medium' && videoDuration >= 600 && videoDuration <= 1800) return 0.05;
+        if (preferredDuration === 'long' && videoDuration > 1800) return 0.05;
+        
+        return 0;
     }
 
     calculateRecencyBoost(video) {
@@ -234,39 +467,34 @@ class AIRecommendationEngine {
         
         const daysSinceUpload = (Date.now() - new Date(video.uploadDate).getTime()) / (1000 * 60 * 60 * 24);
         
-        // Boost newer videos (within 30 days)
-        if (daysSinceUpload <= 30) {
-            return (30 - daysSinceUpload) / 30 * 0.2;
+        // Boost newer videos (within 7 days)
+        if (daysSinceUpload <= 7) {
+            return (7 - daysSinceUpload) / 7 * 0.1;
         }
         
         return 0;
     }
 
-    calculateQualityBoost(video) {
-        const qualityScores = {
-            '4K': 0.3,
-            'HD': 0.2,
-            'SD': 0.1
-        };
-        
-        return qualityScores[video.quality] || 0;
-    }
-
-    applyDiversityFilters(recommendations) {
+    applyDiversityFilters(recommendations, limit) {
         const diversified = [];
         const performerCount = new Map();
         const categoryCount = new Map();
         
-        for (const video of recommendations) {
-            // Limit videos per performer
+        // Sort by score first
+        const sortedRecommendations = recommendations.sort((a, b) => 
+            (b.aiScore || 0) - (a.aiScore || 0)
+        );
+        
+        for (const video of sortedRecommendations) {
+            // Limit videos per performer (max 2)
             const performerVideos = performerCount.get(video.artist) || 0;
-            if (performerVideos >= 3) continue;
+            if (performerVideos >= 2) continue;
             
-            // Ensure category diversity
+            // Ensure category diversity (max 3 per category)
             let categoryOverload = false;
             for (const category of video.categories) {
                 const categoryVideos = categoryCount.get(category) || 0;
-                if (categoryVideos >= 5) {
+                if (categoryVideos >= 3) {
                     categoryOverload = true;
                     break;
                 }
@@ -283,7 +511,7 @@ class AIRecommendationEngine {
             }
             
             // Stop when we have enough
-            if (diversified.length >= 20) break;
+            if (diversified.length >= limit) break;
         }
         
         return diversified;
@@ -318,20 +546,15 @@ class AIRecommendationEngine {
     hasWatchedRecently(videoId) {
         if (!this.userProfile.watchHistory.length) return false;
         
-        const recentWatches = this.userProfile.watchHistory.slice(-20);
+        const recentWatches = this.userProfile.watchHistory.slice(-10);
         return recentWatches.some(watch => watch.id === videoId);
     }
 
     isSimilarDuration(duration1, duration2) {
         if (!duration1 || !duration2) return false;
         
-        const parseTime = (timeStr) => {
-            const parts = timeStr.split(':').map(Number);
-            return parts.length === 2 ? parts[0] * 60 + parts[1] : 0;
-        };
-        
-        const time1 = parseTime(duration1);
-        const time2 = parseTime(duration2);
+        const time1 = this.parseDuration(duration1);
+        const time2 = this.parseDuration(duration2);
         
         return Math.abs(time1 - time2) <= 300; // Within 5 minutes
     }
@@ -366,37 +589,29 @@ class AIRecommendationEngine {
     getRecommendationExplanation(video) {
         if (!this.userProfile) return "Trending video";
         
-        const reasons = [];
-        
-        // Check subscription
-        if (this.userProfile.subscriptions.some(sub => sub.name === video.artist)) {
-            reasons.push(`You're subscribed to ${video.artist}`);
+        // Use AI reasons if available
+        if (video.aiReasons && video.aiReasons.length > 0) {
+            return video.aiReasons[0];
         }
         
-        // Check favorites
+        // Fallback to basic analysis
+        if (this.userProfile.subscriptions.some(sub => sub.name === video.artist)) {
+            return `You're subscribed to ${video.artist}`;
+        }
+        
         const favoritesByArtist = this.userProfile.favorites.filter(fav => fav.artist === video.artist);
         if (favoritesByArtist.length > 0) {
-            reasons.push(`You've favorited ${favoritesByArtist.length} videos by ${video.artist}`);
+            return `You've favorited ${favoritesByArtist.length} videos by ${video.artist}`;
         }
         
-        // Check categories
         const preferredCategories = video.categories.filter(cat => 
             this.userProfile.categoryPreferences[cat]?.score > 0.5
         );
         if (preferredCategories.length > 0) {
-            reasons.push(`You enjoy ${preferredCategories.slice(0, 2).join(', ')} content`);
+            return `You enjoy ${preferredCategories.slice(0, 2).join(', ')} content`;
         }
         
-        // Check watch history
-        const similarWatches = this.userProfile.watchHistory.filter(watch => 
-            watch.artist === video.artist || 
-            video.categories.some(cat => watch.categories?.includes(cat))
-        );
-        if (similarWatches.length > 0) {
-            reasons.push("Based on your viewing history");
-        }
-        
-        return reasons.length > 0 ? reasons[0] : "Recommended for you";
+        return "Recommended for you";
     }
 }
 
@@ -457,6 +672,18 @@ function createAIVideoCard(video) {
     
     const thumbnailUrl = video.thumbnailExists ? video.thumbnailUrl : '/api/placeholder/400/225';
     const explanation = window.aiEngine.getRecommendationExplanation(video);
+    const confidence = video.aiConfidence || 0.5;
+    
+    // Determine confidence level
+    let confidenceClass = 'medium';
+    let confidenceText = 'Good Match';
+    if (confidence >= 0.7) {
+        confidenceClass = 'high';
+        confidenceText = 'Perfect Match';
+    } else if (confidence < 0.4) {
+        confidenceClass = 'low';
+        confidenceText = 'Possible Match';
+    }
     
     card.innerHTML = `
         <div class="video-thumbnail">
@@ -472,6 +699,9 @@ function createAIVideoCard(video) {
             <div class="ai-recommendation-badge">
                 <i class="fas fa-robot"></i>
                 AI
+            </div>
+            <div class="ai-confidence ${confidenceClass}">
+                ${confidenceText}
             </div>
             ${video.duration ? `<div class="video-duration">${video.duration}</div>` : ''}
             ${video.quality ? `<div class="video-quality">${video.quality}</div>` : ''}

@@ -123,19 +123,6 @@
     box-shadow: 0 4px 16px rgba(255, 107, 157, 0.4);
 }
 
-.ai-nav-link i {
-    animation: aiIconRotate 3s linear infinite;
-}
-
-@keyframes aiIconRotate {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
-}
-
-.ai-nav-link:hover i {
-    animation-duration: 1s;
-}
-
 .header-center {
     flex: 1;
     max-width: 500px;
@@ -174,10 +161,6 @@
         font-size: 13px;
         padding: 6px 12px;
     }
-    
-    .ai-nav-link i {
-        animation-duration: 2s;
-    }
 }
 
 @media (max-width: 480px) {
@@ -208,10 +191,6 @@
 
 /* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
-    .ai-nav-link i {
-        animation: none;
-    }
-    
     .ai-nav-link::before {
         transition: none;
     }
