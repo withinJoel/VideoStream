@@ -1,0 +1,114 @@
+/* Filter Bar */
+.filter-bar {
+    background: #1a1a1a;
+    border-bottom: 1px solid #333333;
+    margin-top: 80px;
+    padding: 20px;
+}
+
+.filter-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 0 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+}
+
+.filter-left {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+.filter-group {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.filter-label {
+    font-size: 13px;
+    color: #cccccc;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.filter-select {
+    background: #000000;
+    border: 2px solid #333333;
+    color: #ffffff;
+    padding: 8px 16px;
+    border-radius: 16px;
+    font-size: 13px;
+    cursor: pointer;
+    min-width: 120px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.filter-select:focus {
+    outline: none;
+    border-color: #ff4081;
+    box-shadow: 0 0 0 4px rgba(255, 64, 129, 0.12);
+}
+
+.filter-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.view-option,
+.shuffle-btn,
+.create-playlist-btn {
+    background: #333333;
+    border: none;
+    color: #cccccc;
+    height: 40px;
+    border-radius: 20px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    font-size: 12px;
+    padding: 0 16px;
+    gap: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.view-option {
+    width: 40px;
+    padding: 0;
+}
+
+.view-option:hover,
+.shuffle-btn:hover,
+.create-playlist-btn:hover {
+    background: #444444;
+    color: #ffffff;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.view-option.active {
+    background: #ff4081;
+    color: #000000;
+    box-shadow: 0 4px 16px rgba(255, 64, 129, 0.3);
+}
+
+.create-playlist-btn {
+    background: #ff4081;
+    color: #000000;
+    box-shadow: 0 4px 16px rgba(255, 64, 129, 0.3);
+}
+
+.create-playlist-btn:hover {
+    background: #ff6ec7;
+    box-shadow: 0 6px 20px rgba(255, 64, 129, 0.4);
+}
+
+.shuffle-btn:active {
+    transform: scale(0.95);
+}
