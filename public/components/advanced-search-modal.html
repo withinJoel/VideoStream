@@ -1,0 +1,81 @@
+<!-- Advanced Search Modal -->
+<div class="auth-modal" id="advancedSearchModal">
+    <div class="modal-backdrop"></div>
+    <div class="auth-modal-container advanced-search-container">
+        <div class="auth-modal-header">
+            <h2>Advanced Search</h2>
+            <button class="modal-close-btn" id="advancedSearchClose">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <form class="auth-form" id="advancedSearchForm">
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="searchKeywords">Keywords</label>
+                    <input type="text" id="searchKeywords" name="keywords" placeholder="Enter keywords...">
+                </div>
+                <div class="form-group">
+                    <label for="searchPerformer">Performer</label>
+                    <input type="text" id="searchPerformer" name="performer" placeholder="Performer name...">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="searchCategory">Category</label>
+                    <select id="searchCategory" name="category">
+                        <option value="">Any Category</option>
+                        <!-- Categories will be populated dynamically -->
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="searchQuality">Quality</label>
+                    <select id="searchQuality" name="quality">
+                        <option value="">Any Quality</option>
+                        <option value="4K">4K</option>
+                        <option value="HD">HD</option>
+                        <option value="SD">SD</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="searchMinDuration">Min Duration (minutes)</label>
+                    <input type="number" id="searchMinDuration" name="minDuration" min="0" placeholder="0">
+                </div>
+                <div class="form-group">
+                    <label for="searchMaxDuration">Max Duration (minutes)</label>
+                    <input type="number" id="searchMaxDuration" name="maxDuration" min="0" placeholder="999">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="searchMinRating">Min Rating</label>
+                    <select id="searchMinRating" name="minRating">
+                        <option value="">Any Rating</option>
+                        <option value="1">1+ Stars</option>
+                        <option value="2">2+ Stars</option>
+                        <option value="3">3+ Stars</option>
+                        <option value="4">4+ Stars</option>
+                        <option value="5">5 Stars</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="searchSort">Sort By</label>
+                    <select id="searchSort" name="sort">
+                        <option value="relevance">Relevance</option>
+                        <option value="newest">Newest</option>
+                        <option value="oldest">Oldest</option>
+                        <option value="most-viewed">Most Viewed</option>
+                        <option value="highest-rated">Highest Rated</option>
+                        <option value="longest">Longest</option>
+                        <option value="shortest">Shortest</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-actions">
+                <button type="button" class="auth-submit-btn secondary" id="clearAdvancedSearch">Clear</button>
+                <button type="button" class="auth-submit-btn" id="applyAdvancedSearch">Search</button>
+            </div>
+        </form>
+    </div>
+</div>

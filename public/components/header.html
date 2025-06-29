@@ -1,0 +1,85 @@
+<!-- Header -->
+<header class="header">
+    <div class="header-container">
+        <div class="header-left">
+            <button class="mobile-menu-btn" id="mobileMenuBtn">
+                <i class="fas fa-bars"></i>
+            </button>
+            <div class="logo" id="homeButton">
+                <span class="logo-text">CelebStream</span>
+            </div>
+            <nav class="main-nav" id="mainNav">
+                <a href="#" class="nav-link active" data-section="home">Home</a>
+                <a href="#" class="nav-link" data-section="trending">Trending</a>
+                <a href="#" class="nav-link" data-section="new">New</a>
+                <a href="#" class="nav-link" data-section="top-rated">Top Rated</a>
+                <a href="#" class="nav-link" data-section="categories">Categories</a>
+                <a href="#" class="nav-link" data-section="performers">Celebs</a>
+            </nav>
+        </div>
+        
+        <div class="header-center">
+            <div class="search-container">
+                <input type="text" id="searchInput" placeholder="Search videos, celebs, categories, tags..." class="search-input">
+                <button class="search-btn" id="searchBtn">
+                    <i class="fas fa-search"></i>
+                </button>
+                <button class="advanced-search-btn" id="advancedSearchBtn" title="Advanced Search">
+                    <i class="fas fa-sliders-h"></i>
+                </button>
+                <div class="search-suggestions" id="searchSuggestions"></div>
+            </div>
+        </div>
+        
+        <div class="header-right">
+            <!-- User Authentication -->
+            <div class="auth-section" id="authSection">
+                <button class="auth-btn login-btn" id="loginBtn">
+                    <i class="fas fa-sign-in-alt"></i>
+                    Login
+                </button>
+                <button class="auth-btn register-btn" id="registerBtn">
+                    <i class="fas fa-user-plus"></i>
+                    Register
+                </button>
+            </div>
+            
+            <!-- User Menu (shown when logged in) -->
+            <div class="user-menu" id="userMenu" style="display: none;">
+                <div class="user-avatar-container" id="userAvatarContainer">
+                    <img src="" alt="User Avatar" class="user-avatar-img" id="userAvatarImg">
+                    <span class="user-name" id="userName">User</span>
+                    <i class="fas fa-chevron-down"></i>
+                </div>
+                <div class="user-dropdown" id="userDropdown">
+                    <a href="#" class="dropdown-item" id="profileBtn">
+                        <i class="fas fa-user"></i>
+                        My Profile
+                    </a>
+                    <a href="#" class="dropdown-item" id="myPlaylistsBtn">
+                        <i class="fas fa-list"></i>
+                        My Playlists
+                    </a>
+                    <a href="#" class="dropdown-item" id="subscriptionsBtn">
+                        <i class="fas fa-bell"></i>
+                        Subscriptions
+                    </a>
+                    <a href="#" class="dropdown-item" id="favoritesDropdownBtn">
+                        <i class="fas fa-heart"></i>
+                        Favorite Videos
+                        <span class="favorites-count">0</span>
+                    </a>
+                    <a href="#" class="dropdown-item" id="watchHistoryBtn">
+                        <i class="fas fa-history"></i>
+                        Watch History
+                    </a>
+                    <div class="dropdown-divider"></div>
+                    <a href="#" class="dropdown-item" id="logoutBtn">
+                        <i class="fas fa-sign-out-alt"></i>
+                        Logout
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</header>

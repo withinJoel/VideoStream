@@ -1,0 +1,167 @@
+<!-- Video Modal -->
+<div class="video-modal" id="videoModal">
+    <div class="modal-backdrop" id="modalBackdrop"></div>
+    <div class="modal-container">
+        <div class="modal-header">
+            <button class="modal-close-btn" id="modalCloseBtn">
+                <i class="fas fa-times"></i>
+            </button>
+            <div class="modal-actions">
+                <button class="modal-action-btn" id="modalFullscreenBtn" title="Fullscreen">
+                    <i class="fas fa-expand"></i>
+                </button>
+                <button class="modal-action-btn" id="modalShareBtn" title="Share">
+                    <i class="fas fa-share"></i>
+                </button>
+            </div>
+        </div>
+        
+        <div class="modal-content-wrapper">
+            <div class="modal-video-section">
+                <div class="modal-video-container">
+                    <video id="modalVideo" preload="metadata" autoplay>
+                        <source src="" type="video/mp4">
+                        Your browser does not support the video tag.
+                    </video>
+                    <div class="video-overlay-controls">
+                        <button class="video-control-btn favorite-video-btn" id="modalFavoriteBtn">
+                            <i class="fas fa-heart"></i>
+                        </button>
+                        <button class="video-control-btn download-video-btn" id="modalDownloadBtn" title="Download">
+                            <i class="fas fa-download"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="modal-video-info">
+                    <h2 class="modal-video-title" id="modalVideoTitle">Video Title</h2>
+                    <div class="modal-video-meta">
+                        <div class="video-meta-left">
+                            <div class="performer-info">
+                                <span class="video-performer" id="modalVideoPerformer">Performer</span>
+                                <button class="subscribe-btn" id="subscribeBtn" style="display: none;">
+                                    <i class="fas fa-bell"></i>
+                                    <span>Subscribe</span>
+                                </button>
+                            </div>
+                            <div class="video-stats">
+                                <span class="video-stat">
+                                    <i class="fas fa-eye"></i>
+                                    <span id="modalVideoViews">0</span> views
+                                </span>
+                                <span class="video-stat">
+                                    <i class="fas fa-star"></i>
+                                    <span id="modalVideoRating">4.2</span>
+                                </span>
+                                <span class="video-stat">
+                                    <i class="fas fa-clock"></i>
+                                    <span id="modalVideoDuration">0:00</span>
+                                </span>
+                                <span class="video-stat">
+                                    <i class="fas fa-hd-video"></i>
+                                    <span id="modalVideoQuality">HD</span>
+                                </span>
+                            </div>
+                        </div>
+                        <div class="video-meta-right">
+                            <div class="video-actions">
+                                <button class="action-btn favorite-btn" id="modalFavBtn">
+                                    <i class="fas fa-heart"></i>
+                                    <span>Favorite</span>
+                                </button>
+                                <button class="action-btn playlist-btn" id="modalPlaylistBtn">
+                                    <i class="fas fa-plus"></i>
+                                    <span>Add to Playlist</span>
+                                </button>
+                                <button class="action-btn download-btn" id="modalDownloadActionBtn">
+                                    <i class="fas fa-download"></i>
+                                    <span>Download</span>
+                                </button>
+                                <button class="action-btn share-btn" id="modalShareActionBtn">
+                                    <i class="fas fa-share"></i>
+                                    <span>Share</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Rating System -->
+                    <div class="rating-section" id="ratingSection" style="display: none;">
+                        <span class="rating-label">Rate this video:</span>
+                        <div class="star-rating" id="starRating">
+                            <i class="fas fa-star" data-rating="1"></i>
+                            <i class="fas fa-star" data-rating="2"></i>
+                            <i class="fas fa-star" data-rating="3"></i>
+                            <i class="fas fa-star" data-rating="4"></i>
+                            <i class="fas fa-star" data-rating="5"></i>
+                        </div>
+                    </div>
+                    
+                    <div class="video-categories" id="modalVideoCategories">
+                        <!-- Categories will be added dynamically -->
+                    </div>
+                    
+                    <!-- Video Description -->
+                    <div class="video-description" id="videoDescription">
+                        <div class="description-header">
+                            <h3>Description</h3>
+                            <button class="description-toggle" id="descriptionToggle">
+                                <span>Show more</span>
+                                <i class="fas fa-chevron-down"></i>
+                            </button>
+                        </div>
+                        <div class="description-content" id="descriptionContent">
+                            <p id="videoDescriptionText">No description available.</p>
+                        </div>
+                    </div>
+                    
+                    <!-- Comments Section -->
+                    <div class="comments-section" id="commentsSection">
+                        <div class="comments-header">
+                            <h3>Comments <span class="comment-count" id="commentCount">0</span></h3>
+                            <select class="comment-sort" id="commentSort">
+                                <option value="newest">Newest</option>
+                                <option value="oldest">Oldest</option>
+                                <option value="most-liked">Most Liked</option>
+                            </select>
+                        </div>
+                        
+                        <div class="comment-form" id="commentForm" style="display: none;">
+                            <div class="comment-input-container">
+                                <img src="" alt="Your Avatar" class="comment-avatar" id="commentUserAvatar">
+                                <textarea class="comment-input" id="commentInput" placeholder="Add a comment..." rows="3"></textarea>
+                            </div>
+                            <div class="comment-actions" id="commentActions" style="display: none;">
+                                <button class="comment-cancel-btn" id="commentCancelBtn">Cancel</button>
+                                <button class="comment-submit-btn" id="commentSubmitBtn">Comment</button>
+                            </div>
+                        </div>
+                        
+                        <div class="comments-list" id="commentsList">
+                            <!-- Comments will be loaded dynamically -->
+                        </div>
+                        
+                        <button class="load-more-comments" id="loadMoreComments" style="display: none;">
+                            Load More Comments
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Related Videos Sidebar -->
+            <div class="related-videos-sidebar">
+                <div class="sidebar-tabs">
+                    <button class="sidebar-tab active" data-tab="related">Related</button>
+                </div>
+                <div class="sidebar-content">
+                    <div class="tab-content active" id="relatedTab">
+                        <h3 class="related-videos-title">Related Videos</h3>
+                        <div class="related-videos-list" id="relatedVideosGrid">
+                            <!-- Related videos will be loaded dynamically -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,53 @@
+<!-- Share Modal -->
+<div class="auth-modal" id="shareModal">
+    <div class="modal-backdrop"></div>
+    <div class="auth-modal-container">
+        <div class="auth-modal-header">
+            <h2>Share Video</h2>
+            <button class="modal-close-btn" id="shareModalClose">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="share-modal-content">
+            <div class="share-link-section">
+                <label>Video Link</label>
+                <div class="share-link-container">
+                    <input type="text" id="shareLink" readonly>
+                    <button class="copy-link-btn" id="copyLinkBtn">
+                        <i class="fas fa-copy"></i>
+                        Copy
+                    </button>
+                </div>
+            </div>
+            <div class="share-options">
+                <h3>Share on Social Media</h3>
+                <div class="social-share-buttons">
+                    <button class="social-btn twitter" id="shareTwitter">
+                        <i class="fab fa-twitter"></i>
+                        Twitter
+                    </button>
+                    <button class="social-btn facebook" id="shareFacebook">
+                        <i class="fab fa-facebook"></i>
+                        Facebook
+                    </button>
+                    <button class="social-btn reddit" id="shareReddit">
+                        <i class="fab fa-reddit"></i>
+                        Reddit
+                    </button>
+                    <button class="social-btn telegram" id="shareTelegram">
+                        <i class="fab fa-telegram"></i>
+                        Telegram
+                    </button>
+                </div>
+            </div>
+            <div class="embed-section">
+                <label>Embed Code</label>
+                <textarea id="embedCode" readonly rows="4"></textarea>
+                <button class="copy-embed-btn" id="copyEmbedBtn">
+                    <i class="fas fa-copy"></i>
+                    Copy Embed Code
+                </button>
+            </div>
+        </div>
+    </div>
+</div>

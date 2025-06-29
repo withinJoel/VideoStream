@@ -25,12 +25,24 @@ let currentPlaylistVideos = [];
 
 // Initialize the application
 document.addEventListener('DOMContentLoaded', function() {
-    initializeApp();
+    // Wait for all components to load before initializing
+    if (window.componentLoader && window.componentLoader.loadedComponents.size > 0) {
+        initializeApp();
+    } else {
+        window.addEventListener('allComponentsLoaded', initializeApp);
+    }
 });
 
 function initializeApp() {
+    console.log('Initializing CelebStream application...');
+    
+    // Setup event listeners after components are loaded
     setupEventListeners();
+    
+    // Load initial data
     loadInitialData();
+    
+    // Check authentication status
     checkAuthStatus();
     
     // Initialize view mode after a short delay to ensure DOM is ready
@@ -39,6 +51,8 @@ function initializeApp() {
             initializeViewMode();
         }
     }, 100);
+    
+    console.log('CelebStream application initialized successfully');
 }
 
 function loadInitialData() {
@@ -76,8 +90,11 @@ function updateContentHeader(section) {
         'watch-later': 'Home / Watch Later'
     };
     
-    document.getElementById('contentTitle').textContent = titles[section] || 'Videos';
-    document.getElementById('contentBreadcrumb').innerHTML = breadcrumbs[section] || 'Home';
+    const titleElement = document.getElementById('contentTitle');
+    const breadcrumbElement = document.getElementById('contentBreadcrumb');
+    
+    if (titleElement) titleElement.textContent = titles[section] || 'Videos';
+    if (breadcrumbElement) breadcrumbElement.innerHTML = breadcrumbs[section] || 'Home';
 }
 
 // Enhanced filter functions with proper event handling
@@ -104,11 +121,15 @@ function handleCategoryClick(event, category) {
     };
     
     // Clear search input and update UI
-    document.getElementById('searchInput').value = '';
+    const searchInput = document.getElementById('searchInput');
+    if (searchInput) searchInput.value = '';
     
     // Update content header to show filtered content
-    document.getElementById('contentTitle').textContent = `Category: ${formatCategoryName(category)}`;
-    document.getElementById('contentBreadcrumb').innerHTML = `Home / Categories / ${formatCategoryName(category)}`;
+    const titleElement = document.getElementById('contentTitle');
+    const breadcrumbElement = document.getElementById('contentBreadcrumb');
+    
+    if (titleElement) titleElement.textContent = `Category: ${formatCategoryName(category)}`;
+    if (breadcrumbElement) breadcrumbElement.innerHTML = `Home / Categories / ${formatCategoryName(category)}`;
     
     // Reset pagination and load filtered videos
     currentPage = 1;
@@ -145,11 +166,15 @@ function handlePerformerClick(event, performer) {
     };
     
     // Clear search input and update UI
-    document.getElementById('searchInput').value = '';
+    const searchInput = document.getElementById('searchInput');
+    if (searchInput) searchInput.value = '';
     
     // Update content header to show filtered content
-    document.getElementById('contentTitle').textContent = `Performer: ${formatPerformerName(performer)}`;
-    document.getElementById('contentBreadcrumb').innerHTML = `Home / Performers / ${formatPerformerName(performer)}`;
+    const titleElement = document.getElementById('contentTitle');
+    const breadcrumbElement = document.getElementById('contentBreadcrumb');
+    
+    if (titleElement) titleElement.textContent = `Performer: ${formatPerformerName(performer)}`;
+    if (breadcrumbElement) breadcrumbElement.innerHTML = `Home / Performers / ${formatPerformerName(performer)}`;
     
     // Reset pagination and load filtered videos
     currentPage = 1;
@@ -239,6 +264,8 @@ function toggleVideoFavorite() {
     if (!currentVideoId) return;
     
     const btn = document.getElementById('modalFavBtn');
+    if (!btn) return;
+    
     const isFavorite = btn.classList.contains('active');
     
     const method = isFavorite ? 'DELETE' : 'POST';
@@ -274,6 +301,8 @@ function toggleVideoLike() {
     
     const likeBtn = document.getElementById('modalLikeBtn');
     const dislikeBtn = document.getElementById('modalDislikeBtn');
+    if (!likeBtn || !dislikeBtn) return;
+    
     const isLiked = likeBtn.classList.contains('active');
     
     const method = isLiked ? 'DELETE' : 'POST';
@@ -292,8 +321,10 @@ function toggleVideoLike() {
         dislikeBtn.classList.remove('active'); // Remove dislike if present
         
         // Update counts
-        document.getElementById('likeCount').textContent = data.likeCount || 0;
-        document.getElementById('dislikeCount').textContent = data.dislikeCount || 0;
+        const likeCountElement = document.getElementById('likeCount');
+        const dislikeCountElement = document.getElementById('dislikeCount');
+        if (likeCountElement) likeCountElement.textContent = data.likeCount || 0;
+        if (dislikeCountElement) dislikeCountElement.textContent = data.dislikeCount || 0;
         
         const action = isLiked ? 'removed like from' : 'liked';
         showToast(`Video ${action}`, 'success');
@@ -314,6 +345,8 @@ function toggleVideoDislike() {
     
     const likeBtn = document.getElementById('modalLikeBtn');
     const dislikeBtn = document.getElementById('modalDislikeBtn');
+    if (!likeBtn || !dislikeBtn) return;
+    
     const isDisliked = dislikeBtn.classList.contains('active');
     
     const method = isDisliked ? 'DELETE' : 'POST';
@@ -332,8 +365,10 @@ function toggleVideoDislike() {
         likeBtn.classList.remove('active'); // Remove like if present
         
         // Update counts
-        document.getElementById('likeCount').textContent = data.likeCount || 0;
-        document.getElementById('dislikeCount').textContent = data.dislikeCount || 0;
+        const likeCountElement = document.getElementById('likeCount');
+        const dislikeCountElement = document.getElementById('dislikeCount');
+        if (likeCountElement) likeCountElement.textContent = data.likeCount || 0;
+        if (dislikeCountElement) dislikeCountElement.textContent = data.dislikeCount || 0;
         
         const action = isDisliked ? 'removed dislike from' : 'disliked';
         showToast(`Video ${action}`, 'success');
@@ -362,6 +397,8 @@ function resetStars() {
 
 function displayCategories(categories) {
     const container = document.getElementById('categoriesGrid');
+    if (!container) return;
+    
     container.innerHTML = '';
     
     categories.forEach(category => {
@@ -383,6 +420,8 @@ function displayCategories(categories) {
 
 function displayPerformers(performers) {
     const container = document.getElementById('performersGrid');
+    if (!container) return;
+    
     container.innerHTML = '';
     
     if (!performers || performers.length === 0) {
@@ -431,6 +470,8 @@ function displayPerformers(performers) {
 // New function to display subscribed performers only
 function displaySubscribedPerformers(subscriptions) {
     const container = document.getElementById('performersGrid');
+    if (!container) return;
+    
     container.innerHTML = '';
     
     if (!subscriptions || subscriptions.length === 0) {
@@ -476,6 +517,8 @@ function displaySubscribedPerformers(subscriptions) {
 
 function displayMobileCategories(categories) {
     const container = document.getElementById('mobileCategoriesList');
+    if (!container) return;
+    
     container.innerHTML = '';
     
     categories.slice(0, 10).forEach(category => {
@@ -499,6 +542,8 @@ function displayMobileCategories(categories) {
 
 function displayMobilePerformers(performers) {
     const container = document.getElementById('mobilePerformersList');
+    if (!container) return;
+    
     container.innerHTML = '';
     
     performers.slice(0, 10).forEach(performer => {
@@ -531,17 +576,23 @@ function formatNumber(num) {
 }
 
 function showLoadingIndicator() {
-    document.getElementById('loadingContainer').style.display = 'flex';
+    const loadingContainer = document.getElementById('loadingContainer');
+    if (loadingContainer) loadingContainer.style.display = 'flex';
 }
 
 function hideLoadingIndicator() {
-    document.getElementById('loadingContainer').style.display = 'none';
+    const loadingContainer = document.getElementById('loadingContainer');
+    if (loadingContainer) loadingContainer.style.display = 'none';
 }
 
 function showNoResults(title = 'No videos found', text = 'Try adjusting your search terms or filters') {
-    document.getElementById('noResultsTitle').textContent = title;
-    document.getElementById('noResultsText').textContent = text;
-    document.getElementById('noResults').style.display = 'block';
+    const noResultsTitle = document.getElementById('noResultsTitle');
+    const noResultsText = document.getElementById('noResultsText');
+    const noResults = document.getElementById('noResults');
+    
+    if (noResultsTitle) noResultsTitle.textContent = title;
+    if (noResultsText) noResultsText.textContent = text;
+    if (noResults) noResults.style.display = 'block';
 }
 
 // Favorite functions (merged with likes)
@@ -588,11 +639,13 @@ function updateFavoritesCount() {
         fetch(`/api/favorites?userId=${currentUser.id}`)
             .then(response => response.json())
             .then(data => {
-                document.querySelector('.favorites-count').textContent = data.total;
+                const favoritesCount = document.querySelector('.favorites-count');
+                if (favoritesCount) favoritesCount.textContent = data.total;
             })
             .catch(console.error);
     } else {
-        document.querySelector('.favorites-count').textContent = '0';
+        const favoritesCount = document.querySelector('.favorites-count');
+        if (favoritesCount) favoritesCount.textContent = '0';
     }
 }
 
@@ -608,11 +661,13 @@ function addToWatchHistory(videoId) {
 
 // Mobile navigation
 function toggleMobileNav() {
-    document.getElementById('mobileNav').classList.toggle('active');
+    const mobileNav = document.getElementById('mobileNav');
+    if (mobileNav) mobileNav.classList.toggle('active');
 }
 
 function closeMobileNav() {
-    document.getElementById('mobileNav').classList.remove('active');
+    const mobileNav = document.getElementById('mobileNav');
+    if (mobileNav) mobileNav.classList.remove('active');
 }
 
 // Scroll handling
@@ -639,18 +694,24 @@ function handleScroll() {
 // Advanced search functions
 function showAdvancedSearch() {
     const modal = document.getElementById('advancedSearchModal');
-    modal.classList.add('active');
-    document.body.style.overflow = 'hidden';
+    if (modal) {
+        modal.classList.add('active');
+        document.body.style.overflow = 'hidden';
+    }
 }
 
 function hideAdvancedSearch() {
     const modal = document.getElementById('advancedSearchModal');
-    modal.classList.remove('active');
-    document.body.style.overflow = '';
+    if (modal) {
+        modal.classList.remove('active');
+        document.body.style.overflow = '';
+    }
 }
 
 function applyAdvancedSearch() {
     const form = document.getElementById('advancedSearchForm');
+    if (!form) return;
+    
     const formData = new FormData(form);
     
     // Build advanced search filters
@@ -679,7 +740,7 @@ function applyAdvancedSearch() {
 
 function clearAdvancedSearch() {
     const form = document.getElementById('advancedSearchForm');
-    form.reset();
+    if (form) form.reset();
 }
 
 // Initialize favorites count on load
