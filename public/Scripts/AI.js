@@ -97,15 +97,17 @@ class AIRecommendationEngine {
         // Analyze loyalty (preference for same performers)
         const performerCounts = {};
         watchHistory.forEach(video => {
-            performerCounts[video.artist] = (performerCounts[video.artist] || 0) + 1;
+            if (video.artist) {
+                performerCounts[video.artist] = (performerCounts[video.artist] || 0) + 1;
+            }
         });
         const maxPerformerCount = Math.max(...Object.values(performerCounts), 1);
-        this.behaviorProfile.loyalty = Math.min(1, maxPerformerCount / watchHistory.length);
+        this.behaviorProfile.loyalty = watchHistory.length > 0 ? Math.min(1, maxPerformerCount / watchHistory.length) : 0.5;
 
         // Analyze adventurousness (variety in categories)
         const uniqueCategories = new Set();
         watchHistory.forEach(video => {
-            if (video.categories) {
+            if (video.categories && Array.isArray(video.categories)) {
                 video.categories.forEach(cat => uniqueCategories.add(cat));
             }
         });
@@ -138,7 +140,7 @@ class AIRecommendationEngine {
         if (data.watchHistory) {
             data.watchHistory.forEach((watch, index) => {
                 const recencyWeight = Math.exp(-index / 10); // Exponential decay
-                if (watch.categories) {
+                if (watch.categories && Array.isArray(watch.categories)) {
                     watch.categories.forEach(category => {
                         categoryFrequency[category] = (categoryFrequency[category] || 0) + 1;
                         categoryScores[category] = (categoryScores[category] || 0) + (0.5 * recencyWeight);
@@ -150,7 +152,7 @@ class AIRecommendationEngine {
         // Analyze favorites (higher weight)
         if (data.favorites) {
             data.favorites.forEach(fav => {
-                if (fav.categories) {
+                if (fav.categories && Array.isArray(fav.categories)) {
                     fav.categories.forEach(category => {
                         categoryFrequency[category] = (categoryFrequency[category] || 0) + 2;
                         categoryScores[category] = (categoryScores[category] || 0) + 1.5;
@@ -181,17 +183,21 @@ class AIRecommendationEngine {
         // Analyze favorites with high weight
         if (data.favorites) {
             data.favorites.forEach(fav => {
-                performerScores[fav.artist] = (performerScores[fav.artist] || 0) + 1.0;
-                performerFrequency[fav.artist] = (performerFrequency[fav.artist] || 0) + 3;
+                if (fav.artist) {
+                    performerScores[fav.artist] = (performerScores[fav.artist] || 0) + 1.0;
+                    performerFrequency[fav.artist] = (performerFrequency[fav.artist] || 0) + 3;
+                }
             });
         }
         
         // Analyze watch history with recency weighting
         if (data.watchHistory) {
             data.watchHistory.forEach((watch, index) => {
-                const recencyWeight = Math.exp(-index / 15);
-                performerScores[watch.artist] = (performerScores[watch.artist] || 0) + (0.4 * recencyWeight);
-                performerFrequency[watch.artist] = (performerFrequency[watch.artist] || 0) + 1;
+                if (watch.artist) {
+                    const recencyWeight = Math.exp(-index / 15);
+                    performerScores[watch.artist] = (performerScores[watch.artist] || 0) + (0.4 * recencyWeight);
+                    performerFrequency[watch.artist] = (performerFrequency[watch.artist] || 0) + 1;
+                }
             });
         }
         
@@ -223,7 +229,8 @@ class AIRecommendationEngine {
             // Analyze duration preferences with ML-like clustering
             const durations = data.watchHistory
                 .filter(w => w.duration)
-                .map(w => this.parseDuration(w.duration));
+                .map(w => this.parseDuration(w.duration))
+                .filter(d => d > 0); // Filter out invalid durations
             
             if (durations.length > 0) {
                 const avgDuration = durations.reduce((a, b) => a + b, 0) / durations.length;
@@ -257,9 +264,67 @@ class AIRecommendationEngine {
     }
 
     parseDuration(durationStr) {
+        // Enhanced duration parsing with proper error handling
         if (!durationStr) return 0;
-        const parts = durationStr.split(':').map(Number);
-        return parts.length === 2 ? parts[0] * 60 + parts[1] : 0;
+        
+        // Handle different input types
+        if (typeof durationStr === 'number') {
+            return durationStr; // Already in seconds
+        }
+        
+        if (typeof durationStr !== 'string') {
+            console.warn('Invalid duration format:', durationStr);
+            return 0;
+        }
+        
+        try {
+            // Handle different duration formats
+            const cleanDuration = durationStr.toString().trim();
+            
+            // Format: "5:30" or "1:05:30"
+            if (cleanDuration.includes(':')) {
+                const parts = cleanDuration.split(':').map(part => {
+                    const num = parseInt(part, 10);
+                    return isNaN(num) ? 0 : num;
+                });
+                
+                if (parts.length === 2) {
+                    // MM:SS format
+                    return parts[0] * 60 + parts[1];
+                } else if (parts.length === 3) {
+                    // HH:MM:SS format
+                    return parts[0] * 3600 + parts[1] * 60 + parts[2];
+                }
+            }
+            
+            // Format: "300s" or "5m" or "1h"
+            const timeMatch = cleanDuration.match(/^(\d+(?:\.\d+)?)\s*([smh]?)$/i);
+            if (timeMatch) {
+                const value = parseFloat(timeMatch[1]);
+                const unit = timeMatch[2].toLowerCase();
+                
+                switch (unit) {
+                    case 'h': return value * 3600;
+                    case 'm': return value * 60;
+                    case 's':
+                    case '': return value;
+                    default: return value;
+                }
+            }
+            
+            // Try to parse as plain number (seconds)
+            const numValue = parseFloat(cleanDuration);
+            if (!isNaN(numValue)) {
+                return numValue;
+            }
+            
+            console.warn('Could not parse duration:', durationStr);
+            return 0;
+            
+        } catch (error) {
+            console.error('Error parsing duration:', durationStr, error);
+            return 0;
+        }
     }
 
     async generateRecommendations(userId, limit = 20) {
@@ -445,6 +510,10 @@ class AIRecommendationEngine {
         let bestCategory = '';
         let bestScore = 0;
         
+        if (!video.categories || !Array.isArray(video.categories)) {
+            return { score: 0, confidence: 0, reason: '' };
+        }
+        
         for (const category of video.categories) {
             const preference = this.userProfile.categoryPreferences[category];
             if (preference && preference.score > 0.3) {
@@ -548,9 +617,8 @@ class AIRecommendationEngine {
 
     calculateSerendipityValue(video) {
         // Encourage exploration of new categories/performers
-        const isNewCategory = !video.categories.some(cat => 
-            this.userProfile.categoryPreferences[cat]?.score > 0.1
-        );
+        const isNewCategory = !video.categories || !Array.isArray(video.categories) || 
+            !video.categories.some(cat => this.userProfile.categoryPreferences[cat]?.score > 0.1);
         const isNewPerformer = !this.userProfile.performerPreferences[video.artist];
         
         if (this.behaviorProfile.adventurousness > 0.5) {
@@ -599,11 +667,13 @@ class AIRecommendationEngine {
             
             // Ensure category diversity
             let categoryOverload = false;
-            for (const category of video.categories) {
-                const categoryVideos = categoryCount.get(category) || 0;
-                if (categoryVideos >= 3) {
-                    categoryOverload = true;
-                    break;
+            if (video.categories && Array.isArray(video.categories)) {
+                for (const category of video.categories) {
+                    const categoryVideos = categoryCount.get(category) || 0;
+                    if (categoryVideos >= 3) {
+                        categoryOverload = true;
+                        break;
+                    }
                 }
             }
             if (categoryOverload) continue;
@@ -617,8 +687,10 @@ class AIRecommendationEngine {
             
             // Update counts
             performerCount.set(video.artist, performerVideos + 1);
-            for (const category of video.categories) {
-                categoryCount.set(category, (categoryCount.get(category) || 0) + 1);
+            if (video.categories && Array.isArray(video.categories)) {
+                for (const category of video.categories) {
+                    categoryCount.set(category, (categoryCount.get(category) || 0) + 1);
+                }
             }
             qualityCount.set(video.quality, qualityVideos + 1);
             
@@ -698,11 +770,13 @@ class AIRecommendationEngine {
             return `You love ${video.artist}'s content`;
         }
         
-        const preferredCategories = video.categories.filter(cat => 
-            this.userProfile.categoryPreferences[cat]?.score > 0.5
-        );
-        if (preferredCategories.length > 0) {
-            return `You enjoy ${preferredCategories[0]} content`;
+        if (video.categories && Array.isArray(video.categories)) {
+            const preferredCategories = video.categories.filter(cat => 
+                this.userProfile.categoryPreferences[cat]?.score > 0.5
+            );
+            if (preferredCategories.length > 0) {
+                return `You enjoy ${preferredCategories[0]} content`;
+            }
         }
         
         if (video.rating >= 4.5) {
@@ -875,7 +949,7 @@ function createAIVideoCard(video) {
                 ` : ''}
             </div>
             <div class="video-categories">
-                ${video.categories.map(cat => 
+                ${(video.categories || []).map(cat => 
                     `<span class="category-tag" onclick="handleCategoryClick(event, '${cat}')">${cat}</span>`
                 ).join('')}
             </div>
