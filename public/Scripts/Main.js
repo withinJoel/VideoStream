@@ -32,6 +32,13 @@ function initializeApp() {
     setupEventListeners();
     loadInitialData();
     checkAuthStatus();
+    
+    // Initialize view mode after a short delay to ensure DOM is ready
+    setTimeout(() => {
+        if (typeof initializeViewMode === 'function') {
+            initializeViewMode();
+        }
+    }, 100);
 }
 
 function loadInitialData() {
@@ -71,17 +78,6 @@ function updateContentHeader(section) {
     
     document.getElementById('contentTitle').textContent = titles[section] || 'Videos';
     document.getElementById('contentBreadcrumb').innerHTML = breadcrumbs[section] || 'Home';
-}
-
-function toggleViewMode(view) {
-    const videoGrid = document.getElementById('videoGrid');
-    videoGrid.classList.remove('list-view', 'large-view');
-    
-    if (view === 'list') {
-        videoGrid.classList.add('list-view');
-    } else if (view === 'large') {
-        videoGrid.classList.add('large-view');
-    }
 }
 
 // Enhanced filter functions with proper event handling

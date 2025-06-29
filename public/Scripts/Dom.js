@@ -58,14 +58,8 @@ function setupEventListeners() {
     const shuffleBtn = document.getElementById('shuffleBtn');
     if (shuffleBtn) shuffleBtn.addEventListener('click', shuffleVideos);
     
-    // View options
-    document.querySelectorAll('.view-option').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            document.querySelectorAll('.view-option').forEach(b => b.classList.remove('active'));
-            e.target.classList.add('active');
-            toggleViewMode(e.target.dataset.view);
-        });
-    });
+    // View options - Setup with proper event delegation
+    setupViewToggleListeners();
     
     // Modal controls
     const modalCloseBtn = document.getElementById('modalCloseBtn');
@@ -259,6 +253,9 @@ function showVideoGrid() {
     document.getElementById('performersGrid').style.display = 'none';
     document.getElementById('playlistsGrid').style.display = 'none';
     document.getElementById('filterBar').style.display = 'block';
+    
+    // Re-setup view toggle listeners when showing video grid
+    setTimeout(setupViewToggleListeners, 100);
 }
 
 function showCategoriesGrid() {

@@ -61,4 +61,7 @@ function navigateToSection(section) {
             loadWatchHistory();
             break;
     }
+    
+    // Dispatch section changed event
+    window.dispatchEvent(new CustomEvent('section:changed', { detail: { section } }));
 }
