@@ -51,7 +51,6 @@ async function openVideoModal(video) {
     // Check subscription status
     if (isAuthenticated) {
         checkSubscriptionStatus(video.artist);
-        checkWatchLaterStatus(video.id);
     }
     
     // Show modal
@@ -96,312 +95,8 @@ function setupVideoPlayer(videoElement, video) {
     // Remove default controls and add custom controls
     videoElement.controls = false;
     
-    // Setup custom video controls
-    setupCustomVideoControls(videoElement, video);
-    
     // Setup video events
     setupVideoEvents(videoElement, video);
-}
-
-function setupCustomVideoControls(videoElement, video) {
-    // Remove any existing custom controls
-    const existingControls = videoElement.parentElement.querySelector('.custom-video-controls');
-    if (existingControls) {
-        existingControls.remove();
-    }
-    
-    // Create custom controls container
-    const controlsContainer = document.createElement('div');
-    controlsContainer.className = 'custom-video-controls';
-    
-    // Play/Pause button
-    const playPauseBtn = document.createElement('button');
-    playPauseBtn.className = 'control-btn play-pause-btn';
-    playPauseBtn.innerHTML = '<i class="fas fa-play"></i>';
-    playPauseBtn.onclick = () => togglePlayPause(videoElement, playPauseBtn);
-    
-    // Progress bar container
-    const progressContainer = document.createElement('div');
-    progressContainer.className = 'progress-container';
-    
-    const progressBar = document.createElement('div');
-    progressBar.className = 'progress-bar';
-    
-    const progressFilled = document.createElement('div');
-    progressFilled.className = 'progress-filled';
-    
-    const progressHandle = document.createElement('div');
-    progressHandle.className = 'progress-handle';
-    
-    progressBar.appendChild(progressFilled);
-    progressBar.appendChild(progressHandle);
-    progressContainer.appendChild(progressBar);
-    
-    // Time display
-    const timeDisplay = document.createElement('div');
-    timeDisplay.className = 'time-display';
-    timeDisplay.innerHTML = '<span class="current-time">0:00</span> / <span class="total-time">0:00</span>';
-    
-    // Volume control
-    const volumeContainer = document.createElement('div');
-    volumeContainer.className = 'volume-container';
-    
-    const volumeBtn = document.createElement('button');
-    volumeBtn.className = 'control-btn volume-btn';
-    volumeBtn.innerHTML = '<i class="fas fa-volume-up"></i>';
-    volumeBtn.onclick = () => toggleMute(videoElement, volumeBtn);
-    
-    const volumeSlider = document.createElement('input');
-    volumeSlider.type = 'range';
-    volumeSlider.className = 'volume-slider';
-    volumeSlider.min = '0';
-    volumeSlider.max = '1';
-    volumeSlider.step = '0.1';
-    volumeSlider.value = '1';
-    volumeSlider.oninput = (e) => setVolume(videoElement, e.target.value, volumeBtn);
-    
-    volumeContainer.appendChild(volumeBtn);
-    volumeContainer.appendChild(volumeSlider);
-    
-    // Playback speed control
-    const speedSelector = document.createElement('div');
-    speedSelector.className = 'speed-selector';
-    speedSelector.innerHTML = `
-        <button class="control-btn speed-btn" title="Playback Speed">
-            <i class="fas fa-tachometer-alt"></i>
-            <span class="speed-text">1x</span>
-        </button>
-        <div class="speed-menu">
-            <div class="speed-option" data-speed="0.25">0.25x</div>
-            <div class="speed-option" data-speed="0.5">0.5x</div>
-            <div class="speed-option" data-speed="0.75">0.75x</div>
-            <div class="speed-option" data-speed="1" class="active">1x</div>
-            <div class="speed-option" data-speed="1.25">1.25x</div>
-            <div class="speed-option" data-speed="1.5">1.5x</div>
-            <div class="speed-option" data-speed="2">2x</div>
-        </div>
-    `;
-    
-    // Picture-in-picture button
-    const pipButton = document.createElement('button');
-    pipButton.className = 'control-btn pip-btn';
-    pipButton.innerHTML = '<i class="fas fa-external-link-alt"></i>';
-    pipButton.title = 'Picture in Picture';
-    pipButton.onclick = () => togglePictureInPicture(videoElement);
-    
-    // Theater mode button
-    const theaterButton = document.createElement('button');
-    theaterButton.className = 'control-btn theater-btn';
-    theaterButton.innerHTML = '<i class="fas fa-expand-arrows-alt"></i>';
-    theaterButton.title = 'Theater Mode';
-    theaterButton.onclick = () => toggleTheaterMode();
-    
-    // Fullscreen button
-    const fullscreenButton = document.createElement('button');
-    fullscreenButton.className = 'control-btn fullscreen-btn';
-    fullscreenButton.innerHTML = '<i class="fas fa-expand"></i>';
-    fullscreenButton.title = 'Fullscreen';
-    fullscreenButton.onclick = () => toggleFullscreen(videoElement, fullscreenButton);
-    
-    // Assemble controls
-    const leftControls = document.createElement('div');
-    leftControls.className = 'controls-left';
-    leftControls.appendChild(playPauseBtn);
-    leftControls.appendChild(volumeContainer);
-    leftControls.appendChild(timeDisplay);
-    
-    const centerControls = document.createElement('div');
-    centerControls.className = 'controls-center';
-    centerControls.appendChild(progressContainer);
-    
-    const rightControls = document.createElement('div');
-    rightControls.className = 'controls-right';
-    rightControls.appendChild(speedSelector);
-    rightControls.appendChild(pipButton);
-    rightControls.appendChild(theaterButton);
-    rightControls.appendChild(fullscreenButton);
-    
-    controlsContainer.appendChild(leftControls);
-    controlsContainer.appendChild(centerControls);
-    controlsContainer.appendChild(rightControls);
-    
-    // Add controls to video container
-    const videoContainer = videoElement.parentElement;
-    videoContainer.appendChild(controlsContainer);
-    
-    // Setup control events
-    setupControlEvents(speedSelector, videoElement, progressBar, progressFilled, timeDisplay);
-    
-    // Show/hide controls on hover
-    setupControlsVisibility(videoContainer, controlsContainer);
-}
-
-function setupControlEvents(speedSelector, videoElement, progressBar, progressFilled, timeDisplay) {
-    // Speed selector events
-    const speedBtn = speedSelector.querySelector('.speed-btn');
-    const speedMenu = speedSelector.querySelector('.speed-menu');
-    
-    speedBtn.onclick = (e) => {
-        e.stopPropagation();
-        speedMenu.classList.toggle('active');
-    };
-    
-    speedSelector.querySelectorAll('.speed-option').forEach(option => {
-        option.onclick = (e) => {
-            e.stopPropagation();
-            const speed = parseFloat(option.dataset.speed);
-            videoElement.playbackRate = speed;
-            speedSelector.querySelector('.speed-text').textContent = `${speed}x`;
-            speedMenu.classList.remove('active');
-            
-            // Update active state
-            speedSelector.querySelectorAll('.speed-option').forEach(opt => opt.classList.remove('active'));
-            option.classList.add('active');
-        };
-    });
-    
-    // Progress bar events
-    let isDragging = false;
-    
-    progressBar.onclick = (e) => {
-        if (!isDragging) {
-            const rect = progressBar.getBoundingClientRect();
-            const percent = (e.clientX - rect.left) / rect.width;
-            videoElement.currentTime = percent * videoElement.duration;
-        }
-    };
-    
-    progressBar.onmousedown = (e) => {
-        isDragging = true;
-        const rect = progressBar.getBoundingClientRect();
-        const percent = (e.clientX - rect.left) / rect.width;
-        videoElement.currentTime = percent * videoElement.duration;
-    };
-    
-    document.onmousemove = (e) => {
-        if (isDragging) {
-            const rect = progressBar.getBoundingClientRect();
-            const percent = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-            videoElement.currentTime = percent * videoElement.duration;
-        }
-    };
-    
-    document.onmouseup = () => {
-        isDragging = false;
-    };
-    
-    // Update progress and time
-    videoElement.ontimeupdate = () => {
-        if (!isDragging && videoElement.duration) {
-            const percent = (videoElement.currentTime / videoElement.duration) * 100;
-            progressFilled.style.width = `${percent}%`;
-            
-            const currentTime = formatTime(videoElement.currentTime);
-            const totalTime = formatTime(videoElement.duration);
-            timeDisplay.innerHTML = `<span class="current-time">${currentTime}</span> / <span class="total-time">${totalTime}</span>`;
-        }
-    };
-    
-    // Close menus when clicking outside
-    document.addEventListener('click', () => {
-        speedMenu.classList.remove('active');
-    });
-}
-
-function setupControlsVisibility(videoContainer, controlsContainer) {
-    let hideTimeout;
-    
-    const showControls = () => {
-        controlsContainer.classList.add('visible');
-        clearTimeout(hideTimeout);
-    };
-    
-    const hideControls = () => {
-        hideTimeout = setTimeout(() => {
-            controlsContainer.classList.remove('visible');
-        }, 3000);
-    };
-    
-    videoContainer.onmouseenter = showControls;
-    videoContainer.onmousemove = showControls;
-    videoContainer.onmouseleave = hideControls;
-    
-    // Show controls initially
-    showControls();
-    hideControls();
-}
-
-function togglePlayPause(videoElement, button) {
-    if (videoElement.paused) {
-        videoElement.play();
-        button.innerHTML = '<i class="fas fa-pause"></i>';
-    } else {
-        videoElement.pause();
-        button.innerHTML = '<i class="fas fa-play"></i>';
-    }
-}
-
-function toggleMute(videoElement, button) {
-    videoElement.muted = !videoElement.muted;
-    if (videoElement.muted) {
-        button.innerHTML = '<i class="fas fa-volume-mute"></i>';
-    } else {
-        button.innerHTML = '<i class="fas fa-volume-up"></i>';
-    }
-}
-
-function setVolume(videoElement, value, button) {
-    videoElement.volume = value;
-    if (value == 0) {
-        button.innerHTML = '<i class="fas fa-volume-mute"></i>';
-    } else if (value < 0.5) {
-        button.innerHTML = '<i class="fas fa-volume-down"></i>';
-    } else {
-        button.innerHTML = '<i class="fas fa-volume-up"></i>';
-    }
-}
-
-function toggleFullscreen(videoElement, button) {
-    if (!document.fullscreenElement) {
-        videoElement.parentElement.requestFullscreen().then(() => {
-            button.innerHTML = '<i class="fas fa-compress"></i>';
-        }).catch(err => {
-            console.error('Error attempting to enable fullscreen:', err);
-        });
-    } else {
-        document.exitFullscreen().then(() => {
-            button.innerHTML = '<i class="fas fa-expand"></i>';
-        });
-    }
-}
-
-function togglePictureInPicture(videoElement) {
-    if (document.pictureInPictureElement) {
-        document.exitPictureInPicture();
-    } else if (document.pictureInPictureEnabled) {
-        videoElement.requestPictureInPicture().catch(error => {
-            console.error('Failed to enter picture-in-picture mode:', error);
-            showToast('Picture-in-picture not supported', 'error');
-        });
-    }
-}
-
-function toggleTheaterMode() {
-    const modal = document.getElementById('videoModal');
-    modal.classList.toggle('theater-mode');
-    
-    const theaterBtn = document.querySelector('.theater-btn i');
-    if (modal.classList.contains('theater-mode')) {
-        theaterBtn.className = 'fas fa-compress-arrows-alt';
-    } else {
-        theaterBtn.className = 'fas fa-expand-arrows-alt';
-    }
-}
-
-function formatTime(seconds) {
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = Math.floor(seconds % 60);
-    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
 }
 
 function setupVideoEvents(videoElement, video) {
@@ -441,9 +136,15 @@ function setupVideoEvents(videoElement, video) {
     
     // Double-click to fullscreen
     videoElement.addEventListener('dblclick', () => {
-        const fullscreenBtn = document.querySelector('.fullscreen-btn');
-        if (fullscreenBtn) {
-            toggleFullscreen(videoElement, fullscreenBtn);
+        toggleFullscreen(videoElement);
+    });
+    
+    // Click to play/pause
+    videoElement.addEventListener('click', () => {
+        if (videoElement.paused) {
+            videoElement.play();
+        } else {
+            videoElement.pause();
         }
     });
 }
@@ -453,9 +154,10 @@ function handleVideoKeyboardShortcuts(e, videoElement) {
         case ' ':
         case 'k':
             e.preventDefault();
-            const playPauseBtn = document.querySelector('.play-pause-btn');
-            if (playPauseBtn) {
-                togglePlayPause(videoElement, playPauseBtn);
+            if (videoElement.paused) {
+                videoElement.play();
+            } else {
+                videoElement.pause();
             }
             break;
         case 'ArrowLeft':
@@ -468,36 +170,53 @@ function handleVideoKeyboardShortcuts(e, videoElement) {
             break;
         case 'ArrowUp':
             e.preventDefault();
-            const newVolumeUp = Math.min(1, videoElement.volume + 0.1);
-            videoElement.volume = newVolumeUp;
-            const volumeSlider = document.querySelector('.volume-slider');
-            const volumeBtn = document.querySelector('.volume-btn');
-            if (volumeSlider) volumeSlider.value = newVolumeUp;
-            if (volumeBtn) setVolume(videoElement, newVolumeUp, volumeBtn);
+            videoElement.volume = Math.min(1, videoElement.volume + 0.1);
             break;
         case 'ArrowDown':
             e.preventDefault();
-            const newVolumeDown = Math.max(0, videoElement.volume - 0.1);
-            videoElement.volume = newVolumeDown;
-            const volumeSliderDown = document.querySelector('.volume-slider');
-            const volumeBtnDown = document.querySelector('.volume-btn');
-            if (volumeSliderDown) volumeSliderDown.value = newVolumeDown;
-            if (volumeBtnDown) setVolume(videoElement, newVolumeDown, volumeBtnDown);
+            videoElement.volume = Math.max(0, videoElement.volume - 0.1);
             break;
         case 'm':
             e.preventDefault();
-            const muteBtn = document.querySelector('.volume-btn');
-            if (muteBtn) {
-                toggleMute(videoElement, muteBtn);
-            }
+            videoElement.muted = !videoElement.muted;
             break;
         case 'f':
             e.preventDefault();
-            const fullscreenBtn = document.querySelector('.fullscreen-btn');
-            if (fullscreenBtn) {
-                toggleFullscreen(videoElement, fullscreenBtn);
-            }
+            toggleFullscreen(videoElement);
             break;
+    }
+}
+
+function toggleFullscreen(videoElement) {
+    if (!document.fullscreenElement) {
+        videoElement.parentElement.requestFullscreen().catch(err => {
+            console.error('Error attempting to enable fullscreen:', err);
+        });
+    } else {
+        document.exitFullscreen();
+    }
+}
+
+function togglePictureInPicture(videoElement) {
+    if (document.pictureInPictureElement) {
+        document.exitPictureInPicture();
+    } else if (document.pictureInPictureEnabled) {
+        videoElement.requestPictureInPicture().catch(error => {
+            console.error('Failed to enter picture-in-picture mode:', error);
+            showToast('Picture-in-picture not supported', 'error');
+        });
+    }
+}
+
+function toggleTheaterMode() {
+    const modal = document.getElementById('videoModal');
+    modal.classList.toggle('theater-mode');
+    
+    const theaterBtn = document.querySelector('.theater-btn i');
+    if (modal.classList.contains('theater-mode')) {
+        theaterBtn.className = 'fas fa-compress-arrows-alt';
+    } else {
+        theaterBtn.className = 'fas fa-expand-arrows-alt';
     }
 }
 
@@ -588,12 +307,6 @@ function closeVideoModal() {
     video.pause();
     video.currentTime = 0;
     video.src = '';
-    
-    // Remove custom controls
-    const customControls = modal.querySelector('.custom-video-controls');
-    if (customControls) {
-        customControls.remove();
-    }
     
     currentVideoId = null;
 }
