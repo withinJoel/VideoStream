@@ -98,7 +98,8 @@ document.addEventListener('DOMContentLoaded', async function() {
         { name: 'playlist-modal', container: 'playlist-modal-container' },
         { name: 'profile-modal', container: 'profile-modal-container' },
         { name: 'share-modal', container: 'share-modal-container' },
-        { name: 'advanced-search-modal', container: 'advanced-search-modal-container' }
+        { name: 'advanced-search-modal', container: 'advanced-search-modal-container' },
+        { name: 'bolt-image', container: 'bolt-image-container' }
     ];
 
     console.log('Loading essential components...');
