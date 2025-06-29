@@ -57,17 +57,11 @@ async function openVideoModal(video) {
     document.getElementById('videoModal').classList.add('active');
     document.body.style.overflow = 'hidden';
     
-    // Add to watch history
-    addToWatchHistory(video.id);
-    
     // Load related videos
     loadRelatedVideos(video);
     
     // Load comments
     loadComments(video.id);
-    
-    // Setup video analytics
-    setupVideoAnalytics(video);
 }
 
 function setupVideoPlayer(videoElement, video) {
@@ -100,6 +94,9 @@ function setupVideoPlayer(videoElement, video) {
     
     // Setup video events
     setupVideoEvents(videoElement, video);
+    
+    // Force the video element to reload the new source
+    videoElement.load();
 }
 
 function setupCustomVideoControls(videoElement, video) {
@@ -471,34 +468,11 @@ function formatTime(seconds) {
     }
 }
 
-function setupVideoEvents(videoElement, video) {
-    let watchTime = 0;
-    let totalWatchTime = 0;
-    
-    // Track watch time
-    videoElement.addEventListener('timeupdate', () => {
-        watchTime = videoElement.currentTime;
-        totalWatchTime += 0.25; // Approximate time increment
-        
-        // Save progress every 10 seconds
-        if (Math.floor(watchTime) % 10 === 0) {
-            saveWatchProgress(video.id, watchTime, videoElement.duration);
-        }
-    });
-    
+function setupVideoEvents(videoElement, video) {    
     // Track video completion
     videoElement.addEventListener('ended', () => {
         markVideoAsWatched(video.id);
         autoplayNextVideo();
-    });
-    
-    // Track video interactions
-    videoElement.addEventListener('play', () => {
-        trackVideoEvent('play', video.id);
-    });
-    
-    videoElement.addEventListener('pause', () => {
-        trackVideoEvent('pause', video.id);
     });
     
     // Keyboard shortcuts
@@ -594,54 +568,6 @@ function toggleTheaterMode() {
     }
 }
 
-function setupVideoAnalytics(video) {
-    // Track video view
-    fetch(`/api/analytics/view/${video.id}`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-            userId: isAuthenticated ? currentUser.id : null,
-            timestamp: Date.now(),
-            referrer: document.referrer,
-            userAgent: navigator.userAgent
-        })
-    }).catch(console.error);
-}
-
-function trackVideoEvent(event, videoId) {
-    fetch(`/api/analytics/event`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-            event,
-            videoId,
-            userId: isAuthenticated ? currentUser.id : null,
-            timestamp: Date.now()
-        })
-    }).catch(console.error);
-}
-
-function saveWatchProgress(videoId, currentTime, duration) {
-    if (isAuthenticated) {
-        fetch(`/api/watch-progress/${videoId}`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                userId: currentUser.id,
-                currentTime,
-                duration,
-                percentage: (currentTime / duration) * 100
-            })
-        }).catch(console.error);
-    }
-}
-
 function markVideoAsWatched(videoId) {
     if (isAuthenticated) {
         fetch(`/api/watched/${videoId}`, {
@@ -680,7 +606,7 @@ function closeVideoModal() {
     // Pause and reset video
     video.pause();
     video.currentTime = 0;
-    video.src = '';
+    // Do not set video.src = ''
     
     // Remove custom controls
     const customControls = modal.querySelector('.custom-video-controls');
@@ -962,10 +888,6 @@ function createVideoCard(video) {
     
     const thumbnailUrl = video.thumbnailExists ? video.thumbnailUrl : '/api/placeholder/400/225';
     
-    // Calculate watch progress
-    const watchProgress = video.watchProgress || 0;
-    const progressBar = watchProgress > 0 ? `<div class="watch-progress" style="width: ${watchProgress}%"></div>` : '';
-    
     card.innerHTML = `
         <div class="video-thumbnail">
             <img src="${thumbnailUrl}" alt="${video.title}" loading="lazy">
@@ -985,7 +907,6 @@ function createVideoCard(video) {
             </div>
             ${video.isNew ? '<div class="video-new-badge">NEW</div>' : ''}
             ${video.isWatched ? '<div class="video-watched-badge"><i class="fas fa-check"></i></div>' : ''}
-            ${progressBar ? `<div class="video-progress-bar">${progressBar}</div>` : ''}
         </div>
         <div class="video-info">
             <h3 class="video-title">${video.title}</h3>
