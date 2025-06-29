@@ -1,7 +1,7 @@
 {
-  "name": "LovePorn",
+  "name": "VideoStream",
   "version": "2.0.0",
-  "description": "LovePorn",
+  "description": "VideoStream",
   "type": "module",
   "main": "App.js",
   "scripts": {
@@ -21,7 +21,7 @@
   "devDependencies": {
     "nodemon": "^3.0.1"
   },
-  "keywords": [ "porn", "sex", "premium"
+  "keywords": [ "lifestyle", "videos", "video"
   ],
   "author": "Joel Jolly",
   "license": "MIT"
