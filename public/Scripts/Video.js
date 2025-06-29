@@ -1,3 +1,4 @@
+// Video.js - Fixed duration handling
 async function openVideoModal(video) {
     currentVideoId = video.id;
     
@@ -16,7 +17,25 @@ async function openVideoModal(video) {
     
     document.getElementById('modalVideoViews').textContent = formatNumber(video.views);
     document.getElementById('modalVideoRating').textContent = video.rating.toFixed(1);
-    document.getElementById('modalVideoDuration').textContent = video.duration || 'Unknown';
+    
+    // Fix duration display - handle missing or invalid duration
+    const durationElement = document.getElementById('modalVideoDuration');
+    if (video.duration && video.duration !== 'Unknown' && video.duration !== '0:00') {
+        durationElement.textContent = video.duration;
+    } else {
+        durationElement.textContent = 'Loading...';
+        // Try to get duration from video metadata when it loads
+        const videoElement = document.getElementById('modalVideo');
+        videoElement.addEventListener('loadedmetadata', () => {
+            if (videoElement.duration && !isNaN(videoElement.duration)) {
+                const formattedDuration = formatTime(videoElement.duration);
+                durationElement.textContent = formattedDuration;
+                // Update the video object for future reference
+                video.duration = formattedDuration;
+            }
+        }, { once: true });
+    }
+    
     document.getElementById('modalVideoQuality').textContent = video.quality || 'HD';
     
     // Update video source
@@ -25,7 +44,7 @@ async function openVideoModal(video) {
     
     // Update categories
     const categoriesContainer = document.getElementById('modalVideoCategories');
-    categoriesContainer.innerHTML = video.categories.map(cat => 
+    categoriesContainer.innerHTML = (video.categories || []).map(cat => 
         `<span class="category-tag" onclick="handleCategoryClick(event, '${cat}')">${cat}</span>`
     ).join('');
     
@@ -327,7 +346,11 @@ function setupControlEvents(controlsContainer, videoElement) {
     
     function updateTimeDisplay() {
         currentTimeDisplay.textContent = formatTime(videoElement.currentTime);
-        totalTimeDisplay.textContent = formatTime(videoElement.duration);
+        if (videoElement.duration && !isNaN(videoElement.duration)) {
+            totalTimeDisplay.textContent = formatTime(videoElement.duration);
+        } else {
+            totalTimeDisplay.textContent = '0:00';
+        }
     }
     
     // Speed control
@@ -458,7 +481,7 @@ function setupControlsAutoHide(videoContainer, controlsContainer) {
 }
 
 function formatTime(seconds) {
-    if (isNaN(seconds)) return '0:00';
+    if (isNaN(seconds) || seconds === null || seconds === undefined) return '0:00';
     
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
@@ -897,6 +920,12 @@ function createVideoCard(video) {
     
     const thumbnailUrl = video.thumbnailExists ? video.thumbnailUrl : '/api/placeholder/400/225';
     
+    // Handle duration display - show only if valid duration exists
+    let durationHtml = '';
+    if (video.duration && video.duration !== 'Unknown' && video.duration !== '0:00' && video.duration !== 'Loading...') {
+        durationHtml = `<div class="video-duration">${video.duration}</div>`;
+    }
+    
     card.innerHTML = `
         <div class="video-thumbnail">
             <img src="${thumbnailUrl}" alt="${video.title}" loading="lazy">
@@ -908,7 +937,7 @@ function createVideoCard(video) {
             <button class="video-favorite-btn ${video.isFavorite ? 'active' : ''}" onclick="toggleFavorite(event, '${video.id}')">
                 <i class="fas fa-heart"></i>
             </button>
-            ${video.duration ? `<div class="video-duration">${video.duration}</div>` : ''}
+            ${durationHtml}
             ${video.quality ? `<div class="video-quality">${video.quality}</div>` : ''}
             <div class="video-rating">
                 <i class="fas fa-star"></i>
@@ -933,7 +962,7 @@ function createVideoCard(video) {
                     <i class="fas fa-star"></i>
                     ${video.rating.toFixed(1)}
                 </span>
-                ${video.duration ? `
+                ${durationHtml ? `
                 <span class="video-stat">
                     <i class="fas fa-clock"></i>
                     ${video.duration}
@@ -947,7 +976,7 @@ function createVideoCard(video) {
                 ` : ''}
             </div>
             <div class="video-categories">
-                ${video.categories.map(cat => 
+                ${(video.categories || []).map(cat => 
                     `<span class="category-tag" onclick="handleCategoryClick(event, '${cat}')">${cat}</span>`
                 ).join('')}
             </div>
@@ -999,10 +1028,16 @@ function displayRelatedVideos(videos) {
         
         const thumbnailUrl = video.thumbnailExists ? video.thumbnailUrl : '/api/placeholder/200/113';
         
+        // Handle duration display for related videos
+        let durationHtml = '';
+        if (video.duration && video.duration !== 'Unknown' && video.duration !== '0:00' && video.duration !== 'Loading...') {
+            durationHtml = `<div class="video-duration">${video.duration}</div>`;
+        }
+        
         videoCard.innerHTML = `
             <div class="related-video-thumbnail">
                 <img src="${thumbnailUrl}" alt="${video.title}" loading="lazy">
-                ${video.duration ? `<div class="video-duration">${video.duration}</div>` : ''}
+                ${durationHtml}
                 <div class="video-rating-small">
                     <i class="fas fa-star"></i>
                     ${video.rating.toFixed(1)}
