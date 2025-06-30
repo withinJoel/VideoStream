@@ -34,7 +34,7 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function initializeApp() {
-    console.log('Initializing CelebStream application...');
+    console.log('Initializing VideoStream application...');
     
     // Setup event listeners after components are loaded
     setupEventListeners();
@@ -52,7 +52,7 @@ function initializeApp() {
         }
     }, 100);
     
-    console.log('CelebStream application initialized successfully');
+    console.log('VideoStream application initialized successfully');
 }
 
 function loadInitialData() {

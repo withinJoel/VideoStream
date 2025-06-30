@@ -1,7 +1,7 @@
 {
-  "name": "CelebStream",
+  "name": "VideoStream",
   "version": "2.0.0",
-  "description": "CelebStream",
+  "description": "VideoStream",
   "type": "module",
   "main": "App.js",
   "scripts": {
@@ -21,7 +21,7 @@
   "devDependencies": {
     "nodemon": "^3.0.1"
   },
-  "keywords": [ "lifestyle", "videos", "video", "streaming", "celebrity", "entertainment" ],
+  "keywords": [ "lifestyle", "videos", "video", "streaming", "entertainment" ],
   "author": "Joel Jolly",
   "license": "MIT"
 }
