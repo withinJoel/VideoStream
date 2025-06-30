@@ -1,5 +1,8 @@
 # VideoStream
 
+##About
+* A video streaming application.
+
 ## Features
 * AI based suggestions based on user's taste.
 * Supports Login and Registration.
